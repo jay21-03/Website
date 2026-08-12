@@ -4,3 +4,4 @@ target/
 .env
 server/data/users.json
 npm-debug.log*
+.vscode/

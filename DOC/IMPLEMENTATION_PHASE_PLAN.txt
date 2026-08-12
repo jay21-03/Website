@@ -1,0 +1,941 @@
+Có. Với `04_IMPLEMENTATION_SPEC` hiện tại, tôi khuyên triển khai theo **7 phase**, theo dependency thực tế chứ không code theo thứ tự các section trong tài liệu.
+
+## Tổng thể
+
+```text
+PHASE 0
+Foundation
+    ↓
+PHASE 1
+Identity/Security + Catalog
+    ↓
+PHASE 2
+Cart + Inventory
+    ↓
+PHASE 3
+Order + Payment Core + Checkout Preparation
+    ↓
+PHASE 4
+payOS + Checkout Finalization + Payment Lifecycle
+    ↓
+PHASE 5
+Notification + Reporting + Full Frontend
+    ↓
+PHASE 6
+Integration Test + Hardening + Deploy
+```
+
+Đây phù hợp với module structure đã freeze trong 04 gồm `identity`, `catalog`, `cart`, `inventory`, `order`, `payment`, `notification`, `reporting`, `commerce`. 
+
+---
+
+# PHASE 0 — Foundation
+
+### Mục tiêu
+
+Dựng bộ khung để cả team bắt đầu code mà không đạp lên nhau.
+
+### Backend
+
+Làm trước:
+
+```text
+Spring Boot project
+Maven
+PostgreSQL connection
+Flyway
+profiles
+application config
+
+common/
+├─ config
+├─ security skeleton
+├─ exception
+├─ response
+├─ time
+├─ logging
+└─ validation
+```
+
+Đặc biệt:
+
+```text
+ApiResponse
+ApiError
+GlobalExceptionHandler
+BusinessClock
+CorrelationIdFilter
+Flyway baseline
+```
+
+### Frontend
+
+Dựng:
+
+```text
+Next.js 16
+App Router
+TypeScript
+
+src/
+├─ app
+├─ auth
+├─ components
+├─ config
+├─ domain
+├─ hooks
+├─ lib
+├─ pages/features
+├─ providers
+├─ services
+├─ types
+└─ utils
+```
+
+Cùng với:
+
+```text
+TanStack Query
+fetch wrapper
+Zod
+i18n foundation
+```
+
+### Test foundation
+
+```text
+JUnit
+Mockito
+Testcontainers PostgreSQL
+React Testing Library
+Playwright
+```
+
+04 yêu cầu repository/integration test dùng Testcontainers và các CG phải được integration-test sau này. 
+
+### Exit Criteria
+
+```text
+Backend start được
+PostgreSQL connect được
+Flyway chạy được
+Frontend start được
+Frontend gọi Backend được
+Testcontainers chạy được
+Global error response hoạt động
+BusinessClock hoạt động
+```
+
+**Chưa làm business feature ở Phase 0.**
+
+---
+
+# PHASE 1 — Identity/Security + Catalog
+
+Hai nhánh này có thể làm **song song** vì ít phụ thuộc nhau.
+
+## 1A. Identity + Security
+
+Implement:
+
+```text
+User
+UserRole
+UserStatus
+
+Google Login
+GoogleIdentityVerifier
+ADMIN_EMAILS
+Admin bootstrap
+Promote/Demote
+Block/Unblock
+Last Active Admin protection
+
+JWT
+BT_ACCESS
+CSRF
+CORS
+/me
+logout
+```
+
+Flow Google Login đã được chốt tới mức implementation:
+
+```text
+Google verification
+→ ACTIVE User
+→ Authentication
+→ CsrfAuthenticationStrategy
+→ invalidate old CSRF
+→ JWT
+→ BT_ACCESS
+→ fresh CSRF
+```
+
+
+
+## 1B. Catalog
+
+Implement:
+
+```text
+Collection
+Product
+Discount
+PricingService
+Product Image
+S3
+```
+
+Các API:
+
+```text
+Public Product
+Public Collection
+
+Admin Product
+Admin Collection
+Admin Discount
+Admin Product Images
+```
+
+Pricing phải làm ở phase này vì Cart và Checkout sau này phụ thuộc `PricingService`.
+
+### Frontend Phase 1
+
+Làm:
+
+```text
+Google Login
+logout
+/me
+auth guard
+
+Home
+Product List
+Product Detail
+Collection
+Admin Product
+Admin Collection
+Admin Discount
+Admin Images
+```
+
+### Exit Criteria
+
+```text
+USER Google Login được
+ADMIN Google Login được
+BLOCKED login bị reject
+CSRF rotation test pass
+logout test pass
+last-admin concurrency test pass
+
+Product CRUD pass
+Collection CRUD pass
+Discount calculation pass
+S3 upload/delete pass
+max 10 images pass
+thumbnail constraint pass
+```
+
+Security tests của 04 đã yêu cầu đầy đủ Google-login CSRF, stale-token, blocked user và logout. 
+
+---
+
+# PHASE 2 — Cart + Inventory
+
+Bắt đầu khi:
+
+```text
+Product
++
+Pricing
+```
+
+đã đủ ổn định.
+
+## Cart
+
+Implement:
+
+```text
+Cart
+CartItem
+
+GET cart
+POST item
+PATCH quantity
+DELETE item
+
+CartCheckoutPort
+```
+
+Cart chỉ lưu:
+
+```text
+product
+quantity
+```
+
+Không reserve Inventory khi add Cart.
+
+## Inventory
+
+Implement:
+
+```text
+Inventory
+InventoryTransaction
+
+IMPORT
+ADJUSTMENT
+RESERVE
+RELEASE
+SALE
+CANCEL_ORDER
+```
+
+Quan trọng nhất:
+
+```text
+PESSIMISTIC_WRITE
+sorted Product ID
+business_key uniqueness
+```
+
+và:
+
+```text
+available =
+quantity - reservedQuantity
+```
+
+### Admin Inventory
+
+```text
+Inventory list/search/page
+Inventory history
+IMPORT / ADJUSTMENT
+```
+
+### Frontend Phase 2
+
+```text
+Cart page
+Add to Cart
+Update quantity
+Remove item
+
+availability display
+
+Admin Inventory
+Inventory History
+Adjustment UI
+```
+
+### Exit Criteria
+
+```text
+Cart CRUD pass
+Cart repricing đúng
+
+IMPORT pass
+ADJUSTMENT pass
+RESERVE pass
+RELEASE pass
+SALE pass
+CANCEL_ORDER pass
+
+no negative Inventory
+no oversell
+concurrent last-product checkout test pass
+businessKey prevents duplicate effect
+```
+
+Inventory correctness và concurrency là dependency trực tiếp cho CG-001, CG-002, CG-003 và CG-004. 
+
+---
+
+# PHASE 3 — Order + Payment Core + Checkout Preparation
+
+Đây là lúc bắt đầu Commerce flow.
+
+## Order Core
+
+Implement:
+
+```text
+Order
+OrderItem
+
+NEW
+CONFIRMED
+COMPLETED
+CANCELLED
+```
+
+OrderItem snapshot:
+
+```text
+productId
+productNameVi
+productNameEn
+basePrice
+sellingPrice
+quantity
+totalPrice
+```
+
+Implement:
+
+```text
+My Orders
+Admin Orders
+Order Detail
+Admin status transition
+```
+
+Nhưng chưa cần hoàn chỉnh cancellation flow cho tới Phase 4.
+
+---
+
+## Payment Core
+
+Chỉ làm phần **domain/persistence**, chưa làm payOS đầy đủ:
+
+```text
+Payment
+
+PENDING
+PAID
+FAILED
+CANCELLED
+EXPIRED
+REFUNDED
+```
+
+và:
+
+```text
+PaymentRepository
+PaymentCommandService
+PaymentQueryService
+```
+
+---
+
+## CheckoutOperation
+
+Implement:
+
+```text
+CheckoutOperation
+CheckoutOperationItem
+
+Idempotency-Key
+requestHash
+workflow states
+```
+
+---
+
+## CG-001
+
+Sau đó implement:
+
+```text
+Checkout
+↓
+Validate Cart
+↓
+Product/Pricing
+↓
+Inventory validation
+↓
+Order
+↓
+OrderItems
+↓
+Inventory RESERVE
+↓
+Payment PENDING
+```
+
+**Một PostgreSQL transaction.**
+
+04 map chính xác `CG-001` vào `CheckoutLocalPreparationService` với Order/Inventory/Payment. 
+
+### Frontend Phase 3
+
+```text
+Checkout form
+receiver information
+
+My Orders
+Order Detail
+
+Admin Order List
+Admin Order Detail
+```
+
+Payment UI lúc này có thể dùng mock response.
+
+### Exit Criteria
+
+```text
+Order snapshot đúng
+subtotal = totalAmount
+Order transition test pass
+
+Checkout validation pass
+Inventory RESERVE once
+Order NEW created once
+Payment PENDING created once
+
+same Idempotency-Key
+→ không tạo second Order
+→ không tạo second Payment
+
+CG-001 integration test PASS
+```
+
+---
+
+# PHASE 4 — payOS + Full Payment / Checkout Lifecycle
+
+Đây là phase khó nhất.
+
+Chỉ bắt đầu khi:
+
+```text
+Cart ✅
+Inventory ✅
+Order ✅
+Payment Core ✅
+CheckoutOperation ✅
+CG-001 ✅
+```
+
+---
+
+## Bước 4.1 — payOS create
+
+Implement:
+
+```text
+PayOSClient
+PayOSRestClient
+signature
+create payment request
+provider correlation
+```
+
+Flow:
+
+```text
+CG-001
+↓
+payOS create
+```
+
+### Create fail
+
+Implement:
+
+```text
+CG-005
+
+Payment FAILED
+Order CANCELLED
+Inventory RELEASE
+Cart retained
+PAYMENT_FAILED
+```
+
+04 yêu cầu `CG-005` không clear Cart và không tạo `NEW_ORDER`. 
+
+---
+
+## Bước 4.2 — CG-007
+
+Khi payOS create thành công:
+
+```text
+provider correlation persisted
+↓
+Cart snapshot clear
+↓
+NEW_ORDER
+↓
+CheckoutOperation COMPLETED
+↓
+CheckoutResponse
+```
+
+Quan trọng:
+
+```text
+không return checkout success
+trước khi CG-007 commit
+```
+
+Đây là invariant đã freeze. 
+
+---
+
+## Bước 4.3 — Webhook / CG-002
+
+Implement:
+
+```text
+payOS webhook
+signature verify
+correlation
+amount
+Payment lock
+expiresAt arbitration
+Inventory SALE
+Payment PAID
+Order remains NEW
+PAYMENT_SUCCESS
+```
+
+---
+
+## Bước 4.4 — CG-003
+
+Implement:
+
+```text
+FAILED
+CANCELLED
+EXPIRED
+↓
+Order CANCELLED
+Inventory RELEASE
+PAYMENT_FAILED
+```
+
+---
+
+## Bước 4.5 — Expiration
+
+Implement:
+
+```text
+PaymentExpirationJob
+```
+
+với:
+
+```text
+createdAt + 15 min
+```
+
+và `expiresAt` là authority, scheduler chỉ phát hiện.
+
+Payment tests đã yêu cầu riêng webhook-vs-expiration, delayed scheduler, late success và các trạng thái không hợp lệ. 
+
+---
+
+## Bước 4.6 — Admin Cancellation
+
+### PENDING
+
+```text
+Order CANCELLED
+Payment CANCELLED
+Inventory RELEASE
+COMMIT
+↓
+payOS cancel AFTER COMMIT
+```
+
+### PAID
+
+```text
+Order CANCELLED
+Inventory physical restore
+Payment remains PAID
+```
+
+Provider cancellation failure không rollback local cancellation. 
+
+---
+
+## Bước 4.7 — Manual Refund / CG-006
+
+```text
+Order CANCELLED
++
+Payment PAID
++
+Admin đã refund ngoài hệ thống
+↓
+Payment REFUNDED
+```
+
+Không mutate Inventory.
+
+### Frontend Phase 4
+
+Hoàn chỉnh:
+
+```text
+Checkout → payOS
+QR / checkoutUrl
+
+Payment waiting
+Payment success/failure
+Order status
+
+Admin cancellation
+Manual refund recording
+```
+
+### Exit Criteria Phase 4
+
+Đây là checkpoint quan trọng:
+
+```text
+CG-001 PASS
+CG-002 PASS
+CG-003 PASS
+CG-004 PASS
+CG-005 PASS
+CG-006 PASS
+CG-007 PASS
+
+payOS create PASS
+webhook PASS
+duplicate webhook PASS
+expiration PASS
+late success PASS
+admin cancel PASS
+manual refund PASS
+CG-007 recovery PASS
+```
+
+04 yêu cầu integration tests cho đầy đủ `CG-001..CG-007`. 
+
+---
+
+# PHASE 5 — Notification + Reporting + Complete Frontend
+
+Lúc này core commerce đã hoạt động.
+
+## Notification
+
+Implement:
+
+```text
+Notification
+NotificationRecipient
+
+NEW_ORDER
+PAYMENT_SUCCESS
+PAYMENT_FAILED
+LOW_STOCK
+OUT_OF_STOCK
+
+read/unread per ADMIN
+dedupKey
+SSE
+```
+
+Notification phải persist trước realtime delivery; SSE failure không rollback business transaction.
+
+## Reporting
+
+Implement:
+
+```text
+Dashboard
+
+Revenue
+Best Selling
+New Orders
+```
+
+Business rules:
+
+```text
+Revenue
+→ COMPLETED + PAID
+
+Best Selling
+→ COMPLETED + PAID
+
+New Orders
+→ NEW + PAID
+```
+
+Các rule này đã nằm trong implementation invariants. 
+
+## Frontend hoàn thiện
+
+```text
+Admin Dashboard
+Revenue
+Best Selling
+
+Notification Bell
+Unread count
+SSE
+
+i18n
+responsive
+loading
+empty
+error states
+```
+
+### Exit Criteria
+
+```text
+multi-admin notification pass
+dedup pass
+SSE failure-safe pass
+
+Revenue query pass
+Best Selling query pass
+New Orders query pass
+
+USER end-to-end flow pass
+ADMIN end-to-end flow pass
+```
+
+---
+
+# PHASE 6 — Integration, Hardening, Deployment
+
+Không thêm feature mới nữa.
+
+Tập trung:
+
+```text
+Integration Tests
+Concurrency Tests
+Security Tests
+ArchUnit
+OpenAPI
+Performance
+Observability
+Deployment
+```
+
+### Backend
+
+```text
+all Flyway migrations clean
+all indexes
+all constraints
+structured logging
+correlationId
+production profile
+secret validation
+AWS logging
+```
+
+### Frontend
+
+```text
+Playwright E2E
+
+login
+catalog
+cart
+checkout
+payment
+orders
+admin
+notifications
+reporting
+```
+
+### Boundary testing
+
+04 yêu cầu ArchUnit bảo vệ module ownership, ví dụ Payment không được direct phụ thuộc infrastructure của Order/Inventory và Commerce không được phụ thuộc module infrastructure. 
+
+### Exit Criteria cuối
+
+```text
+Unit tests PASS
+Repository tests PASS
+Integration tests PASS
+CG-001..007 PASS
+Concurrency tests PASS
+Security tests PASS
+Playwright PASS
+ArchUnit PASS
+OpenAPI generated
+Production build PASS
+Deployment smoke test PASS
+```
+
+---
+
+# Thứ tự implement tôi khuyên bạn khóa
+
+```text
+PHASE 0
+Foundation
+│
+├───────────────┐
+↓               ↓
+PHASE 1A        PHASE 1B
+Identity        Catalog
+Security        Product
+                Collection
+                Pricing
+                S3
+      │           │
+      └─────┬─────┘
+            ↓
+PHASE 2
+Cart + Inventory
+            ↓
+PHASE 3
+Order
+Payment Core
+CheckoutOperation
+CG-001
+            ↓
+PHASE 4
+payOS
+CG-005
+CG-007
+CG-002
+CG-003
+Expiration
+CG-004
+CG-006
+            ↓
+PHASE 5
+Notification
+Reporting
+Full Frontend
+            ↓
+PHASE 6
+Test
+Hardening
+Deploy
+```
+
+### Nếu quy về 4 milestone lớn
+
+| Milestone | Phase                  | Kết quả                                                        |
+| --------- | ---------------------- | -------------------------------------------------------------- |
+| **M1**    | Phase 0 + Phase 1      | Foundation + Auth/Security + Catalog                           |
+| **M2**    | Phase 2 + đầu Phase 3  | Cart + Inventory + Order/Payment Core                          |
+| **M3**    | cuối Phase 3 + Phase 4 | Checkout + payOS + toàn bộ CG-001..007                         |
+| **M4**    | Phase 5 + Phase 6      | Notification + Reporting + Frontend hoàn chỉnh + Test + Deploy |
+
+**Critical path thực tế là:**
+
+`Catalog → Inventory/Cart → Order/Payment Core → CG-001 → payOS → CG-007/Webhook → Full E2E`.
+
+Không nên bắt đầu bằng Payment/payOS trước Inventory và Order, vì `CG-001`, `CG-002`, `CG-003`, `CG-004`, `CG-005` đều phụ thuộc trực tiếp vào các module đó. 
+
+Đây có thể dùng trực tiếp làm bộ khung để bước tiếp theo **chia từng Phase thành task nhỏ rồi phân cho 4 thành viên**.

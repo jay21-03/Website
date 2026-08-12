@@ -1,4 +1,4 @@
-CREATE SEQUENCE IF NOT EXISTS bt_global_sequence
+CREATE SEQUENCE IF NOT EXISTS app_global_id_seq
     AS BIGINT
     START WITH 1
     INCREMENT BY 1
