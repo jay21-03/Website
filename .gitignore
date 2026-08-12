@@ -2,6 +2,7 @@ node_modules/
 dist/
 target/
 .env
+.env.local
 server/data/users.json
 npm-debug.log*
 .vscode/

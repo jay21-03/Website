@@ -1,0 +1,10 @@
+target/
+.git/
+.idea/
+.vscode/
+.env
+.env.local
+node_modules/
+review_changes/
+*.zip
+*.log

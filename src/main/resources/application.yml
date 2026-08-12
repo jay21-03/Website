@@ -18,6 +18,16 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 bautruc:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173}
