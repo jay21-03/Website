@@ -16,6 +16,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 @RestControllerAdvice
@@ -78,6 +79,18 @@ public class GlobalExceptionHandler {
         ApiError error = ApiError.of(
                 VALIDATION_FAILED,
                 "Malformed JSON request."
+        );
+        return ResponseEntity.badRequest().body(failure(error));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = ApiError.of(
+                VALIDATION_FAILED,
+                "Validation failed."
         );
         return ResponseEntity.badRequest().body(failure(error));
     }
