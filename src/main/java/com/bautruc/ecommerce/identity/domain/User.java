@@ -114,6 +114,26 @@ public class User {
         return role == UserRole.ADMIN && status == UserStatus.ACTIVE;
     }
 
+    public void promote(Instant updatedAt) {
+        this.role = UserRole.ADMIN;
+        this.updatedAt = requireNonNull(updatedAt, "updatedAt");
+    }
+
+    public void demote(Instant updatedAt) {
+        this.role = UserRole.USER;
+        this.updatedAt = requireNonNull(updatedAt, "updatedAt");
+    }
+
+    public void block(Instant updatedAt) {
+        this.status = UserStatus.BLOCKED;
+        this.updatedAt = requireNonNull(updatedAt, "updatedAt");
+    }
+
+    public void unblock(Instant updatedAt) {
+        this.status = UserStatus.ACTIVE;
+        this.updatedAt = requireNonNull(updatedAt, "updatedAt");
+    }
+
     private static String normalizeEmail(String email) {
         return requireText(email, "email").toLowerCase(Locale.ROOT);
     }

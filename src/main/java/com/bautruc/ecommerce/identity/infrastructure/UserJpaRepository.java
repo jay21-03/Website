@@ -8,10 +8,11 @@ import com.bautruc.ecommerce.identity.domain.UserRole;
 import com.bautruc.ecommerce.identity.domain.UserStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
-public interface UserJpaRepository extends JpaRepository<User, Long> {
+public interface UserJpaRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
     Optional<User> findByGoogleId(String googleId);
 
     Optional<User> findByEmail(String email);
