@@ -1,0 +1,7256 @@
+IMPLEMENTATION SPECIFICATION
+HỆ THỐNG WEBSITE THƯƠNG MẠI ĐIỆN TỬ GỐM BÀU TRÚC
+Document ID: `04_IMPLEMENTATION_SPEC`
+Version: `1.0`
+Status: `DRAFT FOR IMPLEMENTATION`
+Authoritative Requirement Source:
+`02_SRS_SPEC – Version 1.3 – BASELINE / FROZEN`
+Authoritative Architecture Source:
+`03_SYSTEM_ARCHITECTURE – Version 1.0`
+1. DOCUMENT INFORMATION
+1.1. Purpose
+Tài liệu này chuyển các business requirements đã freeze trong `02_SRS_SPEC` và các architecture boundaries đã xác định trong `03_SYSTEM_ARCHITECTURE` thành implementation blueprint cụ thể cho Backend Spring Boot, Frontend Next.js, PostgreSQL, payOS, Amazon S3 và testing.
+Thứ tự authority:
+```text
+02_SRS_SPEC
+Business Requirement Authority
+↓
+03_SYSTEM_ARCHITECTURE
+Architecture Authority
+↓
+04_IMPLEMENTATION_SPEC
+Implementation Decision
+
+```
+Nếu có conflict:
+```text
+SRS wins over Architecture
+Architecture wins over Implementation
+
+```
+`03_SYSTEM_ARCHITECTURE` yêu cầu implementation phải bảo toàn module ownership, state machines, consistency groups, security boundaries, monetary rules và business-time rules.
+2. IMPLEMENTATION PURPOSE
+Developer sau khi đọc tài liệu này phải có thể triển khai:
+```text
+Spring Boot modules
+Java package structure
+Persistence entities
+Database tables
+Constraints
+Indexes
+REST APIs
+DTOs
+Security
+JWT
+Google Login
+ADMIN bootstrap
+Pricing
+Cart
+Inventory
+Order
+Payment
+payOS
+Notification
+Reporting
+S3 images
+Transactions
+Concurrency
+Idempotency
+CG-001..CG-007
+Next.js structure
+Frontend routing
+Frontend auth
+Frontend cache/query
+Frontend validation
+Testing
+
+```
+mà không phải tự đưa ra lại các implementation-critical decisions.
+3. SOURCE DOCUMENTS AND AUTHORITY
+3.1. Frozen Business Rules
+Implementation phải giữ:
+```text
+Actors:
+GUEST
+USER
+ADMIN
+
+Roles:
+USER
+ADMIN
+
+OrderStatus:
+NEW
+CONFIRMED
+COMPLETED
+CANCELLED
+
+PaymentStatus:
+PENDING
+PAID
+FAILED
+CANCELLED
+EXPIRED
+REFUNDED
+
+Payment Gateway:
+payOS only
+
+1 Order
+→ exactly 1 Payment
+
+USER cannot cancel
+
+Payment success:
+Payment = PAID
+Inventory = COMMITTED
+Order = NEW
+
+Business Time:
+Asia/Ho_Chi_Minh
+
+Currency:
+VND
+
+PERCENTAGE monetary result:
+HALF_UP nearest 1 VND
+
+```
+SRS yêu cầu OrderItem lưu historical `productNameVi`, `productNameEn`, price snapshot và không dùng current Product data để overwrite Order history.
+3.2. Architecture Rules
+Implementation phải giữ:
+```text
+Modular Monolith
+
+Shared PostgreSQL
++
+Logical Module Ownership
+
+No foreign repository mutation
+
+Commerce Application Coordination Layer
+owns no authoritative business state
+
+Notification
++
+NotificationRecipient
+
+Static FAQ / Policy / Contact
+→ Next.js owned
+
+No Kafka / RabbitMQ requirement
+
+```
+Architecture xác định `Commerce Application Coordination Layer` chỉ orchestrate module public interfaces, còn mỗi business module vẫn giữ authoritative state riêng.
+4. IMPLEMENTATION PRINCIPLES
+IP-001 – Business Module First
+Không sử dụng global project structure:
+```text
+controller/
+service/
+repository/
+entity/
+
+```
+cho toàn bộ Backend.
+Mỗi business module có internal layers riêng.
+IP-002 – No Foreign Repository Mutation
+Ví dụ bị cấm:
+```text
+PaymentService
+→ InventoryRepository.save(...)
+
+```
+Đúng:
+```text
+Payment Result Orchestrator
+→ InventoryCommandService.commitSale(...)
+
+```
+---
+IP-003 – Controllers Do Not Orchestrate Business Transactions
+Controller chỉ:
+```text
+Parse HTTP request
+Validate structural input
+Resolve authenticated actor
+Call application use case
+Map response
+
+```
+Controller không:
+```text
+directly mutate Entity
+coordinate Inventory + Order + Payment
+perform state transition manually
+
+```
+---
+IP-004 – Backend Authority
+Backend authoritative cho:
+```text
+Authorization
+Product purchasability
+Discount effectiveness
+sellingPrice
+Order total
+Inventory
+Order state
+Payment state
+Refund eligibility
+Business time
+
+```
+---
+IP-005 – External Integration Isolation
+```text
+Google
+payOS
+Amazon S3
+
+```
+chỉ xuất hiện thông qua adapter boundary.
+IP-006 – PostgreSQL Transaction Where Possible
+Các cross-module operation sử dụng cùng PostgreSQL được phép nằm trong cùng local transaction.
+External payOS/S3 call không nằm trong ACID transaction.
+5. TECHNOLOGY STACK
+5.1. Backend Baseline
+Implementation Decision ID-001
+Technology	Selected Baseline
+Java	Java 21
+Spring Boot	3.5.16
+Build	Maven
+Spring MVC	REST API
+Persistence	Spring Data JPA / Hibernate
+Security	Spring Security
+Validation	Jakarta Bean Validation
+Database Migration	Flyway
+Database	PostgreSQL
+API Documentation	Springdoc OpenAPI
+AWS SDK	AWS SDK for Java v2
+Testing	JUnit 5, Mockito, Spring Boot Test, Testcontainers
+Spring Boot 3.5.16 tương thích Java 21 và là release OSS cuối của nhánh 3.5.x; latest stable Spring Boot line tại thời điểm external verification 2026-08-12 là 4.1.0. Việc chọn 3.5.16 là Implementation Decision ưu tiên compatibility/maturity cho project hiện tại, không phải SRS requirement; upgrade path phải được theo dõi trong maintenance planning.	
+---
+5.2. Frontend Baseline
+Technology	Selected Baseline
+Framework	Next.js 16.2.11
+Router	App Router
+Language	TypeScript
+Query/Server State	TanStack Query v5
+Form Validation	Zod
+HTTP	Native `fetch` wrapper
+E2E	Playwright
+Component Test	React Testing Library
+Next.js 16.2.11 được Next.js công bố là Active LTS trong security release tháng 7/2026; App Router tiếp tục là router được tài liệu chính thức hỗ trợ. External version snapshot của tài liệu này được kiểm tra ngày 2026-08-12.	
+---
+6. BACKEND PROJECT STRUCTURE
+```text
+src/main/java/com/bautruc/ecommerce
+│
+├── BautrucEcommerceApplication.java
+│
+├── common
+│   ├── config
+│   │   ├── CorsConfiguration.java
+│   │   ├── JacksonConfiguration.java
+│   │   └── ApplicationProperties.java
+│   │
+│   ├── security
+│   │   ├── SecurityConfig.java
+│   │   ├── JwtAuthenticationFilter.java
+│   │   ├── JwtTokenService.java
+│   │   ├── AuthenticatedUser.java
+│   │   ├── CurrentUserProvider.java
+│   │   └── CsrfController.java
+│   │
+│   ├── exception
+│   │   ├── GlobalExceptionHandler.java
+│   │   ├── BusinessException.java
+│   │   ├── ResourceNotFoundException.java
+│   │   └── ConflictException.java
+│   │
+│   ├── response
+│   │   ├── ApiResponse.java
+│   │   ├── ApiError.java
+│   │   ├── FieldErrorDetail.java
+│   │   └── PageResponse.java
+│   │
+│   ├── time
+│   │   ├── BusinessClock.java
+│   │   └── SystemBusinessClock.java
+│   │
+│   ├── logging
+│   │   ├── CorrelationIdFilter.java
+│   │   └── LogContext.java
+│   │
+│   └── validation
+│
+├── identity
+│   ├── api
+│   │   ├── AuthController.java
+│   │   ├── MeController.java
+│   │   ├── AdminUserController.java
+│   │   ├── request
+│   │   └── response
+│   ├── application
+│   │   ├── GoogleAuthenticationService.java
+│   │   ├── UserQueryService.java
+│   │   ├── UserAdminService.java
+│   │   ├── AdminBootstrapValidator.java
+│   │   └── port
+│   ├── domain
+│   │   ├── User.java
+│   │   ├── UserRole.java
+│   │   └── UserStatus.java
+│   └── infrastructure
+│       ├── UserJpaRepository.java
+│       └── google
+│           └── GoogleIdentityVerifierAdapter.java
+│
+├── catalog
+│   ├── product
+│   │   ├── api
+│   │   ├── application
+│   │   ├── domain
+│   │   └── infrastructure
+│   ├── collection
+│   │   ├── api
+│   │   ├── application
+│   │   ├── domain
+│   │   └── infrastructure
+│   ├── pricing
+│   │   ├── api
+│   │   ├── application
+│   │   ├── domain
+│   │   └── infrastructure
+│   └── image
+│       ├── api
+│       ├── application
+│       ├── domain
+│       └── infrastructure
+│
+├── cart
+│   ├── api
+│   ├── application
+│   ├── domain
+│   └── infrastructure
+│
+├── inventory
+│   ├── api
+│   ├── application
+│   ├── domain
+│   └── infrastructure
+│
+├── order
+│   ├── api
+│   ├── application
+│   ├── domain
+│   └── infrastructure
+│
+├── payment
+│   ├── api
+│   ├── application
+│   │   └── port
+│   │       └── PaymentResultPort.java
+│   ├── domain
+│   └── infrastructure
+│       └── payos
+│
+├── notification
+│   ├── api
+│   ├── application
+│   ├── domain
+│   └── infrastructure
+│
+├── reporting
+│   ├── api
+│   ├── application
+│   └── infrastructure
+│
+└── commerce
+    ├── api
+    │   ├── CheckoutController.java
+    │   ├── AdminOrderWorkflowController.java
+    │   └── AdminManualRefundController.java
+    ├── application
+    │   ├── CheckoutApplicationService.java
+    │   ├── CheckoutLocalPreparationService.java
+    │   ├── CheckoutFinalizationService.java
+    │   ├── PaymentResultApplicationService.java
+    │   ├── OrderCancellationApplicationService.java
+    │   ├── ManualRefundApplicationService.java
+    │   └── CheckoutRecoveryService.java
+    ├── domain
+    │   ├── CheckoutOperation.java
+    │   ├── CheckoutOperationItem.java
+    │   └── CheckoutOperationState.java
+    └── infrastructure
+        ├── CheckoutOperationJpaRepository.java
+        └── CheckoutOperationItemJpaRepository.java
+
+```
+---
+7. BACKEND PACKAGE / MODULE DIAGRAM
+```mermaid
+flowchart TB
+    Common[common]
+
+    Identity[identity]
+    Catalog[catalog]
+    Cart[cart]
+    Inventory[inventory]
+    Order[order]
+    Payment[payment]
+    Notification[notification]
+    Reporting[reporting]
+    Commerce[commerce]
+
+    Common --> Identity
+    Common --> Catalog
+    Common --> Cart
+    Common --> Inventory
+    Common --> Order
+    Common --> Payment
+    Common --> Notification
+    Common --> Reporting
+    Common --> Commerce
+
+    Commerce --> Identity
+    Commerce --> Catalog
+    Commerce --> Cart
+    Commerce --> Inventory
+    Commerce --> Order
+    Commerce --> Payment
+    Commerce --> Notification
+
+    Cart --> Catalog
+    Cart --> Inventory
+
+    Reporting --> Catalog
+    Reporting --> Inventory
+    Reporting --> Order
+    Reporting --> Payment
+
+    Payment --> PayOS[payOS Adapter]
+    Catalog --> S3[S3 Adapter]
+    Identity --> Google[Google Adapter]
+
+```
+`commerce` chỉ sở hữu technical workflow/idempotency records cần cho orchestration; các record này không phải authoritative business state của User, Product, Cart, Inventory, Order hoặc Payment.
+8. MODULE INTERNAL LAYERING
+Mỗi module áp dụng:
+```text
+api
+├── controller
+├── request
+└── response
+
+application
+├── service
+├── query
+└── port
+
+domain
+├── model
+├── enum
+├── rule
+└── event
+
+infrastructure
+├── persistence
+├── repository
+└── adapter
+
+```
+Không bắt buộc tạo folder rỗng.
+`SecurityConfig.java` owns the Spring Security `SecurityFilterChain`, including the shared `CookieCsrfTokenRepository`, the configured `CsrfAuthenticationStrategy` (or Spring Security equivalent authentication-success CSRF strategy) used explicitly by the custom Google Login success path, CORS, and the built-in logout pipeline for `POST /api/v1/auth/logout`. No `LogoutController` or `LogoutService` is introduced.
+9. EXACT COMPONENT CATALOG
+9.1. Identity
+Component	Type	Responsibility	Dependencies
+`AuthController`	Controller	Google Login HTTP endpoint	GoogleAuthenticationService
+`SecurityConfig`	Security Configuration	Own `SecurityFilterChain`; configure shared `CookieCsrfTokenRepository`, `CsrfAuthenticationStrategy`/equivalent custom-login success CSRF cleanup, CORS and Spring Security logout pipeline	Spring Security, `JwtAuthenticationFilter`
+`CsrfController`	Controller	Explicit `GET /api/v1/auth/csrf` token delivery	Spring Security `CsrfToken`
+`MeController`	Controller	Current User	UserQueryService
+`AdminUserController`	Controller	User administration	UserAdminService
+`GoogleAuthenticationService`	Application Service	Verify Google identity, find/create User, issue JWT	GoogleIdentityVerifier, UserRepository, JwtTokenService
+`UserQueryService`	Query Service	Current User, admin user listing	UserRepository
+`UserAdminService`	Application Service	Promote, demote, block, unblock	UserRepository
+`AdminBootstrapValidator`	Startup Component	Validate initial production ADMIN configuration	UserRepository, ADMIN_EMAILS
+`GoogleIdentityVerifier`	Port	Verify Google credential	—
+`GoogleIdentityVerifierAdapter`	External Adapter	Google verification	Google library
+`JwtTokenService`	Security Service	Create/verify JWT	JWT secret
+`JwtAuthenticationFilter`	Filter	Authenticate protected request	JwtTokenService, UserRepository
+`UserJpaRepository`	Repository	User persistence	PostgreSQL
+---
+9.2. Catalog Product
+Component	Type	Responsibility	Dependencies
+`PublicProductController`	Controller	Public list/detail	ProductQueryService
+`AdminProductController`	Controller	Product administration	ProductCommandService
+`ProductQueryService`	Query Service	Public/admin product query	ProductRepository, PricingService, InventoryQueryService
+`ProductCommandService`	Application Service	Create/update/status/soft delete	ProductRepository, CollectionQueryService
+`ProductSearchRepository`	Custom Repository	Search/filter/effective-price sorting	PostgreSQL
+`ProductJpaRepository`	Repository	Product persistence	PostgreSQL
+---
+9.3. Collection
+Component	Type	Responsibility	Dependencies
+`PublicCollectionController`	Controller	Public Collection list/detail	CollectionQueryService
+`AdminCollectionController`	Controller	Collection management	CollectionCommandService
+`CollectionQueryService`	Query Service	Public/admin queries	CollectionRepository
+`CollectionCommandService`	Application Service	Create/update/status/delete	CollectionRepository, ProductQueryService
+`CollectionJpaRepository`	Repository	Persistence	PostgreSQL
+---
+9.4. Pricing / Discount
+Component	Type	Responsibility	Dependencies
+`AdminDiscountController`	Controller	Configure/update/remove Discount	DiscountCommandService
+`PricingService`	Domain/Application Service	Calculate authoritative sellingPrice	DiscountRepository, BusinessClock
+`DiscountCommandService`	Application Service	Discount validation and persistence	DiscountRepository, ProductQueryService
+`DiscountJpaRepository`	Repository	Discount persistence	PostgreSQL
+---
+9.5. Product Image
+Component	Type	Responsibility	Dependencies
+`AdminProductImageController`	Controller	Upload/delete/reorder/thumbnail	ProductImageService
+`ProductImageService`	Application Service	Business image rules	ProductImageRepository, ObjectStoragePort
+`ImageSignatureValidator`	Validator	JPEG/PNG/WebP magic-byte validation	—
+`ObjectStoragePort`	Port	Object operations	—
+`S3ObjectStorageAdapter`	Adapter	S3 upload/delete/URL resolution	AWS SDK
+`ProductImageJpaRepository`	Repository	Metadata	PostgreSQL
+---
+9.6. Cart
+Component	Type	Responsibility	Dependencies
+`CartController`	Controller	Cart CRUD	CartApplicationService
+`CartApplicationService`	Application Service	Add/update/remove/view	CartRepository, Catalog Query, Inventory Query
+`CartCheckoutPort`	Module Interface	Provide cart snapshot / clear checked items	CartRepository
+`CartJpaRepository`	Repository	Cart persistence	PostgreSQL
+`CartItemJpaRepository`	Repository	CartItem persistence	PostgreSQL
+---
+9.7. Inventory
+Component	Type	Responsibility	Dependencies
+`AdminInventoryController`	Controller	Inventory admin functions	InventoryAdminService
+`InventoryQueryService`	Query Service	Availability/list/history	Repositories
+`InventoryCommandService`	Command Service	Reserve/release/sale/restore	InventoryRepository
+`InventoryAdminService`	Application Service	Adjustment	InventoryCommandService
+`InventoryJpaRepository`	Repository	Inventory + locks	PostgreSQL
+`InventoryTransactionJpaRepository`	Repository	Audit	PostgreSQL
+---
+9.8. Order
+Component	Type	Responsibility	Dependencies
+`MyOrderController`	Controller	USER Order queries	OrderQueryService
+`AdminOrderController`	Controller	Admin Order query	OrderQueryService
+`OrderCommandService`	Command Service	Create Order/Items and transition	OrderRepository
+`OrderQueryService`	Query Service	USER/Admin Order read	OrderRepository, PaymentQueryPort
+`OrderStateRule`	Domain Rule	Validate state transitions	—
+`OrderCodeGenerator`	Domain Service	Generate display Order code	BusinessClock
+`OrderJpaRepository`	Repository	Order persistence and locks	PostgreSQL
+`OrderItemJpaRepository`	Repository	OrderItem persistence	PostgreSQL
+---
+9.9. Payment
+Component	Type	Responsibility	Dependencies
+`PaymentController`	Controller	Payment query	PaymentQueryService
+`PayOSWebhookController`	Controller	Receive webhook	PayOSWebhookService
+`PaymentCommandService`	Command Service	Create/change Payment	PaymentRepository
+`PaymentQueryService`	Query Service	Payment read	PaymentRepository
+`PayOSWebhookService`	Application Service	Verify provider event and invoke orchestration port	PayOSWebhookVerifier, PaymentResultPort
+`PayOSClient`	Port	payOS create/get/cancel operations	—
+`PayOSRestClient`	Adapter	Current payOS create/get/cancel HTTP contract	Spring RestClient
+`PayOSSignatureService`	Adapter Service	Request/webhook signature	PAYOS_CHECKSUM_KEY
+`PaymentExpirationJob`	Background Job	Detect expired PENDING payments	PaymentRepository, PaymentResultPort
+`PaymentResultPort`	Module Port	Dispatch verified success / terminal payment outcome to Commerce Coordination	—
+`PaymentJpaRepository`	Repository	Payment state and row locks	PostgreSQL
+---
+9.10. Notification
+Component	Type	Responsibility	Dependencies
+`AdminNotificationController`	Controller	List/mark-read/SSE	NotificationService
+`NotificationService`	Application Service	Persistent Notification creation	Repositories, Identity query
+`NotificationDedupService`	Application Service	Dedup key creation	—
+`NotificationJpaRepository`	Repository	Notification	PostgreSQL
+`NotificationRecipientJpaRepository`	Repository	Per-admin state	PostgreSQL
+`SseEmitterRegistry`	Delivery Component	Best-effort realtime	In-memory
+`NotificationAfterCommitListener`	Event Listener	Push SSE after DB commit	SseEmitterRegistry
+---
+9.11. Reporting
+Component	Type	Responsibility	Dependencies
+`AdminDashboardController`	Controller	Dashboard	ReportingQueryService
+`AdminReportController`	Controller	Revenue / best-selling	ReportingQueryService
+`ReportingQueryService`	Query Service	Read-only metrics	ReportingRepository
+`ReportingRepository`	Custom Repository	Aggregation SQL	PostgreSQL
+---
+9.12. Commerce Coordination
+Component	Type	Responsibility	Dependencies
+`CheckoutController`	Controller	USER checkout HTTP entry	CheckoutApplicationService
+`AdminOrderWorkflowController`	Controller	ADMIN order progress/cancel HTTP entry	Order transition/cancellation orchestrators
+`AdminManualRefundController`	Controller	ADMIN manual-refund recording HTTP entry	ManualRefundApplicationService
+`CheckoutApplicationService`	Orchestrator	Top-level checkout	All checkout modules
+`CheckoutLocalPreparationService`	Transactional Orchestrator	CG-001	Cart, Catalog, Inventory, Order, Payment
+`CheckoutFinalizationService`	Transactional Orchestrator	CG-007	Cart, Payment, Notification
+`PaymentResultApplicationService`	Transactional Orchestrator	Implements PaymentResultPort; CG-002/CG-003	Payment, Order, Inventory, Notification
+`OrderCancellationApplicationService`	Transactional Orchestrator	CG-004 / pending cancellation	Order, Payment, Inventory
+`ManualRefundApplicationService`	Transactional Orchestrator	CG-006	Order, Payment
+`CheckoutRecoveryService`	Recovery Service	Resume CG-007 / stale create	CheckoutOperation, payOS
+`CheckoutFinalizationRecoveryJob`	Job	Background CG-007 retry	CheckoutRecoveryService
+---
+10. PERSISTENCE STRATEGY
+10.1. Primary Key
+Implementation Decision ID-002
+Main persistence entities use:
+```text
+Java:
+Long
+
+PostgreSQL:
+BIGINT
+
+Generation:
+PostgreSQL SEQUENCE
+
+```
+One application sequence:
+```text
+app_global_id_seq
+
+```
+JPA:
+```java
+GenerationType.SEQUENCE
+
+```
+Rationale:
+simple;
+efficient indexes;
+available before insert;
+allows Order display code to use generated ID;
+no distributed ID requirement.
+10.2. Cross-module JPA References
+Cross-module relationship được lưu bằng scalar ID.
+Ví dụ:
+```text
+Payment.orderId : Long
+Inventory.productId : Long
+Order.userId : Long
+OrderItem.productId : Long
+
+```
+Không dùng:
+```text
+@ManyToOne
+private Payment payment;
+
+```
+giữa module khác nhau.
+Within-module relation có thể dùng JPA association.
+11. DATABASE ENTITY RELATIONSHIP DIAGRAM
+```mermaid
+erDiagram
+    USERS ||--|| CARTS : owns
+    USERS ||--o{ ORDERS : places
+    USERS ||--o{ NOTIFICATION_RECIPIENTS : receives
+
+    COLLECTIONS ||--o{ PRODUCTS : groups
+    PRODUCTS ||--o| DISCOUNTS : has
+    PRODUCTS ||--o{ PRODUCT_IMAGES : has
+    PRODUCTS ||--|| INVENTORIES : owns
+
+    CARTS ||--o{ CART_ITEMS : contains
+    PRODUCTS ||--o{ CART_ITEMS : referenced_by
+
+    INVENTORIES ||--o{ INVENTORY_TRANSACTIONS : audited_by
+
+    ORDERS ||--o{ ORDER_ITEMS : contains
+    PRODUCTS ||--o{ ORDER_ITEMS : historical_reference
+    ORDERS ||--|| PAYMENTS : paid_by
+
+    NOTIFICATIONS ||--o{ NOTIFICATION_RECIPIENTS : distributed_to
+
+    USERS ||--o{ CHECKOUT_OPERATIONS : starts
+    CHECKOUT_OPERATIONS ||--o{ CHECKOUT_OPERATION_ITEMS : snapshots
+    ORDERS ||--o| CHECKOUT_OPERATIONS : created_by
+    PAYMENTS ||--o| CHECKOUT_OPERATIONS : created_by
+
+```
+---
+12. DATABASE SCHEMA
+12.1. `users`
+Column	PostgreSQL Type	Nullable	Constraint	Description
+`id`	BIGINT	No	PK	User ID
+`google_id`	VARCHAR(128)	No	UNIQUE	Google `sub`
+`email`	VARCHAR(320)	No	UNIQUE	normalized lowercase
+`full_name`	VARCHAR(255)	Yes	—	Google name
+`avatar_url`	VARCHAR(1024)	Yes	—	Google picture
+`role`	VARCHAR(16)	No	CHECK	USER / ADMIN
+`status`	VARCHAR(16)	No	CHECK	ACTIVE / BLOCKED
+`created_at`	TIMESTAMPTZ	No	—	UTC persistence
+`updated_at`	TIMESTAMPTZ	No	—	UTC persistence
+---
+12.2. `collections`
+Column	PostgreSQL Type	Nullable	Constraint	Description
+`id`	BIGINT	No	PK	Collection ID
+`name_vi`	VARCHAR(255)	No	—	Vietnamese
+`name_en`	VARCHAR(255)	No	—	English
+`description_vi`	TEXT	Yes	—	Vietnamese
+`description_en`	TEXT	Yes	—	English
+`status`	VARCHAR(16)	No	CHECK	ACTIVE / INACTIVE
+`created_at`	TIMESTAMPTZ	No	—	Audit
+`updated_at`	TIMESTAMPTZ	No	—	Audit
+`deleted_at`	TIMESTAMPTZ	Yes	—	Soft delete
+---
+12.3. `products`
+Column	PostgreSQL Type	Nullable	Constraint	Description
+`id`	BIGINT	No	PK	Product ID
+`name_vi`	VARCHAR(255)	No	—	Vietnamese
+`name_en`	VARCHAR(255)	No	—	English
+`description_vi`	TEXT	Yes	—	Description
+`description_en`	TEXT	Yes	—	Description
+`base_price`	BIGINT	No	CHECK `> 0`	integer VND
+`status`	VARCHAR(16)	No	CHECK	ACTIVE / INACTIVE
+`collection_id`	BIGINT	No	FK collections	Product Collection
+`created_at`	TIMESTAMPTZ	No	—	Audit
+`updated_at`	TIMESTAMPTZ	No	—	Audit
+`deleted_at`	TIMESTAMPTZ	Yes	—	Soft delete
+SRS định nghĩa Product không có Variant/Size/Color và public Product phải `ACTIVE + deletedAt IS NULL`.				
+---
+12.4. `discounts`
+Implementation Decision: một Product có tối đa một current Discount configuration row.
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`product_id`	BIGINT	No	FK + UNIQUE
+`discount_type`	VARCHAR(20)	No	CHECK
+`discount_value`	NUMERIC(19,4)	No	CHECK `> 0`
+`start_at`	TIMESTAMPTZ	No	—
+`end_at`	TIMESTAMPTZ	No	CHECK `start_at < end_at`
+`is_active`	BOOLEAN	No	—
+`created_at`	TIMESTAMPTZ	No	—
+`updated_at`	TIMESTAMPTZ	No	—
+Type-specific DB/application rules:			
+```text
+PERCENTAGE:
+0 < discount_value < 100
+
+FIXED_PRICE:
+discount_value must have zero fractional part
+discount_value < Product.basePrice
+
+```
+Cross-table `FIXED_PRICE < basePrice` được validate trong application transaction.
+Một row/Product loại bỏ khả năng overlap ambiguity mà không thêm promotion engine.
+12.5. `product_images`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`product_id`	BIGINT	No	FK
+`object_key`	VARCHAR(512)	No	UNIQUE
+`content_type`	VARCHAR(100)	No	CHECK supported
+`file_size_bytes`	BIGINT	No	CHECK `> 0`
+`sort_order`	SMALLINT	No	CHECK `>= 0`
+`is_thumbnail`	BOOLEAN	No	DEFAULT false
+`created_at`	TIMESTAMPTZ	No	—
+Constraints:			
+```text
+UNIQUE(product_id, sort_order)
+
+partial UNIQUE:
+product_id
+WHERE is_thumbnail = true
+
+```
+Maximum 10 images được enforce bằng Product row lock + count trong transaction.
+12.6. `carts`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`user_id`	BIGINT	No	FK users + UNIQUE
+`created_at`	TIMESTAMPTZ	No	—
+`updated_at`	TIMESTAMPTZ	No	—
+---
+12.7. `cart_items`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`cart_id`	BIGINT	No	FK carts
+`product_id`	BIGINT	No	FK products
+`quantity`	INTEGER	No	CHECK `quantity >= 1`
+`version`	BIGINT	No	optimistic technical version
+`created_at`	TIMESTAMPTZ	No	—
+`updated_at`	TIMESTAMPTZ	No	—
+Constraint:			
+```text
+UNIQUE(cart_id, product_id)
+
+```
+`version` hỗ trợ CG-007 chỉ remove CartItem nếu item vẫn đúng snapshot đã checkout.
+12.8. `inventories`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`product_id`	BIGINT	No	FK + UNIQUE
+`quantity`	BIGINT	No	CHECK `>=0`
+`reserved_quantity`	BIGINT	No	CHECK `>=0`
+`low_stock_threshold`	BIGINT	No	CHECK `>=0`
+`updated_at`	TIMESTAMPTZ	No	—
+Check:			
+```text
+quantity >= 0
+AND reserved_quantity >= 0
+AND quantity - reserved_quantity >= 0
+
+```
+---
+12.9. `inventory_transactions`
+Column	PostgreSQL Type	Nullable	Description / Constraint
+`id`	BIGINT	No	PK
+`product_id`	BIGINT	No	Product
+`type`	VARCHAR(24)	No	InventoryTransactionType
+`quantity_delta`	BIGINT	No	physical delta
+`reserved_quantity_delta`	BIGINT	No	reserved delta
+`before_quantity`	BIGINT	No	Audit
+`after_quantity`	BIGINT	No	Audit
+`before_reserved_quantity`	BIGINT	No	Audit
+`after_reserved_quantity`	BIGINT	No	Audit
+`reference_type`	VARCHAR(32)	Yes	ORDER / ADMIN_ACTION
+`reference_id`	BIGINT	Yes	Order or other reference
+`business_key`	VARCHAR(160)	Yes	idempotency identity
+`reason`	VARCHAR(500)	Yes	adjustment/system reason
+`created_by_user_id`	BIGINT	Yes	ADMIN when relevant
+`created_at`	TIMESTAMPTZ	No	Audit
+Partial uniqueness:			
+```text
+business_key UNIQUE WHERE business_key IS NOT NULL
+
+```
+Examples:
+```text
+RESERVE:ORDER:123:PRODUCT:5
+SALE:ORDER:123:PRODUCT:5
+RELEASE:ORDER:123:PRODUCT:5
+CANCEL_ORDER:ORDER:123:PRODUCT:5
+
+```
+---
+12.10. `orders`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`order_code`	VARCHAR(40)	No	UNIQUE
+`user_id`	BIGINT	No	FK users
+`receiver_name`	VARCHAR(255)	No	—
+`phone`	VARCHAR(32)	No	—
+`email`	VARCHAR(320)	No	—
+`address`	VARCHAR(500)	No	—
+`note`	TEXT	Yes	—
+`total_amount`	BIGINT	No	CHECK `>0`
+`status`	VARCHAR(20)	No	CHECK
+`completed_at`	TIMESTAMPTZ	Yes	technical reporting timestamp
+`created_at`	TIMESTAMPTZ	No	—
+`updated_at`	TIMESTAMPTZ	No	—
+Không persist `payment_status` trong `orders`.			
+Payment Status luôn derive từ `payments.status`.			
+`subtotal` là logical Order value bắt buộc theo SRS nhưng không cần cột riêng vì Shipping Fee nằm ngoài scope:			
+```text
+subtotal = SUM(OrderItem.totalPrice) = Order.totalAmount
+```
+API expose `subtotal` như derived value từ authoritative `total_amount`; không tồn tại monetary source of truth thứ hai.
+12.11. `order_items`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`order_id`	BIGINT	No	FK
+`product_id`	BIGINT	No	historical reference
+`product_name_vi`	VARCHAR(255)	No	snapshot
+`product_name_en`	VARCHAR(255)	No	snapshot
+`base_price`	BIGINT	No	integer VND
+`selling_price`	BIGINT	No	integer VND
+`quantity`	INTEGER	No	CHECK `>=1`
+`total_price`	BIGINT	No	CHECK `>0`
+Constraint:			
+```text
+UNIQUE(order_id, product_id)
+
+```
+Application invariant:
+```text
+total_price =
+selling_price * quantity
+
+```
+---
+12.12. `payments`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`order_id`	BIGINT	No	FK + UNIQUE
+`provider`	VARCHAR(16)	No	PAYOS only
+`status`	VARCHAR(20)	No	PaymentStatus
+`amount`	BIGINT	No	CHECK `>0`
+`provider_payment_link_id`	VARCHAR(128)	Yes	UNIQUE
+`external_transaction_identifier`	VARCHAR(128)	Yes	UNIQUE
+`checkout_url`	VARCHAR(2048)	Yes	payOS UI info
+`qr_code`	TEXT	Yes	payOS QR payload
+`created_at`	TIMESTAMPTZ	No	authoritative creation
+`expires_at`	TIMESTAMPTZ	No	createdAt + 15 min
+`paid_at`	TIMESTAMPTZ	Yes	payment success
+`refunded_at`	TIMESTAMPTZ	Yes	manual refund recording
+`refunded_by_user_id`	BIGINT	Yes	ADMIN audit
+`manual_refund_note`	VARCHAR(500)	Yes	audit
+`manual_resolution_required`	BOOLEAN	No	late-event technical flag
+`manual_resolution_note`	TEXT	Yes	technical audit including late/unverifiable payment-time review
+`updated_at`	TIMESTAMPTZ	No	—
+`provider_payment_link_id` là payOS payment-link correlation.			
+`external_transaction_identifier` lưu verified provider transaction reference khi available.			
+Các field bổ sung không tạo Payment Attempt mới.			
+---
+12.13. `notifications`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`type`	VARCHAR(32)	No	NotificationType
+`title`	VARCHAR(255)	No	—
+`message`	TEXT	No	—
+`reference_type`	VARCHAR(32)	Yes	ORDER/PAYMENT/PRODUCT
+`reference_id`	BIGINT	Yes	business reference
+`metadata`	JSONB	Yes	actual payment status etc.
+`dedup_key`	VARCHAR(180)	No	UNIQUE
+`created_at`	TIMESTAMPTZ	No	—
+---
+12.14. `notification_recipients`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`notification_id`	BIGINT	No	FK
+`admin_id`	BIGINT	No	FK users
+`is_read`	BOOLEAN	No	DEFAULT false
+`read_at`	TIMESTAMPTZ	Yes	—
+Constraint:			
+```text
+UNIQUE(notification_id, admin_id)
+
+```
+Check:
+```text
+is_read = false → read_at IS NULL
+is_read = true  → read_at IS NOT NULL
+
+```
+---
+12.15. `checkout_operations`
+Đây là technical coordination table, không phải authoritative Commerce business entity.
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`user_id`	BIGINT	No	FK
+`idempotency_key`	VARCHAR(64)	No	unique per User
+`request_hash`	CHAR(64)	No	SHA-256
+`state`	VARCHAR(32)	No	technical state
+`order_id`	BIGINT	Yes	UNIQUE
+`payment_id`	BIGINT	Yes	UNIQUE
+`processing_started_at`	TIMESTAMPTZ	Yes	stale create recovery
+`retry_count`	INTEGER	No	DEFAULT 0
+`last_error_code`	VARCHAR(64)	Yes	recovery
+`state_changed_at`	TIMESTAMPTZ	No	recovery
+`completed_at`	TIMESTAMPTZ	Yes	finalization
+`created_at`	TIMESTAMPTZ	No	—
+`updated_at`	TIMESTAMPTZ	No	—
+Constraint:			
+```text
+UNIQUE(user_id, idempotency_key)
+
+```
+Technical states:
+```text
+STARTED
+LOCAL_PREPARED
+PAYOS_CREATING
+PAYOS_CREATED
+COMPLETED
+FAILED
+
+```
+Đây không phải OrderStatus hoặc PaymentStatus.
+12.16. `checkout_operation_items`
+Column	PostgreSQL Type	Nullable	Constraint / Purpose
+`id`	BIGINT	No	PK
+`checkout_operation_id`	BIGINT	No	FK
+`cart_item_id`	BIGINT	No	snapshot ID; no FK
+`cart_item_version`	BIGINT	No	snapshot version
+`product_id`	BIGINT	No	snapshot reference
+`quantity`	INTEGER	No	CHECK `>=1`
+Constraint:			
+```text
+UNIQUE(checkout_operation_id, cart_item_id)
+
+```
+`cart_item_id` không FK vì item được delete tại CG-007 nhưng snapshot record phải còn để recovery/idempotency.
+13. DATABASE CONSTRAINTS SUMMARY
+Constraint	Implementation
+Google identity unique	`users.google_id UNIQUE`
+Email unique	normalized lowercase + `users.email UNIQUE`
+Product price positive	CHECK
+One Discount config/Product	`discounts.product_id UNIQUE`
+One Inventory/Product	`inventories.product_id UNIQUE`
+One Cart/User	`carts.user_id UNIQUE`
+One Product/Cart	`cart_items(cart_id, product_id) UNIQUE`
+Inventory invariant	CHECK quantity/reserved
+Order Code unique	UNIQUE
+One line/Product/Order	UNIQUE
+One Payment/Order	`payments.order_id UNIQUE`
+Payment link identifier	partial/nullable UNIQUE
+External transaction identifier	partial/nullable UNIQUE
+One Recipient/Notification/Admin	UNIQUE
+Notification dedup	`dedup_key UNIQUE`
+Checkout Idempotency	`(user_id,idempotency_key) UNIQUE`
+Exactly-once Inventory effect	`inventory_transactions.business_key UNIQUE`
+---
+14. DATABASE INDEXES
+Table	Index	Columns	Reason
+users	`idx_users_role_status`	role, status	Active ADMIN lookup
+products	`idx_products_public`	status, deleted_at, created_at	Public list
+products	`idx_products_collection`	collection_id, status, deleted_at	Collection filter
+discounts	`idx_discounts_effective`	product_id, is_active, start_at, end_at	Pricing
+product_images	`idx_product_images_order`	product_id, sort_order	Gallery
+cart_items	`idx_cart_items_cart`	cart_id	Cart read
+inventories	`idx_inventory_product`	product_id	stock lookup
+inventory_transactions	`idx_inv_tx_product_created`	product_id, created_at DESC	history
+orders	`idx_orders_user_created`	user_id, created_at DESC	My Orders
+orders	`idx_orders_status_created`	status, created_at DESC	Admin/filter
+orders	`idx_orders_completed_at`	completed_at	Revenue range
+payments	`idx_payments_status_expiry`	status, expires_at	Expiration
+payments	`idx_payments_status_updated`	status, updated_at	Payment queries
+notification_recipients	`idx_nr_admin_read`	admin_id, is_read, notification_id DESC	Bell/unread
+notifications	`idx_notifications_created`	created_at DESC	List
+checkout_operations	`idx_checkout_state_changed`	state, state_changed_at	recovery
+`order_id`, `product_id`, `payment.order_id`, etc. already benefit from UNIQUE/FK indexes where explicitly created by migrations.			
+---
+15. SOFT DELETE IMPLEMENTATION
+Product
+Normal public query:
+```text
+status = 'ACTIVE'
+AND deleted_at IS NULL
+
+```
+Admin normal list:
+```text
+deleted_at IS NULL
+
+```
+Soft-delete:
+```text
+deleted_at = BusinessClock.now()
+
+```
+Không hard-delete Product trong normal business operation.
+Soft-deleted Product:
+```text
+not purchasable
+not addable to Cart
+not checkoutable
+
+```
+Historical OrderItem không bị thay đổi.
+Collection
+Normal public:
+```text
+ACTIVE
++
+deleted_at IS NULL
+
+```
+Soft delete bị reject nếu bất kỳ Product record hiện tại còn reference Collection.
+Admin phải chuyển Product sang Collection khác trước.
+Không cascade Product.
+16. AUDIT TIMESTAMPS
+Implementation convention:
+```text
+Java persistence:
+Instant
+
+PostgreSQL:
+TIMESTAMPTZ
+
+Database representation:
+UTC instant
+
+Business presentation:
+Asia/Ho_Chi_Minh
+
+```
+Không lưu local Vietnamese time dưới dạng timezone-less timestamp.
+Response business timestamp được serialize ISO-8601 với:
+```text
++07:00
+
+```
+Ví dụ:
+```text
+2026-08-12T10:30:00+07:00
+
+```
+---
+17. BR-TIME-001 IMPLEMENTATION
+17.1. Shared Time Boundary
+```java
+public interface BusinessClock {
+    Instant now();
+    ZoneId businessZone();
+    ZonedDateTime businessNow();
+    Instant startOfDay(LocalDate date);
+    Instant startOfNextDay(LocalDate date);
+}
+
+```
+Production implementation internally uses injected:
+```text
+Clock.systemUTC()
+
+```
+Business zone constant:
+```text
+Asia/Ho_Chi_Minh
+
+```
+Unit tests use:
+```text
+Clock.fixed(...)
+
+```
+Bị cấm trong business module:
+```text
+Instant.now()
+LocalDateTime.now()
+ZonedDateTime.now()
+
+```
+gọi trực tiếp.
+17.2. Usage
+`BusinessClock` bắt buộc dùng cho:
+```text
+Discount effectiveness
+Payment.createdAt
+Payment.expiresAt
+OrderCode business date
+Order timestamps
+Manual refund timestamps
+Reporting date conversion
+Dashboard ranges
+Notification timestamps
+
+```
+---
+17.3. Reporting Date Conversion
+Request:
+```text
+fromDate = 2026-08-01
+toDate   = 2026-08-31
+
+```
+Backend convert:
+```text
+start =
+2026-08-01T00:00 Asia/Ho_Chi_Minh
+→ Instant
+
+endExclusive =
+2026-09-01T00:00 Asia/Ho_Chi_Minh
+→ Instant
+
+```
+SQL uses:
+```text
+timestamp >= start
+AND
+timestamp < endExclusive
+
+```
+---
+18. BR-MONEY-001 IMPLEMENTATION
+18.1. Types
+Implementation Decision ID-003
+Authoritative monetary values:
+```text
+Java:
+long / Long
+
+PostgreSQL:
+BIGINT
+
+```
+Không dùng:
+```text
+float
+double
+
+```
+Percentage value:
+```text
+Java:
+BigDecimal
+
+PostgreSQL:
+NUMERIC(19,4)
+
+```
+---
+18.2. Pricing Algorithm
+```text
+calculateSellingPrice(product, discount, now):
+
+    basePrice = product.basePrice
+
+    if discount == null:
+        return basePrice
+
+    if discount.isActive == false:
+        return basePrice
+
+    if now < discount.startAt:
+        return basePrice
+
+    if now > discount.endAt:
+        return basePrice
+
+    if discount.type == FIXED_PRICE:
+        fixed = discount.discountValue.longValueExact()
+
+        assert fixed > 0
+        assert fixed < basePrice
+
+        return fixed
+
+    if discount.type == PERCENTAGE:
+        percentage = discount.discountValue
+
+        rawDiscount =
+            BigDecimal(basePrice)
+            * percentage
+            / 100
+
+        rawSellingPrice =
+            BigDecimal(basePrice)
+            - rawDiscount
+
+        sellingPrice =
+            rawSellingPrice.setScale(
+                0,
+                RoundingMode.HALF_UP
+            ).longValueExact()
+
+        assert sellingPrice > 0
+
+        return sellingPrice
+
+```
+`divide(100)` không thực hiện rounding trung gian.
+18.3. Order Line
+```java
+lineTotal =
+Math.multiplyExact(
+    sellingPrice,
+    quantity
+)
+
+```
+---
+18.4. Order Total
+```text
+orderTotal =
+sum(OrderItem.totalPrice)
+
+```
+dùng:
+```java
+Math.addExact
+
+```
+để phát hiện overflow.
+18.5. Payment Amount
+```text
+Payment.amount =
+Order.totalAmount
+
+```
+SRS yêu cầu cùng monetary rule áp dụng từ Product display tới Payment và không được có mismatch giữa `Order.totalAmount` và `Payment.amount`.
+19. ENUM MAPPING
+Tất cả business enums persistence bằng:
+```text
+EnumType.STRING
+
+```
+UserRole
+```text
+USER
+ADMIN
+
+```
+UserStatus
+```text
+ACTIVE
+BLOCKED
+
+```
+ProductStatus
+```text
+ACTIVE
+INACTIVE
+
+```
+CollectionStatus
+```text
+ACTIVE
+INACTIVE
+```
+InventoryAvailabilityStatus
+API-derived display status only; không persist như authoritative Inventory state:
+```text
+IN_STOCK
+LOW_STOCK
+OUT_OF_STOCK
+```
+DiscountType
+```text
+PERCENTAGE
+FIXED_PRICE
+
+```
+OrderStatus
+```text
+NEW
+CONFIRMED
+COMPLETED
+CANCELLED
+
+```
+PaymentStatus
+```text
+PENDING
+PAID
+FAILED
+CANCELLED
+EXPIRED
+REFUNDED
+
+```
+PaymentProvider
+```text
+PAYOS
+
+```
+`PaymentProvider` là implementation enum phản ánh gateway duy nhất; không thêm gateway mới.
+InventoryTransactionType
+```text
+IMPORT
+ADJUSTMENT
+RESERVE
+RELEASE
+SALE
+CANCEL_ORDER
+
+```
+`IMPORT` chỉ tăng physical quantity và không thay đổi `reservedQuantity`. `ADJUSTMENT` có thể tăng hoặc giảm physical quantity nhưng phải giữ Inventory invariants.
+NotificationType
+```text
+NEW_ORDER
+PAYMENT_SUCCESS
+PAYMENT_FAILED
+LOW_STOCK
+OUT_OF_STOCK
+
+```
+CheckoutOperationState
+Technical only:
+```text
+STARTED
+LOCAL_PREPARED
+PAYOS_CREATING
+PAYOS_CREATED
+COMPLETED
+FAILED
+
+```
+Không expose enum này như business status tới USER.
+20. IDENTITY IMPLEMENTATION
+20.1. Google Login + CSRF Flow
+Browser authentication flow:
+```text
+App initialization
+↓
+GET /api/v1/auth/csrf
+with credentials: "include"
+↓
+receive anonymous/current CSRF token in response body
+↓
+store CSRF token in frontend memory
+↓
+Google Identity Services
+↓
+credential
+↓
+POST /api/v1/auth/google
+with:
+credentials: "include"
+X-XSRF-TOKEN: <csrf-token>
+↓
+GoogleIdentityVerifierAdapter
+↓
+verify
+↓
+extract authoritative claims
+↓
+find User by googleId
+↓
+if existing User.status = BLOCKED
+→ reject USER_BLOCKED
+→ do not establish Authentication
+→ do not invoke authentication-success CSRF rotation
+→ do not issue JWT
+→ do not set BT_ACCESS
+↓
+create if absent
+↓
+ADMIN_EMAILS bootstrap only if new
+↓
+require resulting User.status = ACTIVE
+↓
+successful Google authentication
+↓
+establish authenticated Authentication
+in the current Spring Security SecurityContext
+↓
+explicitly invoke configured CsrfAuthenticationStrategy
+or Spring Security equivalent authentication-success CSRF cleanup
+↓
+invalidate/remove old pre-login CSRF token
+from the configured CookieCsrfTokenRepository
+↓
+issue JWT
+↓
+set HttpOnly BT_ACCESS cookie
+↓
+GET /api/v1/auth/csrf again
+with credentials: "include"
+↓
+receive fresh authenticated CSRF token
+↓
+replace cached CSRF token in memory
+↓
+GET /api/v1/me
+↓
+normal authenticated state
+```
+`POST /api/v1/auth/google` is public for authentication but is not CSRF-exempt. A valid CSRF token is required because login is a state-changing browser request.
+Because Google Login is a custom controller-driven flow (`AuthController → GoogleAuthenticationService`) rather than a framework-managed form-login authentication flow, implementation must not rely on an implicit Spring Security authentication-success hook. The successful custom login path must explicitly establish the authenticated `Authentication` and invoke the configured `CsrfAuthenticationStrategy`, or an equivalent Spring Security authentication-success CSRF strategy, using the same configured `CookieCsrfTokenRepository`.
+Logical behavior is equivalent to:
+```java
+Authentication authentication =
+    createAuthenticatedPrincipal(activeUser);
+
+SecurityContext context =
+    SecurityContextHolder.createEmptyContext();
+
+context.setAuthentication(authentication);
+SecurityContextHolder.setContext(context);
+
+csrfAuthenticationStrategy.onAuthentication(
+    authentication,
+    request,
+    response
+);
+
+// old pre-login CSRF token is invalidated
+
+String jwt =
+    jwtTokenService.createToken(activeUser);
+
+writeBtAccessCookie(
+    response,
+    jwt
+);
+```
+This establishes authentication for the successful login request only; subsequent requests remain authenticated through the `BT_ACCESS` JWT cookie and `JwtAuthenticationFilter`. This requirement does not introduce a server-side login session.
+The authentication-success CSRF strategy is invoked only after Google credential verification succeeds and the resulting User is confirmed `ACTIVE`. Invalid Google credentials, validation failures, and `BLOCKED` User login attempts must not establish Authentication, must not invoke authentication-success CSRF rotation, must not issue JWT, and must not set `BT_ACCESS`.
+After successful authentication, the old pre-login CSRF token is invalidated before the successful login response completes. The Frontend must call `GET /api/v1/auth/csrf` again and use the returned fresh authenticated CSRF token for later state-changing requests.
+20.2. Google Fields
+Backend chỉ lấy từ verified Google token:
+```text
+sub
+email
+email_verified
+name
+picture
+
+```
+Mapping:
+```text
+sub → googleId
+email → email
+name → fullName
+picture → avatarUrl
+
+```
+Requirements:
+```text
+email must exist
+email_verified must be true
+audience must match GOOGLE_CLIENT_ID
+token must not be expired
+issuer must be accepted Google issuer
+signature must verify
+
+```
+Frontend-supplied email/name/avatar ngoài credential không được trusted.
+Nếu User đã tồn tại và `status = BLOCKED`, Google credential vẫn được verify nhưng Backend trả `USER_BLOCKED`, không phát JWT mới và không set `BT_ACCESS` authentication cookie.
+21. ADMIN_EMAILS IMPLEMENTATION
+Environment:
+```text
+ADMIN_EMAILS=admin1@gmail.com,admin2@gmail.com
+
+```
+Normalization:
+```text
+split comma
+trim
+lowercase
+remove blank
+remove duplicates
+validate email syntax
+
+```
+Algorithm:
+```text
+verifiedIdentity = verifyGoogleCredential()
+
+user = findByGoogleId(verifiedIdentity.sub)
+
+if user exists:
+    return user
+    // NEVER reapply ADMIN_EMAILS
+
+normalizedEmail = lower(verifiedIdentity.email)
+
+if normalizedEmail in ADMIN_EMAILS:
+    role = ADMIN
+else:
+    role = USER
+
+status = ACTIVE
+
+create User
+
+```
+---
+22. INITIAL ADMIN BOOTSTRAP VALIDATION
+Implementation Decision ID-004
+`AdminBootstrapValidator` chạy bằng `ApplicationRunner` trong profile:
+```text
+prod
+
+```
+sau khi Flyway migrations hoàn tất.
+Algorithm:
+```text
+activeAdminCount =
+repository.countByRoleAndStatus(
+    ADMIN,
+    ACTIVE
+)
+
+if activeAdminCount > 0:
+    startup valid
+
+else:
+    parsedAdminEmails =
+        parse ADMIN_EMAILS
+
+    if parsedAdminEmails is empty:
+        throw IllegalStateException
+        stop application startup
+
+    if any configured item fails email syntax:
+        throw IllegalStateException
+
+    startup valid
+
+```
+Startup không thể xác thực rằng email thực sự sở hữu Google Account trước khi người đó login.
+Google ownership được verify khi first login.
+23. LAST-ADMIN CONCURRENCY IMPLEMENTATION
+Implementation Decision ID-005
+Chọn:
+```text
+Pessimistic locking
+
+```
+cho toàn bộ current ACTIVE ADMIN rows.
+Repository:
+```text
+findActiveAdminsForUpdate()
+
+```
+logical SQL:
+```sql
+SELECT *
+FROM users
+WHERE role = 'ADMIN'
+  AND status = 'ACTIVE'
+FOR UPDATE;
+
+```
+Transaction:
+```java
+@Transactional
+demoteAdmin(targetId)
+
+1. lock all ACTIVE ADMIN rows
+2. load target
+3. verify target = ADMIN
+4. if target ACTIVE and activeAdminCount <= 1
+       reject LAST_ADMIN_PROTECTED
+5. target.role = USER
+6. commit
+
+```
+Block tương tự.
+Admin count nhỏ nên lock tất cả ACTIVE ADMIN rows là implementation đơn giản và an toàn cho team hiện tại.
+24. SECURITY IMPLEMENTATION
+24.1. JWT Storage Decision
+Implementation Decision ID-006
+Chọn:
+```text
+HttpOnly Secure Cookie
+
+```
+Không dùng:
+```text
+localStorage
+sessionStorage
+
+```
+cho JWT.
+Cookie name:
+```text
+BT_ACCESS
+
+```
+Production:
+```text
+HttpOnly = true
+Secure = true
+SameSite = Lax
+Path = /
+```
+If `AUTH_COOKIE_DOMAIN` is configured, cookie creation uses that effective Domain. Logout deletion must use the same effective Name/Path/Domain semantics as creation so the browser actually removes the original authentication cookie.
+Rationale:
+JavaScript không đọc được access token;
+giảm token theft do XSS;
+hỗ trợ browser request tự động;
+phù hợp Next.js server/client access.
+24.2. Production Same-site Deployment Constraint
+Selected cookie-authentication strategy:
+```text
+BT_ACCESS:
+HttpOnly
+Secure
+SameSite=Lax
+```
+requires:
+```text
+Frontend and Backend production deployment
+must remain same-site.
+```
+Valid production shape:
+```text
+https://www.example.com
+https://api.example.com
+```
+because both are HTTPS origins under the same registrable site:
+```text
+example.com
+```
+Exact production domain names remain a Deployment Design decision, but `same-site` is a deployment constraint of the selected `SameSite=Lax` authentication strategy, not merely a recommendation.
+If a future deployment places Frontend and Backend on unrelated sites, Cookie/CORS/CSRF strategy must be reviewed before production. The current Implementation Specification does not authorize such a deployment without that review.
+24.3. CSRF Token Delivery and Mutation Contract
+Cookie-based authentication makes the browser send credentials automatically. State-changing browser requests therefore require Spring Security CSRF protection.
+Repository:
+```text
+Spring Security CookieCsrfTokenRepository
+```
+CSRF repository cookie:
+```text
+XSRF-TOKEN
+HttpOnly = true
+Secure = true in prod
+SameSite = Lax
+```
+Because the token is delivered explicitly by `/api/v1/auth/csrf`, frontend JavaScript does not need direct access to this cookie.
+Frontend does not depend on reading the API-host `XSRF-TOKEN` cookie directly.
+24.3.1. CSRF Endpoint
+Endpoint:
+```text
+GET /api/v1/auth/csrf
+```
+Actor:
+```text
+GUEST
+USER
+ADMIN
+```
+Backend behavior:
+```text
+resolve/generate current CsrfToken
+↓
+return token explicitly in response body
+```
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "token": "<csrf-token>"
+  },
+  "message": null,
+  "timestamp": "2026-08-12T10:30:00+07:00",
+  "correlationId": "f58e1f1b-..."
+}
+```
+Frontend storage:
+```text
+memory only
+```
+Frontend must not persist CSRF token in:
+```text
+localStorage
+sessionStorage
+```
+24.3.2. CSRF Mutation Header
+Frontend sends:
+```text
+X-XSRF-TOKEN: <csrf-token>
+```
+for:
+```text
+POST
+PUT
+PATCH
+DELETE
+```
+except endpoints intentionally CSRF-exempt, currently:
+```text
+POST /api/v1/payments/webhook/payos
+```
+24.3.3. Login Token Rotation
+Flow:
+```text
+App initialization
+↓
+GET /api/v1/auth/csrf
+↓
+receive anonymous/current token
+↓
+POST /api/v1/auth/google
+with X-XSRF-TOKEN
+↓
+Google credential verified
+↓
+resulting User confirmed ACTIVE
+↓
+establish authenticated Authentication
+in current SecurityContext
+↓
+explicitly invoke configured CsrfAuthenticationStrategy
+or equivalent Spring Security authentication-success CSRF cleanup
+↓
+old pre-login CSRF token removed/invalidated
+from CookieCsrfTokenRepository
+↓
+issue JWT
+↓
+BT_ACCESS set
+↓
+GET /api/v1/auth/csrf again
+↓
+receive fresh authenticated token
+↓
+replace in-memory token
+```
+The custom `/api/v1/auth/google` path must invoke the configured authentication-success CSRF strategy explicitly. It must not depend on an implicit form-login success handler that is not part of this custom controller flow.
+`SecurityConfig` owns/configures the shared `CookieCsrfTokenRepository` and the `CsrfAuthenticationStrategy` or equivalent Spring Security authentication-success strategy. The custom Google Login success path invokes that configured strategy only after successful authentication and ACTIVE-status validation.
+Failure behavior:
+```text
+invalid Google credential
+OR resulting User = BLOCKED
+OR authentication otherwise fails
+↓
+do not establish authenticated Authentication
+do not invoke authentication-success CSRF rotation
+do not issue/set BT_ACCESS
+```
+A successful Google Login invalidates the pre-login CSRF token before `BT_ACCESS` login completion. The next `GET /api/v1/auth/csrf` returns the fresh authenticated token used by subsequent mutations.
+24.3.4. Spring Security Logout Implementation
+Logout endpoint:
+```text
+POST /api/v1/auth/logout
+```
+Ownership:
+```text
+Spring Security LogoutFilter
+configured through SecurityFilterChain logout DSL
+```
+`AuthController` does not implement logout business logic. No `LogoutController`, `LogoutService` or `LogoutStatus` is introduced.
+Logical `SecurityConfig` design is equivalent to:
+```java
+http
+    .addFilterBefore(jwtAuthenticationFilter, LogoutFilter.class)
+    .logout(logout -> logout
+        .logoutRequestMatcher(authenticatedPostLogoutMatcher)
+        .addLogoutHandler(authenticationCookieCleanupHandler)
+        .logoutSuccessHandler(jsonLogoutSuccessHandler)
+    );
+```
+`authenticatedPostLogoutMatcher` is a logical matcher configured inside `SecurityConfig` for `POST /api/v1/auth/logout` that matches only when the current Spring Security context contains a valid authenticated principal. It does not require a new class file.
+`JwtAuthenticationFilter` must execute before `LogoutFilter` so Cookie JWT authentication is established before the authenticated logout matcher is evaluated. CSRF validation remains earlier in the filter chain for the state-changing POST request.
+If authentication is missing/invalid, the logout matcher does not claim the request; it continues to the normal authenticated-route authorization path and returns the project's standard `401` response. This preserves the current route policy while still using Spring Security's built-in `LogoutFilter` pipeline.
+Required logout behavior:
+```text
+1. Browser sends POST /api/v1/auth/logout
+   with credentials: include
+   and X-XSRF-TOKEN.
+
+2. Request passes Spring Security CSRF validation.
+
+3. Spring Security LogoutFilter handles the logout request.
+
+4. SecurityContextLogoutHandler clears Authentication,
+   SecurityContextHolder and configured SecurityContextRepository state.
+
+5. Authentication-cookie cleanup expires/deletes BT_ACCESS.
+
+6. CsrfLogoutHandler clears the CSRF repository state/token.
+
+7. LogoutSuccessHandler returns the standard JSON API envelope
+   with HTTP 200 OK.
+
+8. Frontend clears CurrentUser auth state,
+   in-memory CSRF token and authenticated TanStack Query cache.
+
+9. Frontend obtains a new anonymous/current CSRF token through
+   GET /api/v1/auth/csrf when a later anonymous mutation/login flow needs it.
+```
+Spring Security CSRF support must retain its logout cleanup behavior; implementation must not replace the built-in CSRF logout handling with a cookie-only authentication cleanup.
+`BT_ACCESS` deletion semantics:
+```text
+Name = BT_ACCESS
+Path = /
+HttpOnly = true
+Secure = true in production
+SameSite = Lax
+Domain = same effective AUTH_COOKIE_DOMAIN used at creation, when configured
+Max-Age = 0 / expired cookie semantics
+```
+Cookie creation and cookie deletion must use matching effective `Path` and `Domain` semantics. A deployment with configured `AUTH_COOKIE_DOMAIN` must delete with that same effective Domain; otherwise a stale authentication cookie can remain in the browser.
+The authentication-cookie cleanup may be implemented as a `LogoutHandler` configured in `SecurityConfig` and may reuse the existing cookie-writing logic. No additional service abstraction is required solely for logout.
+`CsrfLogoutHandler` or equivalent Spring Security logout behavior clears the `CookieCsrfTokenRepository` state. Deleting only `BT_ACCESS` is incomplete and forbidden.
+Logout success contract:
+```json
+{
+  "success": true,
+  "data": null,
+  "message": null,
+  "timestamp": "2026-08-12T13:05:00+07:00",
+  "correlationId": "f58e1f1b-..."
+}
+```
+HTTP status:
+```text
+200 OK
+```
+No redirect, HTML logout page or `204` contract is used by the API.
+Repeated logout behavior follows the current authenticated-only route policy:
+```text
+first authenticated logout + valid CSRF
+→ 200 OK
+→ authentication/CSRF state cleared
+
+subsequent logout without valid authentication
+→ normal 401 security response
+```
+No new business error code is introduced.
+24.3.5. payOS Webhook CSRF Exemption
+```text
+POST /api/v1/payments/webhook/payos
+```
+is CSRF-exempt because it is a server-to-server provider callback, not a browser-cookie-authenticated mutation.
+CSRF exemption does not make the endpoint trusted. Correctness still requires:
+```text
+payOS signature verification
++
+provider correlation validation
++
+amount validation
++
+Payment state guard
++
+expiration/success-time arbitration
+```
+---
+24.4. CORS and Credentialed Browser Requests
+Browser → Spring Boot requests that require Cookie Authentication use:
+```ts
+credentials: "include"
+```
+The effective browser security contract is:
+```text
+BT_ACCESS HttpOnly cookie
++
+credentials: include
++
+explicit allowed CORS origin
++
+X-XSRF-TOKEN on state-changing requests
+```
+Production:
+```text
+allowCredentials = true
+```
+Allowed origins come from:
+```text
+ALLOWED_ORIGINS
+```
+They must be explicit production origins.
+Do not use:
+```text
+*
+```
+when credentials are enabled.
+Allowed headers include:
+```text
+Content-Type
+X-XSRF-TOKEN
+X-Correlation-Id
+Idempotency-Key
+```
+Allowed methods:
+```text
+GET
+POST
+PUT
+PATCH
+DELETE
+OPTIONS
+```
+---
+25. JWT IMPLEMENTATION
+Implementation Decision ID-007
+Algorithm:
+```text
+HMAC SHA-256
+HS256
+
+```
+Secret:
+```text
+JWT_SECRET_BASE64
+
+```
+minimum decoded length:
+```text
+32 bytes
+
+```
+Expiry:
+```text
+2 hours
+
+```
+Issuer:
+```text
+bautruc-ecommerce
+
+```
+Claims:
+```text
+sub      = userId as String
+userId   = numeric User ID
+email
+role
+iss
+iat
+exp
+
+```
+Không chứa authoritative status.
+Runtime role/status luôn load từ database.
+Không có Refresh Token.
+26. SPRING SECURITY REQUEST FLOW
+```mermaid
+flowchart TB
+    Browser[Browser]
+    Fetch[fetch credentials: include]
+    Creds[BT_ACCESS HttpOnly Cookie<br/>+ X-XSRF-TOKEN]
+    Cors[CORS<br/>explicit allowed origin]
+    Csrf[CSRF Validation]
+    Jwt[JwtAuthenticationFilter]
+    Token[Verify JWT]
+    User[Load User from DB]
+    Status{User.status = ACTIVE?}
+    LogoutReq{POST /auth/logout?}
+    Logout[Spring Security LogoutFilter]
+    LogoutDone[Clear SecurityContext<br/>BT_ACCESS<br/>CSRF repository state<br/>HTTP 200 JSON]
+    Role[Use DB-authoritative User.role]
+    Rbac[RBAC]
+    Controller[Controller]
+    Business[Application Service]
+
+    Browser --> Fetch
+    Fetch --> Creds
+    Creds --> Cors
+    Cors --> Csrf
+    Csrf --> Jwt
+    Jwt --> Token
+    Token --> User
+    User --> Status
+    Status -->|No| Reject[401 USER_BLOCKED]
+    Status -->|Yes| LogoutReq
+    LogoutReq -->|Yes| Logout
+    Logout --> LogoutDone
+    LogoutReq -->|No| Role
+    Role --> Rbac
+    Rbac -->|Allowed| Controller
+    Rbac -->|Denied| Forbidden[403]
+    Controller --> Business
+```
+For safe public GET requests, JWT/CSRF may be absent as allowed by route policy. For Cookie-authenticated state-changing browser requests, `credentials: include` and valid `X-XSRF-TOKEN` are required before business logic executes. `JwtAuthenticationFilter` is ordered before `LogoutFilter` so authenticated-only logout matching can be evaluated without routing logout through a controller.
+27. SPRING SECURITY ROUTE RULES
+Public:
+```text
+POST /api/v1/auth/google
+GET  /api/v1/auth/csrf
+
+GET  /api/v1/products/**
+GET  /api/v1/collections/**
+
+POST /api/v1/payments/webhook/payos
+
+```
+Authenticated both USER/ADMIN:
+```text
+GET  /api/v1/me
+POST /api/v1/auth/logout
+```
+`POST /api/v1/auth/logout` is processed by the Spring Security logout pipeline, not by `AuthController`. It remains an authenticated route: missing/invalid authentication follows the normal `401` security behavior; an authenticated logout mutation also requires valid CSRF.
+USER only:
+```text
+/api/v1/cart/**
+/api/v1/checkout
+/api/v1/me/orders/**
+/api/v1/payments/{id}
+
+```
+ADMIN only:
+```text
+/api/v1/admin/**
+
+```
+---
+28. API AUTHORIZATION MATRIX
+API Group	GUEST	USER	ADMIN
+CSRF Token	Yes	Yes	Yes
+Google Login	Yes	Yes	Yes
+Public Product	Yes	Yes	Yes
+Public Collection	Yes	Yes	Yes
+Current User	No	Yes	Yes
+Cart	No	Yes	No
+Checkout	No	Yes	No
+My Orders	No	Yes	No
+User Payment Query	No	Owner only	No
+Admin Users	No	No	Yes
+Admin Product	No	No	Yes
+Admin Collection	No	No	Yes
+Admin Discount	No	No	Yes
+Admin Images	No	No	Yes
+Admin Inventory	No	No	Yes
+Admin Orders	No	No	Yes
+Admin Notification	No	No	Yes
+Dashboard / Reports	No	No	Yes
+Manual Refund Record	No	No	Yes
+payOS Webhook	External	External	External
+---
+29. PRODUCT IMPLEMENTATION
+29.1. Public Search
+Query inputs:
+```text
+keyword
+collectionId
+minPrice
+maxPrice
+page
+size
+sort
+
+```
+Keyword searches:
+```text
+nameVi
+OR
+nameEn
+
+```
+case-insensitive.
+Description search không nằm trong initial implementation.
+29.2. Effective Price Query
+Public list price filter/sort dùng cùng logical formula với `PricingService`.
+Pseudo-SQL:
+```sql
+CASE
+    WHEN discount is not effective
+        THEN p.base_price
+
+    WHEN discount_type = 'FIXED_PRICE'
+        THEN CAST(discount_value AS BIGINT)
+
+    WHEN discount_type = 'PERCENTAGE'
+        THEN CAST(
+            FLOOR(
+                (
+                    p.base_price::numeric
+                    -
+                    (
+                        p.base_price::numeric
+                        * discount_value
+                        / 100
+                    )
+                )
+                + 0.5
+            )
+            AS BIGINT
+        )
+END
+
+```
+Tất cả authoritative prices positive nên:
+```text
+FLOOR(raw + 0.5)
+
+```
+tương ứng HALF_UP nearest 1 VND.
+Repository integration tests phải assert SQL price bằng `PricingService` cho boundary cases `.49`, `.50`, `.51`.
+29.3. Admin Product List Soft-delete Behavior
+Version 1.0 admin Product list mặc định dùng:
+```text
+deleted_at IS NULL
+```
+Không expose soft-deleted Product trong normal admin list và không có restore workflow trong scope hiện tại. Historical OrderItem vẫn độc lập với Product soft-delete.
+29.4. Product Base Price Update vs Existing Discount
+Nếu ADMIN update `Product.basePrice`, Backend phải revalidate current Discount configuration trước commit:
+```text
+basePrice > 0 integer VND
+
+FIXED_PRICE:
+0 < discountValue < newBasePrice
+
+PERCENTAGE:
+0 < discountValue < 100
+AND rounded sellingPrice > 0
+```
+Nếu existing Discount không còn hợp lệ với new `basePrice`, Product update bị reject; Backend không silently mutate hoặc disable Discount để làm request hợp lệ.
+30. DISCOUNT IMPLEMENTATION
+Validation:
+```text
+startAt < endAt
+isActive != null
+
+PERCENTAGE:
+0 < value < 100
+maximum persistence scale = 4
+rounded sellingPrice after BR-MONEY-001 must be > 0
+
+FIXED_PRICE:
+value must be integer
+0 < value < Product.basePrice
+
+```
+Input timestamps phải có timezone offset.
+Backend convert về `Instant`.
+`DiscountCommandService` validates prospective `sellingPrice` against current Product `basePrice` before persistence. `rawSellingPrice` remains an in-memory calculation intermediate and is not persisted.
+Discount effective:
+```text
+isActive
+AND now >= startAt
+AND now <= endAt
+
+```
+---
+31. PRODUCT IMAGE IMPLEMENTATION
+31.1. Limits
+```text
+max images/Product = 10
+max thumbnail/Product = 1
+max upload size = 5 MiB
+
+```
+5 MiB là Implementation Decision, không phải SRS hard business scope.
+31.2. Format Validation
+Supported:
+```text
+image/jpeg
+image/png
+image/webp
+
+```
+Không chỉ tin filename hoặc HTTP Content-Type.
+`ImageSignatureValidator` kiểm tra magic bytes:
+```text
+JPEG:
+FF D8 FF
+
+PNG:
+89 50 4E 47 0D 0A 1A 0A
+
+WebP:
+RIFF....WEBP
+
+```
+---
+31.3. Image Transformation / Compression
+Version 1.0 không thực hiện server-side image compression/resizing pipeline. Backend lưu original validated JPEG/PNG/WebP binary lên S3.
+Frontend sử dụng responsive rendering/zoom/swipe nhưng không thay đổi authoritative stored binary. Future derivative/compression pipeline cần implementation revision riêng.
+31.4. S3 Object Key
+Implementation Decision ID-008
+```text
+products/{productId}/{uuid}.{normalizedExtension}
+
+```
+Ví dụ:
+```text
+products/42/37d0a78e-7d27-4bb1-bcfe-c1d376.png
+
+```
+UUID chỉ cho object key, không thay PK strategy.
+32. PRODUCT IMAGE S3 FLOW
+```mermaid
+sequenceDiagram
+    actor A as ADMIN
+    participant FE as Next.js
+    participant API as ImageController
+    participant IMG as ProductImageService
+    participant S3 as Amazon S3
+    participant DB as PostgreSQL
+
+    A->>FE: Upload image
+    FE->>API: multipart/form-data
+    API->>IMG: upload
+    IMG->>IMG: Validate count/type/size
+    IMG->>S3: PutObject
+    S3-->>IMG: success
+    IMG->>DB: Persist ProductImage metadata
+
+    alt DB success
+        DB-->>IMG: committed
+        IMG-->>FE: ProductImageResponse
+    else DB failure
+        IMG->>S3: Compensation DeleteObject
+        IMG-->>FE: error
+    end
+
+```
+---
+32.1. Upload Consistency
+Flow:
+```text
+1. validate request type/MIME/magic bytes/size
+2. validate Product existence as preliminary check
+3. upload object to S3 OUTSIDE PostgreSQL transaction
+4. begin DB transaction
+5. lock Product row PESSIMISTIC_WRITE
+6. revalidate Product not soft-deleted
+7. recount current images under lock
+8. require current count < 10
+9. persist ProductImage metadata
+10. commit DB transaction
+```
+Correctness của maximum 10 images nằm ở locked recount + metadata insert. Concurrent upload có thể tạo object tạm trên S3, nhưng chỉ metadata transaction hợp lệ được commit.
+Nếu DB persistence/revalidation fail sau S3 success:
+```text
+attempt S3 delete immediately
+retry max 3 times
+```
+Nếu compensation vẫn fail:
+```text
+ERROR log
+objectKey recorded in log
+manual orphan cleanup
+```
+Orphan object không được expose vì DB metadata không tồn tại.
+32.2. Delete Consistency
+Flow:
+```text
+1. DB transaction:
+   lock Product
+   load target ProductImage
+   if target is current thumbnail:
+       choose remaining image with smallest sortOrder, then smallest id
+       set that image as thumbnail
+       if no image remains, Product has no thumbnail
+   delete ProductImage metadata
+   commit
+
+2. after commit:
+   S3 DeleteObject
+   retry max 3
+
+```
+Nếu S3 delete fail:
+```text
+metadata remains deleted
+object becomes orphan
+structured ERROR log
+manual cleanup
+
+```
+Không rollback metadata thành broken visible reference.
+32.3. Thumbnail Concurrency
+Set thumbnail transaction:
+```text
+lock Product
+↓
+validate target Image belongs Product
+↓
+set all product images isThumbnail=false
+↓
+set target true
+↓
+commit
+
+```
+Partial unique DB index là final safety guard.
+32.4. Reorder Consistency
+`ReorderProductImagesRequest.imageIds` phải chứa đúng toàn bộ current Product Image IDs, mỗi ID đúng một lần.
+```text
+lock Product
+↓
+load current images ordered by sortOrder
+↓
+validate request set == current image set
+↓
+move current sortOrder values to temporary non-conflicting range
+↓
+assign final sortOrder = 0..n-1 theo request order
+↓
+commit
+```
+Không reorder image thuộc Product khác. Unique `(product_id, sort_order)` vẫn là DB safety guard.
+33. CART IMPLEMENTATION
+33.1. Persistence Model
+```text
+1 User
+→ exactly 1 Cart
+
+```
+Cart lazy-created khi first cart operation.
+CartItem chỉ persist:
+```text
+productId
+quantity
+
+```
+Không persist:
+```text
+basePrice
+sellingPrice
+lineTotal
+
+```
+---
+33.2. Checkout Selection
+Implementation Decision ID-009
+SRS không định nghĩa partial item selection.
+Do đó Version 1.0 implementation:
+```text
+Checkout toàn bộ current valid Cart snapshot.
+
+```
+Không thêm checkbox/multi-select partial checkout.
+34. INVENTORY CONCURRENCY DECISION
+Implementation Decision ID-010
+Chọn:
+```text
+Pessimistic Write Lock
+SELECT ... FOR UPDATE
+
+```
+trên Inventory rows.
+Rationale:
+Order có thể chứa nhiều Products;
+cần audit before/after chính xác;
+dễ hiểu/test;
+strong consistency;
+phù hợp PostgreSQL + Modular Monolith;
+team 4 người dễ maintain hơn custom atomic multi-row logic.
+Lock multiple Product inventory theo:
+```text
+productId ascending
+
+```
+để giảm deadlock risk.
+35. INVENTORY CONCURRENCY FLOW
+```mermaid
+sequenceDiagram
+    participant A as Checkout A
+    participant B as Checkout B
+    participant DB as PostgreSQL Inventory
+
+    A->>DB: SELECT Product 10 FOR UPDATE
+    DB-->>A: quantity=1 reserved=0
+
+    B->>DB: SELECT Product 10 FOR UPDATE
+    Note over B,DB: waits
+
+    A->>DB: reserved += 1
+    A->>DB: COMMIT
+
+    DB-->>B: lock acquired
+    B->>DB: available = quantity - reserved
+    Note over B: available = 0
+    B-->>B: INVENTORY_INSUFFICIENT
+
+```
+---
+36. INVENTORY RESERVE ALGORITHM
+Within protected transaction:
+```text
+lock inventories sorted by productId
+
+for each item:
+
+    beforeQuantity =
+        inventory.quantity
+
+    beforeReserved =
+        inventory.reservedQuantity
+
+    available =
+        beforeQuantity - beforeReserved
+
+    if available < requested:
+        throw INVENTORY_INSUFFICIENT
+
+    afterQuantity =
+        beforeQuantity
+
+    afterReserved =
+        beforeReserved + requested
+
+    validate:
+        afterReserved <= afterQuantity
+
+    inventory.reservedQuantity =
+        afterReserved
+
+    create InventoryTransaction:
+        type = RESERVE
+        quantityDelta = 0
+        reservedQuantityDelta = +requested
+        beforeQuantity
+        afterQuantity
+        beforeReservedQuantity
+        afterReservedQuantity
+        referenceType = ORDER
+        referenceId = orderId
+        businessKey =
+          RESERVE:ORDER:{orderId}:PRODUCT:{productId}
+
+```
+---
+37. INVENTORY RELEASE ALGORITHM
+```text
+businessKey =
+RELEASE:ORDER:{orderId}:PRODUCT:{productId}
+
+if InventoryTransaction with businessKey exists:
+    return idempotent success
+
+lock Inventory
+
+if reservedQuantity < releaseQty:
+    throw INVENTORY_STATE_CONFLICT
+
+reservedQuantity -= releaseQty
+
+insert RELEASE audit with unique businessKey
+
+```
+Transaction atomic.
+Duplicate release cannot reduce reserved below zero.
+38. INVENTORY SALE ALGORITHM
+Payment success:
+```text
+businessKey =
+SALE:ORDER:{orderId}:PRODUCT:{productId}
+
+if SALE already exists:
+    no-op
+
+lock Inventory
+
+assert reservedQuantity >= soldQty
+assert quantity >= soldQty
+
+quantity -= soldQty
+reservedQuantity -= soldQty
+
+create SALE transaction
+
+```
+---
+39. INVENTORY RESTORE ALGORITHM
+Paid Order cancellation:
+```text
+businessKey =
+CANCEL_ORDER:ORDER:{orderId}:PRODUCT:{productId}
+
+if transaction already exists:
+    no-op
+
+lock Inventory
+
+quantity += soldQty
+reservedQuantity unchanged
+
+create CANCEL_ORDER transaction
+
+```
+---
+39.1. ADMIN INVENTORY IMPORT / ADJUSTMENT
+Admin Inventory mutation dùng một transaction và `PESSIMISTIC_WRITE` Inventory lock.
+Request operation type:
+```text
+IMPORT
+ADJUSTMENT
+```
+Rules:
+```text
+IMPORT:
+quantityChange > 0
+InventoryTransaction.type = IMPORT
+reservedQuantity unchanged
+
+ADJUSTMENT:
+quantityChange != 0
+InventoryTransaction.type = ADJUSTMENT
+reservedQuantity unchanged
+```
+Algorithm:
+```text
+lock Inventory
+beforeQuantity = quantity
+beforeReserved = reservedQuantity
+afterQuantity = beforeQuantity + quantityChange
+require afterQuantity >= beforeReserved
+require afterQuantity >= 0
+quantity = afterQuantity
+persist InventoryTransaction with before/after fields, reason, current ADMIN
+compute beforeAvailable/afterAvailable
+persist LOW_STOCK/OUT_OF_STOCK notification only on state transition
+commit
+```
+No Admin adjustment may directly change `reservedQuantity`.
+40. ORDER IMPLEMENTATION
+40.1. Order Code
+Order ID được lấy từ sequence trước insert.
+Format:
+```text
+ORD-{yyyyMMdd}-{id padded 8}
+
+```
+Date:
+```text
+Asia/Ho_Chi_Minh
+
+```
+Example:
+```text
+ORD-20260812-00000142
+
+```
+Uniqueness cuối cùng được DB enforce.
+40.2. Historical Snapshot
+At checkout:
+```text
+OrderItem.productId =
+Product.id
+
+OrderItem.productNameVi =
+Product.nameVi
+
+OrderItem.productNameEn =
+Product.nameEn
+
+OrderItem.basePrice =
+Product.basePrice
+
+OrderItem.sellingPrice =
+PricingService result
+
+OrderItem.quantity =
+CartItem.quantity
+
+OrderItem.totalPrice =
+sellingPrice * quantity
+
+```
+Sau đó Order query không join Product để lấy tên hiển thị.
+40.3. Admin Order Search / Filter Contract
+Admin Order List query supports:
+```text
+keyword
+orderStatus
+paymentStatus
+fromDate
+toDate
+page
+size
+sort
+```
+`keyword` được trim và match theo OR:
+```text
+order_code ILIKE %keyword%
+receiver_name ILIKE %keyword%
+email ILIKE %keyword%
+phone contains normalized keyword
+```
+`paymentStatus` filter join authoritative `payments.status`; không dùng denormalized Order payment state.
+`fromDate` / `toDate` là business dates theo `Asia/Ho_Chi_Minh` và được chuyển thành `[startInstant, endExclusiveInstant)` bằng `BusinessClock`.
+Default sort:
+```text
+createdAt,desc
+```
+---
+41. ORDER STATE TRANSITION SERVICE
+`OrderCommandService.transitionProcessingStatus(...)`
+Rules:
+```text
+NEW + Payment.PAID
+→ CONFIRMED
+
+CONFIRMED + Payment.PAID
+→ COMPLETED
+
+```
+Nếu transition `COMPLETED`:
+```text
+completedAt = BusinessClock.now()
+
+```
+Reject:
+```text
+NEW + non-PAID → CONFIRMED
+CONFIRMED + non-PAID → COMPLETED
+COMPLETED → CANCELLED
+CANCELLED → CONFIRMED
+CANCELLED → COMPLETED
+
+```
+Cancellation không dùng generic transition method.
+Cancellation luôn đi:
+```text
+OrderCancellationApplicationService
+
+```
+để xử lý Inventory/Payment side effects.
+42. PAYMENT IMPLEMENTATION
+42.1. Payment Lifecycle
+```text
+Checkout local preparation
+→ PENDING
+
+Verified payment success
+→ PAID
+
+Confirmed create/payment failure
+→ FAILED
+
+Provider/admin pending cancellation
+→ CANCELLED
+
+15-minute timeout
+→ EXPIRED
+
+Manual refund recording
+→ REFUNDED
+
+```
+---
+42.2. Payment Row Lock
+Implementation Decision ID-011
+State-changing Payment operations dùng:
+```text
+PESSIMISTIC_WRITE
+
+```
+Global lock ordering cho operation liên quan Order + Payment + Inventory:
+```text
+1. Order
+2. Payment
+3. Inventory rows ascending productId
+
+```
+Điều này áp dụng cho:
+```text
+Payment success
+Payment terminal failure
+Expiration
+Admin cancellation
+Manual refund
+Order progression
+
+```
+---
+42.3. Payment Result Orchestration Port
+`PaymentResultPort` được khai báo trong Payment application boundary và được Commerce Coordination implement bởi `PaymentResultApplicationService`.
+```text
+PayOSWebhookService
+PaymentExpirationJob
+        ↓
+PaymentResultPort
+        ↓
+Commerce PaymentResultApplicationService
+```
+Payment module không import `commerce.application` class trực tiếp. Provider DTO/raw webhook data không đi qua port; Payment boundary chỉ truyền verified internal payment outcome/correlation data.
+43. PAYOS INTEGRATION
+43.1. Integration Approach
+Implementation Decision ID-012
+Không làm business layer phụ thuộc payOS SDK classes.
+Implement:
+```text
+PayOSClient
+↓
+PayOSRestClient
+↓
+Spring RestClient
+↓
+payOS REST API
+```
+Lợi ích:
+explicit external contract;
+adapter testable;
+business module không phụ thuộc provider DTO;
+không phụ thuộc SDK release cadence.
+43.2. Current Official Contract Verification
+External contract snapshot được re-verify ngày 2026-08-12 theo official payOS documentation.
+Current official Payment Request contract:
+```text
+Production host:
+api-merchant.payos.vn
+
+Create:
+POST /v2/payment-requests
+
+Get:
+GET /v2/payment-requests/{id}
+
+Cancel:
+POST /v2/payment-requests/{id}/cancel
+
+Authentication:
+x-client-id
+x-api-key
+```
+Create required request fields include:
+```text
+orderCode
+amount
+description
+cancelUrl
+returnUrl
+signature
+```
+`expiredAt` is supported as an integer Unix timestamp.
+For Get/Cancel, current official `{id}` accepts merchant `orderCode` or payOS `paymentLinkId`.
+Cancel request currently supports body:
+```json
+{
+  "cancellationReason": "..."
+}
+```
+External Contract Verification Required: before coding the adapter and again before production release, re-check official payOS endpoint, headers, signature rules, request/response fields, field limits and cancellation behavior because provider contracts can change.
+43.3. Internal Create Command
+```text
+PayOSCreatePaymentCommand
+
+orderId
+amount
+description
+returnUrl
+cancelUrl
+expiresAt
+```
+---
+43.4. payOS Mapping
+Internal	payOS
+`Order.id`	`orderCode`
+`Payment.amount`	`amount`
+generated short description	`description`
+frontend Order URL	`returnUrl`
+frontend Order URL	`cancelUrl`
+Payment.expiresAt epoch seconds	`expiredAt`
+`Order.orderCode` vẫn là business-facing string.	
+payOS `orderCode` dùng numeric:	
+```text
+Order.id
+```
+---
+43.5. Description
+Current official payOS documentation notes that `description` is limited to 9 characters for bank accounts that are not linked through payOS.
+Implementation generates:
+```text
+D{8-character deterministic suffix}
+```
+from `Order.id`.
+Description is not a business identifier.
+43.6. Create Response Mapping
+Official create response currently includes fields such as:
+```text
+orderCode
+amount
+currency
+paymentLinkId
+status
+checkoutUrl
+qrCode
+```
+Mapping:
+```text
+paymentLinkId
+→ Payment.providerPaymentLinkId
+
+checkoutUrl
+→ Payment.checkoutUrl
+
+qrCode
+→ Payment.qrCode
+```
+Provider create response `PENDING` does not move internal Payment away from `PENDING`.
+43.7. Provider Payment Request Cancellation
+Payment boundary exposes an internal provider-cancellation operation whose payOS adapter maps to the current official cancel API:
+```text
+POST /v2/payment-requests/{id}/cancel
+```
+Identifier selection:
+```text
+prefer providerPaymentLinkId when available
+otherwise use merchant numeric Order.id only when provider creation was confirmed
+```
+Optional/available cancellation reason is passed as provider adapter data and is not a new business state.
+This external call is used only after authoritative local pending ADMIN cancellation commits. It is never executed while holding local Order/Payment/Inventory DB locks.
+44. PAYOS SIGNATURE IMPLEMENTATION
+44.1. Create Request Signature
+Current official payOS contract mô tả HMAC-SHA256 với checksum key và canonical create-payment string:
+```text
+amount={amount}&cancelUrl={cancelUrl}&description={description}&orderCode={orderCode}&returnUrl={returnUrl}
+```
+Các key trên theo provider-defined canonical order; implementation không tự đổi field set/order khi contract chưa được re-verified.
+Implement:
+```text
+PayOSSignatureService.createPaymentRequestSignature(...)
+
+```
+using:
+```text
+HmacSHA256
+PAYOS_CHECKSUM_KEY
+UTF-8
+lowercase hex
+
+```
+---
+44.2. Webhook Verification
+Official payOS documentation yêu cầu signature verification bằng `HMAC_SHA256`, canonicalizing webhook data fields theo alphabetical key order.
+Implementation không tự viết custom alternate canonicalization.
+Provider contract test phải dùng official sample payload/signature.
+45. PAYOS WEBHOOK PROCESSING
+Current official webhook payload contains outer fields:
+```text
+code
+desc
+success
+data
+signature
+```
+and payment `data` includes fields such as:
+```text
+orderCode
+amount
+reference
+transactionDateTime
+currency
+paymentLinkId
+code
+desc
+```
+The payOS signature verification procedure signs/verifies the `data` object, so `transactionDateTime` is inside the signed provider data when present.
+However, the current official payment-webhook documentation shows `transactionDateTime` as a local-looking string such as:
+```text
+2023-02-04 18:25:00
+```
+without explicitly documenting timezone semantics. Therefore the implementation must not silently assume a timezone.
+Internal flow:
+```text
+capture webhookReceivedAt = BusinessClock.now()
+↓
+receive raw webhook
+↓
+verify signature
+↓
+parse verified payload
+↓
+orderId = data.orderCode
+↓
+validate:
+Payment/order correlation
+Payment.amount == data.amount
+currency == VND
+providerPaymentLinkId compatible
+↓
+resolve verified effective payment-success time
+according to Section 49
+↓
+lock Order
+↓
+lock Payment
+↓
+re-read Payment.status
+↓
+state + expiresAt + effective success-time arbitration
+↓
+CG-002 OR terminal/manual-resolution outcome
+```
+Do not trust:
+```text
+frontend timestamp
+returnUrl timestamp
+unsigned client timestamp
+```
+Frontend return URL is never payment authority.
+External Contract Verification Required:
+before `transactionDateTime` is used as the authoritative provider transaction instant, adapter contract tests must verify:
+```text
+field existence
+signature coverage
+parse format
+timezone semantics
+```
+against the then-current official payOS contract.
+46. EXTERNAL PAYMENT IDENTIFIERS
+```text
+provider_payment_link_id
+=
+payOS paymentLinkId
+
+external_transaction_identifier
+=
+verified webhook data.reference
+when available
+
+```
+Both nullable before available.
+Constraints:
+```text
+provider_payment_link_id UNIQUE
+WHERE NOT NULL
+
+external_transaction_identifier UNIQUE
+WHERE NOT NULL
+
+```
+Duplicate reference mapped to another Payment:
+```text
+PAYMENT_EXTERNAL_ID_CONFLICT
+
+```
+---
+47. LATE SUCCESS IMPLEMENTATION
+If:
+```text
+Payment = FAILED/CANCELLED/EXPIRED
+Order = CANCELLED
+Inventory already RELEASED
+
+```
+and verified PAID event arrives:
+```text
+do not set PAID
+do not reopen Order
+do not commit Inventory
+
+```
+Update technical fields:
+```text
+manualResolutionRequired = true
+manualResolutionNote =
+"LATE_VERIFIED_PAYMENT_SUCCESS"
+
+```
+Structured log:
+```text
+event = LATE_PAYMENT_SUCCESS
+paymentId
+orderId
+providerReference
+
+```
+Webhook returns valid acknowledgment after safe recording so provider does not continuously retry the same verified event.
+48. PAYMENT EXPIRATION
+Implementation Decision ID-013
+Use:
+```text
+Spring @Scheduled
+```
+Frequency:
+```text
+every 30 seconds
+```
+Batch:
+```text
+100 Payment IDs
+```
+The 30-second frequency is a detection interval only.
+Business authority:
+```text
+Payment.expiresAt =
+Payment.createdAt + 15 minutes
+```
+Example:
+```text
+expiresAt = 10:15:00
+scheduler processes row = 10:15:20
+
+business expiration remains = 10:15:00
+```
+Scheduler execution delay does not extend Payment lifetime.
+Candidate query:
+```sql
+SELECT id
+FROM payments
+WHERE status = 'PENDING'
+  AND expires_at <= :now
+ORDER BY expires_at
+LIMIT 100
+```
+Each Payment is processed in an independent:
+```java
+@Transactional(REQUIRES_NEW)
+```
+transaction.
+Inside each transaction:
+```text
+lock Order
+↓
+lock Payment
+↓
+re-read Payment.status
+↓
+expire only when:
+Payment.status = PENDING
+AND Payment.expiresAt <= BusinessClock.now()
+```
+---
+49. PAYMENT EXPIRATION AND VERIFIED SUCCESS-TIME ARBITRATION
+Scheduler and webhook may race around the 15-minute deadline.
+Correctness is based on:
+```text
+current Payment.status
++
+Payment.expiresAt
++
+verified effective payment-success time
++
+Order/Payment/Inventory locks
+```
+DB locks serialize competing mutations; they do not define business time.
+49.1. Effective Payment Success Time
+After payOS signature verification succeeds, resolve:
+```text
+effectivePaymentSuccessTime
+```
+Priority:
+```text
+1. verified provider transaction timestamp
+   only if:
+   - field is present in signed provider data
+   - adapter contract test confirms parse format
+   - adapter contract test confirms timezone semantics
+
+2. conservative webhook-receipt fallback
+   only as defined below
+```
+Current payOS docs include signed `transactionDateTime`, but its payment-webhook timezone semantics are not explicitly documented. Until contract verification proves the timezone mapping, implementation must not guess.
+Fallback policy when provider transaction time cannot be interpreted reliably:
+```text
+if verified webhookReceivedAt <= Payment.expiresAt:
+    effectivePaymentSuccessTime = webhookReceivedAt
+    // conservative upper bound; receipt occurred before/on expiry
+
+else:
+    success time cannot be proven to be before expiry
+    do not run normal CG-002
+    expire still-PENDING Payment
+    set manualResolutionRequired = true
+    manualResolutionNote =
+      PAYMENT_SUCCESS_TIME_UNVERIFIABLE_AFTER_EXPIRY
+```
+This fallback does not trust frontend, returnUrl or unsigned timestamps.
+49.2. Verified Success Arbitration
+After verified provider event validation:
+```text
+lock Order
+↓
+lock Payment
+↓
+re-read Payment.status
+```
+Case A — Payment already `PAID`:
+```text
+idempotent success
+```
+Case B — Payment already terminal:
+```text
+FAILED
+CANCELLED
+EXPIRED
+```
+Result:
+```text
+do not set PAID
+do not reopen Order
+do not SALE Inventory
+manualResolutionRequired = true
+audit/log late payment
+```
+This preserves the frozen late-success rule.
+Case C — Payment still `PENDING`:
+resolve `effectivePaymentSuccessTime`.
+If:
+```text
+effectivePaymentSuccessTime <= Payment.expiresAt
+```
+run normal `CG-002`:
+```text
+Inventory SALE exactly once
+Payment → PAID
+Payment.paidAt = effectivePaymentSuccessTime
+Order remains NEW
+PAYMENT_SUCCESS
+```
+This remains valid even if webhook delivery reaches Backend after `expiresAt`, as long as Payment is still `PENDING` and verified provider time proves the transaction happened before/on expiry.
+If:
+```text
+effectivePaymentSuccessTime > Payment.expiresAt
+```
+do not run normal `CG-002`. Converge:
+```text
+Payment → EXPIRED
+Order → CANCELLED
+Inventory → RELEASED exactly once
+InventoryTransaction.RELEASE
+PAYMENT_FAILED actualStatus=EXPIRED
+manualResolutionRequired = true
+manualResolutionNote = LATE_VERIFIED_PAYMENT_SUCCESS
+```
+Do not:
+```text
+set Payment PAID
+reopen Order
+SALE Inventory
+```
+49.3. Required Success Pseudo-code
+```text
+processVerifiedSuccess(event):
+
+    validate verified provider event
+
+    order = lock Order
+    payment = lock Payment
+
+    if payment.status == PAID:
+        return idempotent success
+
+    if payment.status in
+       FAILED, CANCELLED, EXPIRED:
+
+        markManualResolutionRequired()
+        auditLateSuccess()
+        return
+
+    require payment.status == PENDING
+
+    successTime =
+        resolveVerifiedPaymentSuccessTime(event)
+
+    if successTime is UNVERIFIABLE_AFTER_EXPIRY:
+
+        expirePendingPayment()
+        releaseInventoryExactlyOnce()
+        cancelOrder()
+        createPaymentFailed(EXPIRED)
+        markManualResolutionRequired(
+            PAYMENT_SUCCESS_TIME_UNVERIFIABLE_AFTER_EXPIRY
+        )
+        return
+
+    if successTime > payment.expiresAt:
+
+        expirePendingPayment()
+        releaseInventoryExactlyOnce()
+        cancelOrder()
+        createPaymentFailed(EXPIRED)
+        markManualResolutionRequired(
+            LATE_VERIFIED_PAYMENT_SUCCESS
+        )
+        return
+
+    commitInventorySaleExactlyOnce()
+
+    payment.status = PAID
+    payment.paidAt = successTime
+
+    Order remains NEW
+
+    create PAYMENT_SUCCESS
+
+    commit
+```
+---
+50. NOTIFICATION IMPLEMENTATION
+50.1. Dedup Strategy
+Implementation Decision ID-014
+Notification uses:
+```text
+notifications.dedup_key UNIQUE
+
+```
+Examples:
+```text
+NEW_ORDER:ORDER:123
+
+PAYMENT_SUCCESS:PAYMENT:77
+
+PAYMENT_FAILED:FAILED:PAYMENT:77
+
+PAYMENT_FAILED:EXPIRED:PAYMENT:77
+
+LOW_STOCK:INV_TX:501
+
+OUT_OF_STOCK:INV_TX:502
+
+```
+Low-stock/out-of-stock key uses triggering InventoryTransaction ID, allowing a later new transition into Low Stock to create a new Notification.
+50.2. Insert Pattern
+Custom repository:
+```sql
+INSERT INTO notifications (...)
+VALUES (...)
+ON CONFLICT (dedup_key) DO NOTHING
+RETURNING id;
+
+```
+If no row returned:
+```text
+duplicate business event
+→ no recipient duplicates
+
+```
+---
+50.3. Recipients
+When Notification created:
+```text
+IdentityQueryService
+→ active ADMIN IDs
+
+```
+Snapshot recipients at event creation.
+Insert:
+```text
+NotificationRecipient
+for each ACTIVE ADMIN
+
+```
+Promotion after event does not retroactively create recipient rows.
+50.4. Read
+Mark read:
+```sql
+UPDATE notification_recipients
+SET
+    is_read = true,
+    read_at = :now
+WHERE notification_id = :notificationId
+  AND admin_id = :currentAdminId
+  AND is_read = false;
+
+```
+ADMIN A cannot mutate ADMIN B row.
+51. LOW STOCK / OUT OF STOCK DETECTION
+For every Inventory mutation calculate:
+```text
+beforeAvailable
+afterAvailable
+
+```
+State function:
+```text
+if available == 0:
+    OUT
+
+else if available <= lowStockThreshold:
+    LOW
+
+else:
+    NORMAL
+
+```
+Create Notification only when:
+```text
+beforeState != afterState
+AND afterState == LOW
+
+```
+or:
+```text
+beforeState != afterState
+AND afterState == OUT
+
+```
+No notification is generated from read/query operation.
+Implementation dependency rule:
+```text
+Inventory mutation
+→ compute before/after availability state
+→ publish internal InventoryAvailabilityTransition event
+→ Notification application listener persists LOW_STOCK / OUT_OF_STOCK
+```
+Inventory module không access Notification repository. Persistent Notification listener chạy synchronously trong business transaction; SSE vẫn AFTER_COMMIT best-effort.
+52. SSE IMPLEMENTATION
+SSE remains SHOULD.
+Implementation included but correctness does not depend on it.
+Endpoint:
+```text
+GET /api/v1/admin/notifications/stream
+
+```
+Component:
+```text
+SseEmitterRegistry
+
+```
+Connection indexed by:
+```text
+adminId
+
+```
+Flow:
+```java
+Persistent Notification commit
+↓
+@TransactionalEventListener(AFTER_COMMIT)
+↓
+SSE best-effort push
+
+```
+If connection fails:
+```text
+remove emitter
+do not rollback Notification
+
+```
+Frontend still fetches persistent list.
+53. REPORTING IMPLEMENTATION
+53.1. Revenue
+SQL semantics:
+```sql
+SELECT
+    COALESCE(SUM(o.total_amount), 0)
+FROM orders o
+JOIN payments p
+    ON p.order_id = o.id
+WHERE o.status = 'COMPLETED'
+  AND p.status = 'PAID'
+  AND o.completed_at >= :fromInstant
+  AND o.completed_at < :toExclusiveInstant;
+
+```
+---
+53.2. Revenue Chart
+Group by business local date.
+Implementation converts `completed_at` to business timezone in SQL/query projection.
+Logical grouping:
+```text
+Asia/Ho_Chi_Minh local date
+
+```
+---
+53.3. Best Selling Products
+```sql
+SELECT
+    oi.product_id,
+    oi.product_name_vi,
+    oi.product_name_en,
+    SUM(oi.quantity) AS sold_quantity
+FROM order_items oi
+JOIN orders o
+    ON o.id = oi.order_id
+JOIN payments p
+    ON p.order_id = o.id
+WHERE o.status = 'COMPLETED'
+  AND p.status = 'PAID'
+GROUP BY
+    oi.product_id,
+    oi.product_name_vi,
+    oi.product_name_en
+ORDER BY sold_quantity DESC;
+
+```
+Historical name grouping may split renamed Product snapshots.
+For report display, aggregate by `product_id` and choose latest historical name in application if needed; sold quantity remains grouped by `product_id`.
+53.4. Dashboard New Orders
+```sql
+SELECT COUNT(*)
+FROM orders o
+JOIN payments p ON p.order_id = o.id
+WHERE o.status = 'NEW'
+  AND p.status = 'PAID';
+
+```
+---
+53.5. Recent Orders
+```text
+ORDER BY orders.created_at DESC
+LIMIT configured dashboard size
+
+```
+Default:
+```text
+10
+
+```
+---
+53.6. Low Stock Products
+```text
+available =
+quantity - reserved_quantity
+
+available > 0
+AND
+available <= low_stock_threshold
+
+```
+Only non-deleted Product records are returned.
+54. COMMERCE COORDINATION IMPLEMENTATION
+Commerce package does not access module repositories directly.
+Dependencies are application interfaces:
+```text
+CartCheckoutPort
+ProductCheckoutQuery
+PricingService
+InventoryCommandService
+OrderCommandService
+PaymentCommandService
+NotificationService
+IdentityQueryService
+PayOSClient
+
+```
+No Controller calls these components individually.
+55. CHECKOUT IDEMPOTENCY
+Implementation Decision ID-015
+Mechanism:
+```text
+Idempotency-Key HTTP header
++
+checkout_operations table
++
+unique(user_id, idempotency_key)
+
+```
+Header format:
+```text
+UUID v4
+
+```
+Frontend generates before first submit and reuses it for retry of the same checkout.
+55.1. Request Hash
+Backend creates:
+```text
+SHA-256
+
+```
+of canonical normalized CheckoutRequest.
+If existing key has different hash:
+```text
+409
+IDEMPOTENCY_KEY_REUSED
+
+```
+---
+55.2. Duplicate Behavior
+Existing COMPLETED
+```text
+reconstruct CheckoutResponse
+from Order + Payment
+return same logical result
+
+```
+Existing PAYOS_CREATED
+```text
+resume CG-007
+
+```
+Existing PAYOS_CREATING
+```text
+return CHECKOUT_IN_PROGRESS
+retryable=true
+
+```
+or recovery logic if stale.
+Existing LOCAL_PREPARED
+```text
+continue external payment creation
+
+```
+Existing FAILED
+```text
+return original terminal failure
+do not create new Order
+
+```
+Existing STARTED
+```text
+resume local preparation
+
+```
+---
+56. CG-007 RECOVERY DECISION
+Three options evaluated:
+Option	Advantage	Problem
+Local boolean recovery fields	Simple	insufficient idempotency/history
+Generic Outbox/workflow engine	Powerful	over-engineered
+Explicit Checkout Operation record	Solves idempotency + CG-007	one technical table set
+Implementation Decision ID-016		
+Choose:		
+```text
+checkout_operations
++
+checkout_operation_items
+
+```
+as PostgreSQL-backed technical workflow state.
+No Kafka.
+No Saga engine.
+No Redis.
+Architecture explicitly requires CG-007 retry/resume to preserve one Order, one Payment, one reservation, one logical Cart clear and one NEW_ORDER.
+57. CHECKOUT IMPLEMENTATION SEQUENCE
+```mermaid
+sequenceDiagram
+    actor U as USER
+    participant API as CheckoutController
+    participant CO as CheckoutApplicationService
+    participant OP as CheckoutOperation
+    participant Cart as Cart
+    participant Price as Catalog Pricing
+    participant Inv as Inventory
+    participant Ord as Order
+    participant Pay as Payment
+    participant P as payOS
+    participant N as Notification
+
+    U->>API: POST /checkout + Idempotency-Key
+    API->>CO: checkout(command)
+
+    CO->>OP: acquire idempotency operation
+    CO->>Cart: lock/load whole Cart snapshot
+    CO->>Price: validate Products + calculate prices
+
+    CO->>Inv: lock Inventory and validate availability
+    CO->>Ord: create Order + OrderItems
+    CO->>Inv: reserve + RESERVE audit
+    CO->>Pay: create PENDING Payment
+    CO->>OP: LOCAL_PREPARED
+
+    CO->>OP: atomic LOCAL_PREPARED -> PAYOS_CREATING
+    CO->>P: create payment information
+
+    P-->>CO: create success
+
+    CO->>Pay: persist provider correlation
+    CO->>OP: PAYOS_CREATED
+
+    CO->>Cart: remove unchanged checked-out CartItems
+    CO->>N: persist NEW_ORDER
+    CO->>OP: COMPLETED
+
+    CO-->>API: CheckoutResponse
+    API-->>U: payment information
+
+```
+---
+58. CHECKOUT PSEUDO-CODE
+```text
+checkout(userId, idempotencyKey, request):
+
+    assert user role == USER
+
+    op = acquireOperation(
+        userId,
+        idempotencyKey,
+        requestHash
+    )
+
+    if op.COMPLETED:
+        return replayResponse(op)
+
+    if op.FAILED:
+        throw replayTerminalFailure(op)
+
+    if op.STARTED:
+        localPrepare(op, request)
+
+    if op.LOCAL_PREPARED:
+        createExternalPayment(op)
+
+    if op.PAYOS_CREATED:
+        finalizeCheckout(op)
+
+    if op.COMPLETED:
+        return replayResponse(op)
+
+    throw CHECKOUT_IN_PROGRESS
+
+```
+---
+59. CG-001 IMPLEMENTATION
+Architecture CG-001 requires Order + OrderItems + reservation + RESERVE audit + Payment PENDING as one consistent local outcome.
+Transaction Decision
+One PostgreSQL transaction.
+Method:
+```java
+CheckoutLocalPreparationService.prepare()
+@Transactional
+
+```
+Steps:
+```text
+1. lock CheckoutOperation
+
+2. capture checkoutNow = BusinessClock.now() once
+
+3. lock Cart row
+
+4. load CartItems
+
+5. assert non-empty
+
+6. snapshot:
+   cartItemId
+   cartItemVersion
+   productId
+   quantity
+
+7. load Products
+   validate ACTIVE
+   validate deletedAt null
+
+8. calculate authoritative sellingPrice
+   use checkoutNow for Discount effectiveness
+   apply BR-TIME-001
+   apply BR-MONEY-001
+
+9. lock Inventory rows
+   sorted by productId
+
+10. validate availability
+
+11. create Order
+    status NEW
+    use checkoutNow for business timestamp / OrderCode business date
+
+12. create OrderItems
+    bilingual immutable snapshot
+
+13. reserve Inventory
+
+14. create RESERVE InventoryTransaction
+
+15. create Payment
+    provider PAYOS
+    status PENDING
+    amount = Order.totalAmount
+    createdAt = checkoutNow
+    expiresAt = checkoutNow + 15 minutes
+
+16. persist CheckoutOperationItem snapshots
+
+17. update CheckoutOperation:
+    orderId
+    paymentId
+    state = LOCAL_PREPARED
+
+18. commit
+
+```
+Any exception:
+```text
+rollback entire CG-001
+
+```
+No Order remains if Inventory reservation fails.
+60. PAYOS CREATION STEP
+Outside PostgreSQL transaction:
+```text
+atomic technical transition:
+LOCAL_PREPARED
+→ PAYOS_CREATING
+
+↓
+call payOS
+
+```
+Only the request that successfully changes state to `PAYOS_CREATING` may call create payment.
+Concurrent duplicate request gets:
+```text
+CHECKOUT_IN_PROGRESS
+
+```
+---
+60.1. Ambiguous Network Failure
+If HTTP create request times out after send:
+```text
+do not immediately issue second create blindly
+
+```
+Recovery:
+```text
+PayOSClient.getPaymentRequest(Order.id)
+
+```
+Official payOS API supports fetching a payment request by merchant order code or payment-link identifier.
+If existing provider payment found:
+```text
+capture provider data
+state PAYOS_CREATED
+continue CG-007
+
+```
+If provider confirms no payment request exists:
+```text
+one controlled retry may be made
+
+```
+If definitive create failure:
+```text
+CG-005
+
+```
+---
+61. CG-005 IMPLEMENTATION
+```mermaid
+sequenceDiagram
+    participant CO as Commerce
+    participant Ord as Order
+    participant Pay as Payment
+    participant Inv as Inventory
+    participant N as Notification
+    participant Op as CheckoutOperation
+
+    CO->>Ord: lock Order
+    CO->>Pay: lock Payment
+    CO->>Inv: lock Inventory rows
+
+    CO->>Pay: PENDING -> FAILED
+    CO->>Ord: NEW -> CANCELLED
+    CO->>Inv: RELEASE exactly once
+    Inv->>Inv: persist RELEASE audit
+
+    CO->>N: persist PAYMENT_FAILED actualStatus=FAILED
+    CO->>Op: FAILED
+
+    Note over CO,Op: Cart remains unchanged
+
+```
+Method:
+```java
+CheckoutApplicationService.compensatePayOSFailure()
+@Transactional
+
+```
+Required result:
+```text
+Payment = FAILED
+Order = CANCELLED
+Inventory = RELEASED
+RELEASE audit
+PAYMENT_FAILED
+Cart retained
+No NEW_ORDER
+
+```
+---
+62. CG-007 SUCCESS CAPTURE
+After payOS create succeeds, first persist external success in a small transaction:
+```java
+CheckoutRecoveryService.capturePayOSCreateSuccess()
+@Transactional
+
+```
+Steps:
+```text
+lock CheckoutOperation
+lock Payment
+
+persist:
+providerPaymentLinkId
+checkoutUrl
+qrCode
+
+CheckoutOperation.state =
+PAYOS_CREATED
+
+commit
+
+```
+This creates durable recovery correlation before Cart/Notification finalization.
+63. CG-007 FINALIZATION
+Method:
+```java
+CheckoutFinalizationService.finalizeCheckout()
+@Transactional
+
+```
+Steps:
+```text
+1. lock CheckoutOperation
+
+2. if COMPLETED:
+       return idempotent success
+
+3. require state = PAYOS_CREATED
+
+4. lock Order, then Payment
+   using global business lock order
+
+5. require Order = NEW
+   require Payment not in FAILED/CANCELLED/EXPIRED/REFUNDED
+
+   normal canonical case:
+       Payment = PENDING
+       Inventory reservation remains RESERVED
+
+   verified-success race case:
+       Payment = PAID
+       allowed only because CG-002 already processed a verified success event;
+       CG-007 itself does not change Payment or Inventory
+
+6. load CheckoutOperationItems
+
+7. for each snapshot:
+       DELETE CartItem
+       WHERE id = snapshot.cartItemId
+         AND version = snapshot.cartItemVersion
+
+   if CartItem no longer exists:
+       treated as already finalized
+
+   if version changed:
+       preserve current CartItem
+       because it represents user modification after checkout snapshot
+
+8. create Notification:
+       type NEW_ORDER
+       dedupKey NEW_ORDER:ORDER:{orderId}
+
+9. create NotificationRecipient rows
+
+10. set CheckoutOperation:
+        state = COMPLETED
+        completedAt = now
+
+11. commit
+
+```
+Only after transaction commit:
+```text
+CheckoutApplicationService
+returns CheckoutResponse
+
+```
+Nếu Order không còn `NEW` hoặc Payment đã ở terminal unsuccessful/refunded state trước khi CG-007 lock được business rows, finalization không được clear Cart hoặc persist `NEW_ORDER`; Backend không return successful checkout initiation.
+64. CG-007 RECOVERY SEQUENCE
+```mermaid
+sequenceDiagram
+    participant J as Recovery Job or Retry Request
+    participant Op as CheckoutOperation
+    participant Pay as Payment
+    participant Cart as Cart
+    participant N as Notification
+    participant DB as PostgreSQL
+
+    J->>Op: Find PAYOS_CREATED
+    J->>DB: Begin transaction
+    J->>Op: Lock operation
+    J->>DB: Lock Order then Payment and validate state
+
+    alt Already COMPLETED
+        J-->>J: replay result
+    else PAYOS_CREATED
+        J->>Pay: verify provider correlation persisted
+        J->>Cart: conditional delete checked items
+        J->>N: insert NEW_ORDER ON CONFLICT DO NOTHING
+        J->>Op: state = COMPLETED
+        J->>DB: Commit
+    end
+
+```
+---
+64.1. Background Recovery
+`CheckoutFinalizationRecoveryJob`
+Frequency:
+```text
+15 seconds
+
+```
+Batch:
+```text
+50
+
+```
+Candidates:
+```text
+state = PAYOS_CREATED
+
+```
+Each op handled in separate transaction.
+Additionally stale:
+```text
+PAYOS_CREATING
+AND
+processing_started_at < now - 30 seconds
+
+```
+are resolved by provider lookup before any further create attempt.
+64.2. Initial Request Failure During Phase C
+If Phase C throws transient DB error:
+```text
+HTTP 503
+CHECKOUT_FINALIZATION_PENDING
+
+```
+Backend does not return checkout success.
+Frontend retries with same:
+```text
+Idempotency-Key
+
+```
+Recovery/background job may finish first.
+Subsequent request gets completed response.
+64.3. CG-007 vs Payment/Order Terminal Race
+`Recoverability ≠ Successful Finalization`. Recovery only resumes the same required Phase C effects; it does not authorize early success.
+`CheckoutFinalizationService` serializes against payment/terminal flows using:
+```text
+CheckoutOperation
+→ Order
+→ Payment
+```
+Outcomes after locks:
+```text
+Order = NEW + Payment = PENDING
+→ finalize Cart + NEW_ORDER + CheckoutOperation
+
+Order = NEW + Payment = PAID
+→ verified success already won the race
+→ finalize only Cart + NEW_ORDER + CheckoutOperation
+→ do not mutate Payment/Inventory
+
+Order != NEW
+OR Payment in FAILED/CANCELLED/EXPIRED/REFUNDED
+→ do not clear Cart
+→ do not create NEW_ORDER
+→ no successful CheckoutResponse
+→ structured observable recovery/error state
+```
+A retry/resume never creates a second Order, OrderItems, Payment, payOS Payment Information, reservation, RESERVE audit or uncontrolled `NEW_ORDER`. It only removes the checked-out CartItems captured in CheckoutOperationItem snapshots.
+65. CG-002 PAYMENT SUCCESS
+Verified provider data is parsed and validated before the business transaction.
+Then:
+```java
+PaymentResultApplicationService.processSuccess()
+@Transactional
+```
+Steps:
+```text
+1. determine orderId from verified provider event
+
+2. lock Order
+
+3. lock Payment
+
+4. if Payment = PAID:
+       duplicate webhook
+       return idempotent success
+
+5. if Payment in FAILED/CANCELLED/EXPIRED:
+       mark manualResolutionRequired
+       log/audit late event
+       return
+
+6. require Payment = PENDING
+
+7. validate:
+       amount matches
+       provider payment link matches
+       Order.status = NEW
+
+8. resolve effectivePaymentSuccessTime
+   using Section 49
+
+9. if effectivePaymentSuccessTime cannot be proven
+   before/on expiry after expiry has passed:
+       expire PENDING Payment
+       cancel Order
+       RELEASE Inventory exactly once
+       PAYMENT_FAILED actualStatus=EXPIRED
+       manualResolutionRequired=true
+       return
+
+10. if effectivePaymentSuccessTime > Payment.expiresAt:
+        expire PENDING Payment
+        cancel Order
+        RELEASE Inventory exactly once
+        PAYMENT_FAILED actualStatus=EXPIRED
+        manualResolutionRequired=true
+        return
+
+11. lock Inventory rows sorted productId
+
+12. for each OrderItem:
+        commit SALE
+        create SALE audit
+        unique businessKey
+
+13. Payment.status = PAID
+    paidAt = effectivePaymentSuccessTime
+    externalTransactionIdentifier =
+        verified provider reference
+
+14. Order remains NEW
+
+15. persist PAYMENT_SUCCESS
+    dedupKey PAYMENT_SUCCESS:PAYMENT:{id}
+
+16. commit
+```
+Architecture mandates `Order remains NEW` after payment success.
+66. PAYMENT SUCCESS WEBHOOK SEQUENCE
+```mermaid
+sequenceDiagram
+    participant P as payOS
+    participant W as WebhookController
+    participant V as PayOSWebhookVerifier
+    participant C as PaymentResultApplicationService
+    participant O as Order
+    participant Pay as Payment
+    participant I as Inventory
+    participant N as Notification
+
+    P->>W: Webhook
+    W->>W: capture webhookReceivedAt
+    W->>V: verify raw payload
+
+    alt Invalid signature
+        V-->>W: reject
+        W-->>P: 400
+    else Valid
+        V-->>W: VerifiedPayOSEvent
+        W->>C: processSuccess(event, receivedAt)
+        C->>C: validate correlation + amount
+        C->>O: lock
+        C->>Pay: lock + re-read status
+
+        alt already PAID
+            C-->>W: idempotent success
+        else FAILED/CANCELLED/EXPIRED
+            C->>Pay: manualResolutionRequired=true
+            C->>C: audit late success
+        else PENDING
+            C->>C: resolve effectivePaymentSuccessTime
+
+            alt successTime <= expiresAt
+                C->>I: lock + SALE exactly once
+                C->>Pay: status=PAID, paidAt=successTime
+                C->>N: persist PAYMENT_SUCCESS
+            else successTime > expiresAt or unverifiable after expiry
+                C->>I: RELEASE exactly once
+                C->>Pay: status=EXPIRED
+                C->>O: status=CANCELLED
+                C->>N: PAYMENT_FAILED actualStatus=EXPIRED
+                C->>Pay: manualResolutionRequired=true
+            end
+        end
+
+        W-->>P: 2xx after safe processing
+    end
+```
+---
+67. CG-003 TERMINAL PAYMENT
+Method:
+```java
+PaymentResultApplicationService.processTerminalFailure(
+    paymentId,
+    actualStatus
+)
+@Transactional
+
+```
+Allowed actualStatus:
+```text
+FAILED
+CANCELLED
+EXPIRED
+
+```
+Flow:
+```text
+lock Order
+lock Payment
+
+if already same terminal state:
+    no-op
+
+if Payment = PAID or REFUNDED:
+    reject incompatible terminal transition
+
+lock Inventory rows
+
+release reservations exactly once
+create RELEASE audits
+
+Payment.status = actualStatus
+Order.status = CANCELLED
+
+persist PAYMENT_FAILED
+metadata.actualStatus = actualStatus
+
+commit
+
+```
+---
+68. PAYMENT EXPIRATION SEQUENCES
+68.1. Verified Webhook Expiration Arbitration
+```mermaid
+sequenceDiagram
+    participant P as payOS
+    participant W as Webhook
+    participant O as Order
+    participant Pay as Payment
+    participant I as Inventory
+    participant N as Notification
+
+    P->>W: payment-success webhook
+    W->>W: verify signature + correlation + amount
+    W->>O: lock Order
+    W->>Pay: lock Payment
+    W->>Pay: re-read status + expiresAt
+
+    alt Payment = PAID
+        W-->>P: idempotent 2xx
+    else Payment = FAILED/CANCELLED/EXPIRED
+        W->>Pay: manualResolutionRequired=true
+        W-->>P: safe 2xx
+    else Payment = PENDING
+        W->>W: resolve effective success time
+
+        alt successTime <= expiresAt
+            W->>I: SALE exactly once
+            W->>Pay: PAID, paidAt=successTime
+            W->>N: PAYMENT_SUCCESS
+        else successTime > expiresAt or unverifiable after expiry
+            W->>I: RELEASE exactly once
+            W->>Pay: EXPIRED + manual resolution
+            W->>O: CANCELLED
+            W->>N: PAYMENT_FAILED actualStatus=EXPIRED
+        end
+    end
+```
+68.2. Scheduler Detection
+```mermaid
+sequenceDiagram
+    participant Job as PaymentExpirationJob
+    participant O as Order
+    participant P as Payment
+    participant I as Inventory
+    participant N as Notification
+
+    Job->>P: Query PENDING and expires_at <= now
+
+    loop each Payment ID
+        Job->>O: lock Order
+        Job->>P: lock Payment
+        Job->>P: re-read status + expiresAt
+
+        alt Payment no longer PENDING
+            Job-->>Job: no-op
+        else PENDING and expiresAt <= BusinessClock.now()
+            Job->>I: RELEASE exactly once
+            Job->>P: status = EXPIRED
+            Job->>O: status = CANCELLED
+            Job->>N: PAYMENT_FAILED actualStatus=EXPIRED
+        else PENDING but not yet expired
+            Job-->>Job: no-op
+        end
+    end
+```
+The scheduler detects expiration; its execution time never extends or redefines `Payment.expiresAt`.
+69. CG-004 PAID ORDER CANCELLATION
+`OrderCancellationApplicationService.cancel(orderId, adminId)`
+69.1. Pending Payment ADMIN Cancellation
+Local business precondition:
+```text
+Order = NEW
+Payment = PENDING
+```
+Authoritative local transaction:
+```text
+BEGIN DB TX
+
+lock Order
+lock Payment
+lock Inventory rows sorted by Product ID
+
+Order → CANCELLED
+Payment → CANCELLED
+Inventory → RELEASED exactly once
+InventoryTransaction.RELEASE
+PAYMENT_FAILED actualStatus=CANCELLED
+
+COMMIT
+```
+Only after local commit:
+```text
+best-effort provider payment-request cancellation
+through Payment/payOS adapter
+```
+Current provider mapping:
+```text
+PayOSClient.cancelPaymentRequest(...)
+→ POST /v2/payment-requests/{id}/cancel
+```
+No payOS network call is executed while holding Order/Payment/Inventory DB locks.
+If provider cancellation fails:
+```text
+do not rollback local cancellation
+do not restore Payment PENDING
+do not re-reserve Inventory
+```
+Structured WARN/ERROR contains:
+```text
+event = PAYOS_PROVIDER_CANCEL_FAILED
+orderId
+paymentId
+providerPaymentLinkId
+correlationId
+provider cancel result/error
+```
+The adapter may perform bounded best-effort retry. Operational retry is allowed, but no new business status is introduced.
+If provider cancellation fails and a verified payment success later arrives while local state is:
+```text
+Order = CANCELLED
+Payment = CANCELLED
+Inventory = RELEASED
+```
+reuse the frozen late-success rule:
+```text
+do not reopen Order
+do not set normal business flow to PAID
+do not SALE Inventory
+manualResolutionRequired = true
+audit/log late success
+```
+69.2. Paid Order Cancellation
+Precondition:
+```text
+Order = NEW or CONFIRMED
+Payment = PAID
+```
+Flow:
+```text
+lock Order
+lock Payment
+lock Inventory rows sorted by Product ID
+
+restore physical quantity exactly once
+create CANCEL_ORDER audits
+
+Order = CANCELLED
+Payment remains PAID
+
+commit
+```
+No automatic refund.
+No provider refund/cancellation call is introduced for paid cancellation.
+70. ADMIN CANCELLATION IDEMPOTENCY
+If duplicate cancellation request reaches:
+```text
+Order = CANCELLED
+
+```
+Service reads Inventory business transactions.
+If cancellation effect already applied:
+```text
+return current Order state
+no second RELEASE
+no second RESTORE
+
+```
+Unique InventoryTransaction business keys provide DB safety.
+71. CG-006 MANUAL REFUND
+Endpoint invokes:
+```java
+ManualRefundApplicationService.record(...)
+@Transactional
+
+```
+Flow:
+```text
+lock Order
+lock Payment
+
+require:
+Order = CANCELLED
+Payment = PAID
+
+Payment.status = REFUNDED
+Payment.refundedAt = now
+Payment.refundedByUserId = currentAdminId
+Payment.manualRefundNote = request.note
+
+NO Inventory call
+
+commit
+
+```
+Duplicate request after Payment already REFUNDED:
+```text
+return current REFUNDED state
+no Inventory action
+
+```
+---
+72. MANUAL REFUND API SEMANTICS
+API chỉ ghi nhận:
+```text
+external refund was completed manually
+
+```
+Không:
+```text
+call payOS refund
+initiate bank transfer
+modify Inventory
+
+```
+---
+73. TRANSACTION STRATEGY
+Use Case	Transaction Boundary	Lock / Guard	External Call	Compensation
+Idempotency acquire	Small local tx	CheckoutOp unique	No	No
+CG-001	One PostgreSQL tx	Cart + Inventory locks	No	rollback
+payOS create	No business DB tx	CheckoutOp technical state	Yes	CG-005
+payOS success capture	Small local tx	CheckoutOp + Payment	No	recovery
+CG-007	One PostgreSQL tx	CheckoutOp + Order + Payment state guard	No	retry/resume / terminal abort
+CG-002 webhook success	One PostgreSQL tx	Order + Payment + Inventory; state + expiresAt + verified effective success time	Webhook verified before tx	state/time arbitration
+CG-003 terminal	One PostgreSQL tx	Order + Payment + Inventory	No	idempotent
+Expiration	tx per Payment	Order + Payment + Inventory; Payment.expiresAt authoritative	No	idempotent
+Pending ADMIN cancellation	Order + Payment + Inventory local tx	Order → Payment → Inventory	payOS cancellation AFTER COMMIT	No rollback of local business result
+CG-004 paid cancel	One tx	Order + Payment + Inventory	No	business keys
+CG-006 refund	One tx	Order + Payment	No	idempotent
+Inventory adjust	One tx	Inventory	No	rollback
+Order status progress	One tx	Order + Payment	No	rollback
+Admin demote/block	One tx	ACTIVE ADMIN rows	No	rollback
+Image upload	S3 external call + short local DB metadata tx	Product row lock only during DB finalization	S3 PutObject before DB tx	S3 DeleteObject if metadata finalization fails
+Image delete	DB then S3	Product row	S3 DeleteObject AFTER COMMIT	S3 retry
+---
+74. LOCKING MATRIX
+Resource	Operation	Risk	Selected Strategy
+Inventory	Reserve	Oversell	PESSIMISTIC_WRITE
+Inventory	Sale	Double commit	Lock + business key
+Inventory	Release	Double release	Lock + business key
+Inventory	Restore	Double restore	Lock + business key
+Payment	Webhook	duplicate/race	PESSIMISTIC_WRITE + state/expiresAt/effective-time guard
+Payment	Expiration	success race	PESSIMISTIC_WRITE + expiresAt guard
+Order	Admin transition	stale state	PESSIMISTIC_WRITE
+Order	Cancellation	race	PESSIMISTIC_WRITE
+ACTIVE ADMIN rows	Demote/block	zero admin	PESSIMISTIC_WRITE all active
+Product	Image upload	>10 images	PESSIMISTIC_WRITE only during short metadata finalization
+Product	Thumbnail	two thumbnails	PESSIMISTIC_WRITE + DB partial unique
+CheckoutOperation	Workflow	duplicate external call	PESSIMISTIC_WRITE + state CAS
+CheckoutOperation + Order + Payment	CG-007 finalize	finalization vs terminal/payment race	lock Op, then Order → Payment + state guard
+Global Order/Payment/Inventory lock order:			
+```text
+Order
+→ Payment
+→ Inventory sorted by Product ID
+```
+External call rule:
+```text
+No payOS create/cancel network call while
+Order/Payment/Inventory DB locks are held.
+
+S3 PutObject never runs while
+Product DB lock is held.
+```
+---
+75. IDEMPOTENCY MATRIX
+Operation	Identity	Storage / Constraint	Duplicate Behavior
+Checkout	userId + Idempotency-Key	checkout_operations UNIQUE	replay/resume
+CG-001	checkoutOperationId	operation state	no second Order
+payOS create	Order.id + op state	PAYOS_CREATING	no blind duplicate
+Webhook success	Payment state + provider IDs	Payment lock + UNIQUE IDs	state/time-safe no-op or single transition
+Provider cancel	local Order/Payment terminal state + provider request identifier	local Payment/Order state; provider adapter best-effort	no second Inventory release; duplicate provider cancel is safe/best-effort
+Inventory RESERVE	order+product+type	business_key UNIQUE	no-op
+Inventory SALE	order+product+type	business_key UNIQUE	no-op
+Inventory RELEASE	order+product+type	business_key UNIQUE	no-op
+Inventory RESTORE	order+product+type	business_key UNIQUE	no-op
+CG-007	checkoutOperationId	op state + cart versions	resume
+NEW_ORDER	Order ID	notification dedup_key	no-op
+PAYMENT_SUCCESS	Payment ID	notification dedup_key	no-op
+PAYMENT_FAILED	Payment ID + status	notification dedup_key	no-op
+Manual refund record	Payment state	Payment lock	already REFUNDED no-op
+---
+76. REST API VERSIONING
+Implementation Decision ID-017
+Base:
+```text
+/api/v1
+
+```
+No second version until incompatible contract change.
+76.1. OpenAPI Documentation
+Springdoc exposes development API documentation from the same `/api/v1` contract.
+Required coverage:
+```text
+HTTP method + path
+request/query/header fields
+validation
+cookie authentication
+CSRF header for state-changing browser requests
+Idempotency-Key for checkout
+response envelope
+error codes
+role requirement
+```
+Development endpoints:
+```text
+/v3/api-docs
+/swagger-ui/**
+```
+Production exposure may be restricted, but generated OpenAPI contract remains part of the build and must not contain secrets/provider credentials.
+77. REST API CATALOG
+77.1. Authentication
+Method	Endpoint	Actor	Purpose	Request	Response
+GET	`/api/v1/auth/csrf`	GUEST/USER/ADMIN	Resolve/generate current CSRF token	—	CsrfTokenResponse
+POST	`/api/v1/auth/google`	GUEST	Google Login; requires CSRF header	GoogleLoginRequest	AuthResponse + Set-Cookie
+POST	`/api/v1/auth/logout`	USER/ADMIN	Spring Security `LogoutFilter`; clear SecurityContext, `BT_ACCESS` and CSRF repository state	`X-XSRF-TOKEN` header + Cookie Authentication	Standard `ApiResponse<Void>` + `Set-Cookie` deletion, HTTP 200
+GET	`/api/v1/me`	USER/ADMIN	Current User	—	CurrentUserResponse
+---
+77.2. User Administration
+Method	Endpoint	Actor	Purpose
+GET	`/api/v1/admin/users`	ADMIN	List/search/page
+GET	`/api/v1/admin/users/{id}`	ADMIN	Detail
+POST	`/api/v1/admin/users/{id}/promote`	ADMIN	USER → ADMIN
+POST	`/api/v1/admin/users/{id}/demote`	ADMIN	ADMIN → USER
+POST	`/api/v1/admin/users/{id}/block`	ADMIN	ACTIVE → BLOCKED
+POST	`/api/v1/admin/users/{id}/unblock`	ADMIN	BLOCKED → ACTIVE
+---
+77.3. Products
+Method	Endpoint	Actor	Purpose
+GET	`/api/v1/products`	Public	Search/filter/page
+GET	`/api/v1/products/{id}`	Public	Detail
+GET	`/api/v1/admin/products`	ADMIN	Admin list
+GET	`/api/v1/admin/products/{id}`	ADMIN	Admin detail
+POST	`/api/v1/admin/products`	ADMIN	Create
+PUT	`/api/v1/admin/products/{id}`	ADMIN	Update
+PATCH	`/api/v1/admin/products/{id}/status`	ADMIN	Enable/disable
+DELETE	`/api/v1/admin/products/{id}`	ADMIN	Soft delete
+---
+77.4. Collections
+Method	Endpoint	Actor
+GET	`/api/v1/collections`	Public
+GET	`/api/v1/collections/{id}`	Public SHOULD
+GET	`/api/v1/admin/collections`	ADMIN
+POST	`/api/v1/admin/collections`	ADMIN
+PUT	`/api/v1/admin/collections/{id}`	ADMIN
+PATCH	`/api/v1/admin/collections/{id}/status`	ADMIN
+DELETE	`/api/v1/admin/collections/{id}`	ADMIN
+---
+77.5. Discount
+Method	Endpoint	Actor	Purpose
+PUT	`/api/v1/admin/products/{productId}/discount`	ADMIN	create/update
+PATCH	`/api/v1/admin/products/{productId}/discount/active`	ADMIN	enable/disable
+DELETE	`/api/v1/admin/products/{productId}/discount`	ADMIN	remove
+---
+77.6. Images
+Method	Endpoint	Actor
+POST	`/api/v1/admin/products/{productId}/images`	ADMIN
+DELETE	`/api/v1/admin/products/{productId}/images/{imageId}`	ADMIN
+PUT	`/api/v1/admin/products/{productId}/images/order`	ADMIN
+PUT	`/api/v1/admin/products/{productId}/images/{imageId}/thumbnail`	ADMIN
+---
+77.7. Cart / Checkout
+Method	Endpoint	Actor
+GET	`/api/v1/cart`	USER
+POST	`/api/v1/cart/items`	USER
+PATCH	`/api/v1/cart/items/{itemId}`	USER
+DELETE	`/api/v1/cart/items/{itemId}`	USER
+POST	`/api/v1/checkout`	USER
+`POST /checkout` requires:		
+```text
+Idempotency-Key
+
+```
+---
+77.8. Orders
+Method	Endpoint	Actor
+GET	`/api/v1/me/orders`	USER
+GET	`/api/v1/me/orders/{id}`	USER owner
+GET	`/api/v1/admin/orders`	ADMIN
+GET	`/api/v1/admin/orders/{id}`	ADMIN
+PATCH	`/api/v1/admin/orders/{id}/status`	ADMIN
+POST	`/api/v1/admin/orders/{id}/cancel`	ADMIN
+No USER cancel endpoint.		
+---
+77.9. Payment
+Method	Endpoint	Actor
+GET	`/api/v1/payments/{id}`	USER owner
+POST	`/api/v1/payments/webhook/payos`	payOS
+POST	`/api/v1/admin/payments/{id}/manual-refund`	ADMIN
+---
+77.10. Notification
+Method	Endpoint	Actor
+GET	`/api/v1/admin/notifications`	ADMIN
+PATCH	`/api/v1/admin/notifications/{id}/read`	ADMIN
+GET	`/api/v1/admin/notifications/stream`	ADMIN
+---
+77.11. Reporting
+Method	Endpoint	Actor
+GET	`/api/v1/admin/dashboard`	ADMIN
+GET	`/api/v1/admin/reports/revenue`	ADMIN
+GET	`/api/v1/admin/reports/best-selling`	ADMIN
+---
+77.12. Inventory
+Method	Endpoint	Actor	Purpose
+GET	`/api/v1/admin/inventory`	ADMIN	List/search/filter/page Inventory
+GET	`/api/v1/admin/inventory/{productId}/transactions`	ADMIN	Inventory Transaction History
+POST	`/api/v1/admin/inventory/{productId}/adjust`	ADMIN	IMPORT or ADJUSTMENT physical quantity
+---
+77.13. Query Parameter Contracts
+All pageable endpoints use Section 81 pagination rules.
+Admin Users
+```text
+keyword → email OR fullName contains, case-insensitive
+role → USER | ADMIN
+status → ACTIVE | BLOCKED
+page,size
+sort → createdAt | email, asc|desc
+```
+Admin Products
+```text
+keyword
+status → ACTIVE | INACTIVE
+collectionId
+page,size
+sort → createdAt | basePrice | nameVi | nameEn, asc|desc
+```
+Soft-deleted Products are excluded.
+Admin Collections
+```text
+keyword → nameVi OR nameEn contains, case-insensitive
+status → ACTIVE | INACTIVE
+page,size
+sort → createdAt | nameVi | nameEn, asc|desc
+```
+Admin Inventory
+```text
+keyword → Product nameVi/nameEn through Catalog public query/composite read contract
+status → IN_STOCK | LOW_STOCK | OUT_OF_STOCK
+page,size
+sort → productId | quantity | availableQuantity, asc|desc
+```
+`availableQuantity` and `status` are derived; no persisted Inventory status column exists.
+Inventory Transaction History
+```text
+productId → path
+page,size
+sort → createdAt,desc default
+```
+Admin Orders
+Uses Section 40.3 contract.
+Notifications
+```text
+isRead
+type
+page,size
+sort=createdAt,desc
+```
+Revenue Report
+```text
+fromDate → required LocalDate
+toDate → required LocalDate
+groupBy → DAY | WEEK | MONTH
+```
+Backend converts business dates using `Asia/Ho_Chi_Minh` to an end-exclusive Instant range.
+Best Selling
+```text
+fromDate → optional LocalDate
+toDate → optional LocalDate
+limit → default 10, max 100
+```
+Eligibility remains strictly `COMPLETED + PAID`; sold quantity comes from OrderItem snapshot.
+78. REQUEST DTO SPECIFICATION
+78.1. GoogleLoginRequest
+Field	Type	Required	Validation
+`credential`	String	Yes	nonblank
+---
+78.2. CreateProductRequest
+Field	Type	Required	Validation
+`nameVi`	String	Yes	1..255
+`nameEn`	String	Yes	1..255
+`descriptionVi`	String	No	max 10000
+`descriptionEn`	String	No	max 10000
+`basePrice`	Long	Yes	>0
+`collectionId`	Long	Yes	exists
+`status`	ProductStatus	Yes	ACTIVE/INACTIVE
+---
+78.3. UpdateProductRequest
+Same editable fields as Create.
+Fractional Product base price cannot deserialize into `Long`; request is rejected `400`.
+78.4. Create/UpdateCollectionRequest
+Field	Type	Required
+`nameVi`	String	Yes
+`nameEn`	String	Yes
+`descriptionVi`	String	No
+`descriptionEn`	String	No
+`status`	CollectionStatus	Yes
+Implementation uses dedicated:		
+```text
+CollectionStatus
+ACTIVE
+INACTIVE
+
+```
+---
+78.5. UpsertDiscountRequest
+Field	Type	Required	Validation
+`discountType`	DiscountType	Yes	valid
+`discountValue`	BigDecimal	Yes	type-specific
+`startAt`	OffsetDateTime	Yes	`< endAt`
+`endAt`	OffsetDateTime	Yes	`> startAt`
+`isActive`	Boolean	Yes	—
+---
+78.6. AddCartItemRequest
+Field	Type	Required	Validation
+`productId`	Long	Yes	positive
+`quantity`	Integer	Yes	>=1
+---
+78.7. UpdateCartItemRequest
+Field	Type	Required
+`quantity`	Integer	Yes, >=1
+---
+78.8. CheckoutRequest
+Field	Type	Required	Validation
+`receiverName`	String	Yes	1..255
+`phone`	String	Yes	8..32
+`email`	String	No	email format
+`address`	String	Yes	1..500
+`note`	String	No	max 1000
+If email absent:			
+```text
+Order.email =
+authenticated User.email
+
+```
+---
+78.9. UpdateOrderStatusRequest
+Field	Type	Required	Validation
+`status`	OrderStatus	Yes	CONFIRMED or COMPLETED only
+Cancellation uses dedicated endpoint.			
+---
+78.10. AdjustInventoryRequest
+Field	Type	Required	Validation
+`type`	String	Yes	`IMPORT` or `ADJUSTMENT`
+`quantityChange`	Long	Yes	IMPORT: `>0`; ADJUSTMENT: `!=0`
+`reason`	String	Yes	1..500
+`type` is admin audit/operation classification; RESERVE/RELEASE/SALE/CANCEL_ORDER are not admin-selectable values.			
+78.11. RecordManualRefundRequest
+Field	Type	Required
+`note`	String	No, max 500
+Submission means ADMIN confirms external refund has already succeeded.		
+---
+78.12. ReorderProductImagesRequest
+Field	Type	Required
+`imageIds`	List	Yes
+List must contain exactly the Product's currently reorderable image IDs with no duplicates.		
+---
+79. RESPONSE DTO SPECIFICATION
+79.1. AuthResponse
+```text
+user
+expiresAt
+
+```
+JWT itself is not returned to JavaScript.
+It is set in HttpOnly cookie.
+79.2. CurrentUserResponse
+```text
+id
+email
+fullName
+avatarUrl
+role
+status
+
+```
+---
+79.3. ProductSummaryResponse
+```text
+id
+nameVi
+nameEn
+basePrice
+sellingPrice
+thumbnailUrl
+collection
+availableQuantity
+availabilityStatus
+createdAt
+
+```
+---
+79.4. ProductDetailResponse
+```text
+id
+nameVi
+nameEn
+descriptionVi
+descriptionEn
+basePrice
+sellingPrice
+discount
+collection
+images[]
+availableQuantity
+availabilityStatus
+
+```
+---
+79.5. CartItemResponse
+```text
+id
+productId
+nameVi
+nameEn
+thumbnailUrl
+quantity
+basePrice
+sellingPrice
+lineTotal
+availableQuantity
+
+```
+---
+79.6. CartResponse
+```text
+items[]
+totalAmount
+
+```
+`totalAmount` chỉ là current cart display calculation.
+Checkout vẫn recalculate.
+79.7. CheckoutResponse
+```text
+checkoutOperationId
+orderId
+orderCode
+paymentId
+paymentStatus
+totalAmount
+checkoutUrl
+qrCode
+expiresAt
+
+```
+Expected initial:
+```text
+paymentStatus = PENDING
+
+```
+---
+79.8. OrderSummaryResponse
+```text
+id
+orderCode
+createdAt
+totalAmount
+orderStatus
+paymentStatus
+
+```
+---
+79.9. OrderItemResponse
+```text
+productId
+productNameVi
+productNameEn
+basePrice
+sellingPrice
+quantity
+totalPrice
+
+```
+Frontend chooses historical name according to locale.
+79.10. OrderDetailResponse
+```text
+id
+orderCode
+userId
+
+receiverName
+phone
+email
+address
+note
+
+items[]
+
+subtotal
+totalAmount
+orderStatus
+paymentStatus
+
+createdAt
+updatedAt
+
+```
+---
+79.11. PaymentResponse
+```text
+id
+orderId
+status
+amount
+checkoutUrl
+qrCode
+expiresAt
+paidAt
+
+```
+Do not expose:
+```text
+provider secrets
+signature
+checksum
+
+```
+---
+79.12. NotificationResponse
+```text
+id
+type
+title
+message
+referenceType
+referenceId
+metadata
+isRead
+readAt
+createdAt
+
+```
+`isRead` comes from current ADMIN's NotificationRecipient row.
+79.13. DashboardResponse
+```text
+totalOrders
+totalRevenue
+newOrders
+lowStockProducts
+revenueChart
+recentOrders
+bestSellingProducts
+
+```
+---
+79.14. InventoryListItemResponse
+```text
+productId
+productNameVi
+productNameEn
+quantity
+reservedQuantity
+availableQuantity
+lowStockThreshold
+status
+```
+`status` is derived `IN_STOCK | LOW_STOCK | OUT_OF_STOCK` and is never authoritative persisted state.
+79.15. InventoryTransactionResponse
+```text
+id
+productId
+type
+quantityDelta
+reservedQuantityDelta
+beforeQuantity
+afterQuantity
+beforeReservedQuantity
+afterReservedQuantity
+referenceType
+referenceId
+reason
+createdByUserId
+createdAt
+```
+---
+79.16. CsrfTokenResponse
+Wrapped by the standard API envelope:
+```json
+{
+  "success": true,
+  "data": {
+    "token": "<csrf-token>"
+  },
+  "message": null,
+  "timestamp": "2026-08-12T10:30:00+07:00",
+  "correlationId": "f58e1f1b-..."
+}
+```
+The token is stored by the Frontend in memory only and is sent as `X-XSRF-TOKEN` on state-changing browser requests.
+80. STANDARD API RESPONSE
+Success:
+```json
+{
+  "success": true,
+  "data": {},
+  "message": null,
+  "timestamp": "2026-08-12T10:30:00+07:00",
+  "correlationId": "f58e1f1b-..."
+}
+
+```
+Error:
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVENTORY_INSUFFICIENT",
+    "message": "Số lượng tồn kho không đủ.",
+    "fieldErrors": []
+  },
+  "timestamp": "2026-08-12T10:30:00+07:00",
+  "correlationId": "f58e1f1b-..."
+}
+
+```
+Không expose:
+```text
+stack trace
+SQL
+secret
+token
+provider credential
+
+```
+---
+81. PAGINATION STANDARD
+Request:
+```text
+page = zero-based
+size = number of rows
+sort = field,direction
+
+```
+Defaults:
+```text
+page = 0
+size = 20
+
+```
+Maximum:
+```text
+size = 100
+
+```
+Page response:
+```json
+{
+  "content": [],
+  "page": 0,
+  "size": 20,
+  "totalElements": 125,
+  "totalPages": 7,
+  "first": true,
+  "last": false
+}
+
+```
+Sort fields are endpoint-specific whitelists.
+Client cannot pass raw SQL field names.
+81.1. Read/List Performance Target
+For baseline test dataset and local/staging Test Plan, ordinary read/list APIs that do not wait on external services SHOULD complete within 2 seconds for the majority of normal requests, matching `NFR-PER-004`.
+Performance validation covers Product List, User List, Inventory List, Order List and Notification List with production-like pagination/indexes. Image upload and third-party payOS latency are excluded.
+82. ERROR CODE CATALOG
+Authentication / Security
+```text
+AUTH_INVALID_GOOGLE_CREDENTIAL
+AUTH_TOKEN_MISSING
+AUTH_TOKEN_INVALID
+AUTH_TOKEN_EXPIRED
+USER_BLOCKED
+ACCESS_DENIED
+CSRF_INVALID
+
+```
+User Admin
+```text
+USER_NOT_FOUND
+USER_INVALID_ROLE_TRANSITION
+LAST_ADMIN_PROTECTED
+
+```
+Product / Collection / Discount
+```text
+PRODUCT_NOT_FOUND
+PRODUCT_NOT_PURCHASABLE
+PRODUCT_BASE_PRICE_INVALID
+COLLECTION_NOT_FOUND
+COLLECTION_IN_USE
+DISCOUNT_INVALID
+DISCOUNT_NOT_FOUND
+
+```
+Image
+```text
+IMAGE_LIMIT_EXCEEDED
+IMAGE_INVALID_FORMAT
+IMAGE_TOO_LARGE
+IMAGE_NOT_FOUND
+IMAGE_STORAGE_FAILED
+
+```
+Cart / Checkout
+```text
+CART_EMPTY
+CART_ITEM_NOT_FOUND
+CART_INVALID
+IDEMPOTENCY_KEY_REQUIRED
+IDEMPOTENCY_KEY_REUSED
+CHECKOUT_IN_PROGRESS
+CHECKOUT_FINALIZATION_PENDING
+
+```
+Inventory
+```text
+INVENTORY_NOT_FOUND
+INVENTORY_INSUFFICIENT
+INVENTORY_INVALID_ADJUSTMENT
+INVENTORY_STATE_CONFLICT
+
+```
+Order
+```text
+ORDER_NOT_FOUND
+ORDER_NOT_OWNER
+ORDER_INVALID_TRANSITION
+ORDER_NOT_PAID
+ORDER_ALREADY_CANCELLED
+
+```
+Payment
+```text
+PAYMENT_NOT_FOUND
+PAYMENT_INVALID_STATE
+PAYMENT_AMOUNT_MISMATCH
+PAYMENT_EXTERNAL_ID_CONFLICT
+PAYOS_REQUEST_FAILED
+PAYOS_WEBHOOK_INVALID
+PAYMENT_LATE_SUCCESS_REQUIRES_REVIEW
+
+```
+Refund
+```text
+REFUND_NOT_ALLOWED
+
+```
+Generic
+```text
+VALIDATION_FAILED
+RESOURCE_NOT_FOUND
+CONFLICT
+INTERNAL_ERROR
+
+```
+---
+83. HTTP ERROR MAPPING
+HTTP	Meaning
+400	Structural validation / malformed request
+401	Missing/invalid/expired auth
+403	Authenticated but forbidden
+404	Resource absent
+409	Business state/concurrency/idempotency conflict
+413	Image too large
+422	Optional use for semantically invalid provider payload; main project uses 400/409
+502	Definitive external provider failure where appropriate
+503	Recoverable integration/finalization unavailable
+500	Unexpected error
+---
+84. VALIDATION STRATEGY
+Bean Validation
+Used for:
+```text
+@NotBlank
+@Size
+@Email
+@Positive
+@NotNull
+
+```
+Business Validation
+Application/domain services handle:
+```text
+Product ACTIVE
+Product not deleted
+Discount time
+Discount type/value relationship
+Inventory availability
+Order transition
+Payment status precondition
+Last ADMIN protection
+Manual refund eligibility
+Image count
+Collection in use
+
+```
+Business invariants không encode toàn bộ bằng DTO annotations.
+85. DATABASE MIGRATION
+Implementation Decision ID-018
+Use:
+```text
+Flyway
+
+```
+Production:
+```text
+spring.jpa.hibernate.ddl-auto=validate
+
+```
+Không:
+```text
+create
+create-drop
+update
+
+```
+cho production schema management.
+85.1. Migration Order
+```text
+V1__base_sequence.sql
+
+V2__identity.sql
+
+V3__catalog.sql
+
+V4__cart_inventory.sql
+
+V5__orders.sql
+
+V6__payments.sql
+
+V7__notifications.sql
+
+V8__checkout_operations.sql
+
+V9__indexes_and_constraints.sql
+
+```
+All integration/test DB instances run same migrations.
+86. CONFIGURATION PROFILES
+Profiles:
+```text
+local
+test
+prod
+
+```
+local
+```text
+local PostgreSQL
+local/test Google client ID
+payOS test channel where available
+S3 dev bucket or configured test bucket
+Secure cookie disabled for http localhost only
+
+```
+test
+```text
+Testcontainers PostgreSQL
+mock Google verifier
+mock payOS adapter
+mock ObjectStoragePort
+fixed BusinessClock
+
+```
+prod
+```text
+HTTPS
+Secure cookies
+Frontend + Backend same-site deployment
+explicit credentialed ALLOWED_ORIGINS
+real Google verification
+real payOS configuration
+AWS S3
+AWS-compatible logs
+```
+---
+87. CONFIGURATION / SECRETS
+Key	Purpose	Secret?
+`DB_URL`	PostgreSQL JDBC	No
+`DB_USERNAME`	DB user	Yes
+`DB_PASSWORD`	DB password	Yes
+`JWT_SECRET_BASE64`	JWT signing	Yes
+`JWT_ISSUER`	issuer	No
+`JWT_TTL_SECONDS`	7200	No
+`GOOGLE_CLIENT_ID`	Google audience	No-sensitive
+`ADMIN_EMAILS`	bootstrap list	Sensitive-ish config
+`PAYOS_CLIENT_ID`	payOS	Yes
+`PAYOS_API_KEY`	payOS	Yes
+`PAYOS_CHECKSUM_KEY`	signature	Yes
+`PAYOS_BASE_URL`	provider URL	No
+`FRONTEND_BASE_URL`	return/cancel	No
+`ALLOWED_ORIGINS`	CORS	No
+`AWS_REGION`	AWS	No
+`S3_BUCKET_NAME`	bucket	No
+`S3_PUBLIC_BASE_URL`	image URL base	No
+`IMAGE_MAX_BYTES`	upload limit	No
+`AUTH_COOKIE_DOMAIN`	cookie	No
+Production AWS credentials should use runtime IAM role where available rather than static source-code credentials.		
+---
+88. LOGGING CONVENTION
+Structured logs contain where available:
+```text
+timestamp
+level
+correlationId
+operation
+userId
+orderId
+paymentId
+productId
+checkoutOperationId
+result
+errorCode
+durationMs
+
+```
+Never log:
+```text
+BT_ACCESS token
+JWT secret
+Google credential
+PAYOS_API_KEY
+PAYOS_CHECKSUM_KEY
+DB_PASSWORD
+AWS secret
+full webhook signature material where sensitive
+
+```
+---
+89. OBSERVABILITY EVENTS
+Must log:
+```text
+GOOGLE_LOGIN_FAILED
+JWT_INVALID
+USER_ROLE_CHANGED
+USER_STATUS_CHANGED
+
+CHECKOUT_STARTED
+CHECKOUT_LOCAL_PREPARED
+PAYOS_CREATE_STARTED
+PAYOS_CREATE_SUCCEEDED
+PAYOS_CREATE_FAILED
+CG007_FINALIZATION_FAILED
+CG007_RECOVERED
+CHECKOUT_COMPLETED
+
+WEBHOOK_RECEIVED
+WEBHOOK_VERIFIED
+WEBHOOK_REJECTED
+
+PAYMENT_STATUS_CHANGED
+PAYMENT_EXPIRED
+LATE_PAYMENT_SUCCESS
+
+INVENTORY_RESERVED
+INVENTORY_RELEASED
+INVENTORY_SOLD
+INVENTORY_RESTORED
+INVENTORY_ADJUSTED
+
+ORDER_STATUS_CHANGED
+ORDER_CANCELLED
+
+MANUAL_REFUND_RECORDED
+
+S3_UPLOAD_FAILED
+S3_COMPENSATION_FAILED
+S3_DELETE_FAILED
+PAYOS_PROVIDER_CANCEL_FAILED
+
+```
+---
+89.1. AWS Log Collection
+Backend emits structured logs to stdout/stderr. Production AWS deployment routes them to Amazon CloudWatch Logs or equivalent AWS logging architecture without CloudWatch-specific business logic in domain modules.
+Exact log-group name, retention, metric filters and alarms belong to Deployment Design. Correlation IDs and critical event names must remain searchable.
+90. NEXT.JS PROJECT STRUCTURE
+```text
+src/
+│
+├── app/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   │
+│   ├── products/
+│   │   ├── page.tsx
+│   │   └── [id]/
+│   │       └── page.tsx
+│   │
+│   ├── collections/
+│   │   ├── page.tsx
+│   │   └── [id]/
+│   │       └── page.tsx
+│   │
+│   ├── cart/
+│   │   └── page.tsx
+│   │
+│   ├── checkout/
+│   │   └── page.tsx
+│   │
+│   ├── orders/
+│   │   ├── page.tsx
+│   │   └── [id]/
+│   │       └── page.tsx
+│   │
+│   ├── faq/
+│   │   └── page.tsx
+│   ├── policy/
+│   │   └── page.tsx
+│   ├── contact/
+│   │   └── page.tsx
+│   │
+│   └── admin/
+│       ├── layout.tsx
+│       ├── dashboard/
+│       ├── users/
+│       ├── products/
+│       ├── collections/
+│       ├── discounts/
+│       ├── inventory/
+│       ├── orders/
+│       └── notifications/
+│
+├── features/
+│   ├── auth/
+│   ├── product/
+│   ├── collection/
+│   ├── cart/
+│   ├── checkout/
+│   ├── order/
+│   ├── payment/
+│   ├── notification/
+│   └── admin/
+│
+├── components/
+│   ├── ui/
+│   ├── layout/
+│   └── feedback/
+│
+├── lib/
+│   ├── api/
+│   │   ├── api-client.ts
+│   │   ├── csrf.ts
+│   │   └── api-error.ts
+│   ├── query/
+│   │   ├── query-client.ts
+│   │   └── query-keys.ts
+│   ├── auth/
+│   ├── format/
+│   └── utils/
+│
+├── schemas/
+├── types/
+├── i18n/
+│   ├── vi.ts
+│   └── en.ts
+│
+├── content/
+│   ├── faq.ts
+│   ├── policy.ts
+│   └── contact.ts
+│
+├── config/
+│   └── app-config.ts
+│
+└── proxy.ts
+
+```
+Không dùng Pages Router.
+90.1. Responsive / Browser Compatibility
+Frontend must remain usable on Desktop, Tablet, Mobile, Google Chrome, Microsoft Edge and modern mobile browsers.
+Playwright matrix at minimum:
+```text
+Desktop Chromium
+Desktop Edge-compatible Chromium profile
+Mobile Chromium viewport
+Mobile WebKit viewport
+```
+90.2. Product Image Interaction
+Product Detail gallery implements:
+```text
+Thumbnail Selection
+Zoom In
+Zoom Out
+Mobile Swipe
+```
+Mobile swipe uses pointer/touch-capable interaction and requires no extra Backend API beyond ordered Product Image data.
+91. FRONTEND ROUTE MAP
+Public
+```text
+/
+ /products
+ /products/[id]
+ /collections
+ /collections/[id]   SHOULD
+ /faq
+ /policy
+ /contact
+
+```
+USER
+```text
+/cart
+/checkout
+/orders
+/orders/[id]
+
+```
+ADMIN
+```text
+/admin/dashboard
+/admin/users
+/admin/products
+/admin/collections
+/admin/discounts
+/admin/inventory
+/admin/orders
+/admin/notifications
+
+```
+Không có:
+```text
+/user/order/cancel
+/shipping
+/admin/shipping
+
+```
+---
+92. NEXT.JS → SPRING BOOT REQUEST FLOW
+```mermaid
+flowchart LR
+    Page[Next.js Page or Feature]
+    Query[TanStack Query or Server Fetch]
+    Client[API Client]
+    Creds[credentials: include]
+    Csrf[X-XSRF-TOKEN for mutations]
+    Cookie[BT_ACCESS HttpOnly Cookie]
+    API[Spring Boot /api/v1]
+    Cors[CORS]
+    Security[CSRF + JWT + DB role/status]
+    App[Application Service]
+
+    Page --> Query
+    Query --> Client
+    Client --> Creds
+    Client --> Csrf
+    Client --> Cookie
+    Creds --> API
+    Csrf --> API
+    Cookie --> API
+    API --> Cors
+    Cors --> Security
+    Security --> App
+```
+---
+92.1. Browser API Client Contract
+`src/lib/api/api-client.ts` uses:
+```ts
+credentials: "include"
+```
+for Browser → Spring Boot requests that rely on Cookie Authentication or need the CSRF repository cookie.
+For:
+```text
+POST
+PUT
+PATCH
+DELETE
+```
+the wrapper also supplies:
+```text
+X-XSRF-TOKEN: <token from in-memory CSRF state>
+```
+except the payOS webhook, which is not called by the Frontend.
+Production browser contract:
+```text
+same-site Frontend + Backend
++
+explicit ALLOWED_ORIGINS
++
+allowCredentials = true
++
+BT_ACCESS HttpOnly SameSite=Lax cookie
++
+credentials: include
++
+X-XSRF-TOKEN on mutations
+```
+---
+93. FRONTEND AUTHENTICATION
+Google Login component flow:
+```text
+App initialization
+↓
+GET /api/v1/auth/csrf
+with credentials: include
+↓
+store token in memory
+↓
+Google button
+↓
+credential
+↓
+POST /api/v1/auth/google
+with:
+credentials: include
+X-XSRF-TOKEN
+↓
+Backend verifies Google credential
+and confirms resulting User ACTIVE
+↓
+Backend establishes authenticated Authentication
+↓
+Backend explicitly invokes configured CsrfAuthenticationStrategy
+or equivalent authentication-success CSRF cleanup
+↓
+old pre-login CSRF token invalidated
+↓
+Backend Set-Cookie BT_ACCESS
+↓
+GET /api/v1/auth/csrf again
+↓
+replace in-memory token with fresh authenticated token
+↓
+GET /api/v1/me
+↓
+update auth state
+```
+Frontend auth state stores:
+```text
+CurrentUserResponse
+```
+not JWT.
+CSRF token is separate security state and is held in memory only.
+93.1. Route Guard
+`proxy.ts` may perform coarse cookie-presence redirect.
+This is UX only.
+Actual authority:
+```text
+Backend /me
++
+Backend RBAC
+```
+Admin layout:
+```text
+/me
+↓
+role == ADMIN
+status == ACTIVE
+```
+otherwise render unauthorized/redirect.
+93.2. Logout
+```text
+POST /api/v1/auth/logout
+
+headers:
+X-XSRF-TOKEN: <current authenticated token>
+
+fetch:
+credentials: include
+↓
+Backend Spring Security LogoutFilter succeeds
+↓
+SecurityContext cleared
+↓
+BT_ACCESS removed with matching Path/Domain semantics
+↓
+CookieCsrfTokenRepository state cleared through Spring Security logout handling
+↓
+Frontend clears CurrentUser auth state
+↓
+Frontend clears in-memory CSRF token
+↓
+Frontend clears authenticated TanStack Query cache
+↓
+navigate /
+↓
+GET /api/v1/auth/csrf
+when the next anonymous mutation/login flow requires a token
+```
+Old authenticated CSRF state is not reused after logout. The Frontend does not attempt to read or retain the old API-host CSRF cookie/token.
+94. FRONTEND DATA FETCHING
+Implementation Decision ID-019
+Use mixed model consistent with ADR-014.
+Public Product / Collection
+```text
+Next.js Server Component
++
+Backend fetch
+cache: no-store
+
+```
+Filters are represented in URL search params.
+Advantages:
+```text
+SEO
+server-rendered initial content
+authoritative fresh price/availability
+
+```
+---
+Product Detail
+```text
+Server Component initial fetch
+
+```
+Interactive image gallery is Client Component.
+Cart
+```text
+Client Component
++
+TanStack Query
+
+```
+---
+Checkout
+```text
+Client mutation
+
+```
+---
+My Orders / Order Detail
+```text
+TanStack Query
+
+```
+Order Detail refetches while Payment is:
+```text
+PENDING
+
+```
+---
+Admin
+```text
+Client dynamic queries
++
+TanStack Query
+
+```
+---
+Static FAQ / Policy / Contact
+```text
+build-time local content
+
+```
+No Backend API.
+95. TANSTACK QUERY KEYS
+```text
+["me"]
+
+["products", filters]
+["product", id]
+["collections"]
+["collection", id]
+
+["cart"]
+
+["my-orders", params]
+["my-order", id]
+
+["payment", id]
+
+["admin", "users", params]
+["admin", "products", params]
+["admin", "collections", params]
+["admin", "inventory", params]
+["admin", "inventory-history", productId, params]
+["admin", "orders", params]
+["admin", "order", id]
+["admin", "notifications", params]
+["admin", "dashboard"]
+["admin", "revenue", params]
+["admin", "best-selling", params]
+
+```
+---
+96. QUERY INVALIDATION
+Mutation	Invalidate
+Cart add/update/delete	`cart`
+Checkout completed	`cart`, `my-orders`
+Product admin update	`products`, `product`
+Discount update	`products`, `product`
+Inventory adjust	inventory, products, dashboard
+Order status update	admin orders, order, dashboard, reports
+Order cancel	admin orders, inventory, dashboard
+Manual refund	order/payment/report
+Notification read	notification list
+SSE notification	notification list, relevant dashboard
+---
+97. PAYMENT FRONTEND FLOW
+```text
+POST /checkout
+↓
+CheckoutResponse
+↓
+display QR / checkoutUrl
+↓
+USER pays on payOS
+↓
+payOS redirects to configured Order URL
+↓
+Frontend does NOT set Payment PAID
+↓
+Frontend GET Order/Payment
+↓
+Backend state from verified webhook
+
+```
+When Order Detail sees:
+```text
+Payment = PENDING
+
+```
+TanStack Query:
+```text
+refetchInterval = 5000 ms
+
+```
+Stops when:
+```text
+PAID
+FAILED
+CANCELLED
+EXPIRED
+REFUNDED
+
+```
+or component unmounts.
+98. FRONTEND VALIDATION
+Implementation Decision ID-020
+Use:
+```text
+Zod
+
+```
+for UX validation.
+Schemas:
+```text
+checkoutSchema
+productFormSchema
+collectionFormSchema
+discountFormSchema
+inventoryAdjustmentSchema
+
+```
+Frontend validation mirrors structural Backend rules.
+Backend remains authoritative.
+99. FRONTEND I18N
+Static dictionaries:
+```text
+src/i18n/vi.ts
+src/i18n/en.ts
+
+```
+Locale persisted in non-sensitive client preference cookie/local preference.
+Product rendering:
+```text
+vi:
+nameVi
+descriptionVi
+
+en:
+nameEn
+descriptionEn
+
+```
+Order history:
+```text
+vi:
+OrderItem.productNameVi
+
+en:
+OrderItem.productNameEn
+
+```
+Never use current Product name for Order history.
+100. FRONTEND PRICE DISPLAY
+Frontend only:
+```text
+format integer VND
+
+```
+Example utility:
+```text
+formatVnd(value: number)
+
+```
+No calculation of authoritative Discount.
+Frontend must not:
+```text
+basePrice * percentage
+recalculate Order total
+recalculate Payment amount
+
+```
+for business submission.
+101. FRONTEND CHECKOUT IDEMPOTENCY
+At checkout page initialization:
+```text
+generate crypto.randomUUID()
+
+```
+Store current logical checkout key in component state plus:
+```text
+sessionStorage
+
+```
+until checkout operation completes or terminally fails.
+Retry reuses same key.
+After completed checkout:
+```text
+remove stored key
+
+```
+A new purchase generates a new UUID.
+JWT remains outside browser storage.
+102. SSE FRONTEND
+Admin layout may establish:
+```text
+EventSource
+
+```
+to:
+```text
+/api/v1/admin/notifications/stream
+
+```
+On message:
+```text
+invalidate admin notification query
+
+```
+For relevant types also invalidate:
+```text
+admin dashboard
+admin orders
+admin inventory
+
+```
+On SSE failure:
+```text
+UI continues using persistent Notification query
+
+```
+---
+103. TEST STRATEGY
+103.1. Unit Tests
+Test:
+```text
+PricingService
+OrderStateRule
+NotificationDedupService
+OrderCodeGenerator
+ImageSignatureValidator
+BusinessClock conversion
+ADMIN_EMAILS parser
+Discount prospective sellingPrice validation
+InventoryAvailabilityStatus derivation
+IMPORT / ADJUSTMENT inventory rules
+
+```
+---
+103.2. Repository Tests
+Use:
+```text
+Testcontainers PostgreSQL
+
+```
+Test:
+```text
+constraints
+indexes behavior
+native effective-price query
+row locks
+unique business keys
+partial thumbnail unique index
+thumbnail replacement after delete
+IMPORT audit persistence
+
+```
+---
+103.3. Integration Tests
+Use:
+```text
+@SpringBootTest
+Testcontainers PostgreSQL
+mock external adapters
+
+```
+Test complete:
+```text
+CG-001
+CG-002
+CG-003
+CG-004
+CG-005
+CG-006
+CG-007
+blocked Google login rejection
+Admin Inventory APIs
+OpenAPI contract generation
+
+```
+---
+103.4. Security Tests
+Required:
+```text
+401
+403
+blocked USER
+stale JWT role
+ADMIN routes
+USER routes
+
+CSRF initial fetch
+CSRF token returned in response body
+mutation with correct CSRF
+mutation without CSRF → rejected
+invalid CSRF → rejected
+Google login with valid CSRF
+explicit custom-login CsrfAuthenticationStrategy invocation
+pre-login CSRF token invalidated after successful Google authentication
+fresh CSRF after login
+old pre-login CSRF rejected after login
+failed/BLOCKED login does not run authentication-success CSRF rotation
+logout with CSRF
+old authenticated CSRF state not reused indefinitely
+fresh anonymous CSRF after logout
+
+credentials: include browser API flow
+allowed-origin credentialed CORS
+disallowed-origin CORS
+wildcard credentials prohibited
+```
+Security tests must verify DB-authoritative `User.role`/`User.status`; frontend route guards are not security authority.
+SEC-LOGIN-CSRF-001 – Successful custom Google Login rotates CSRF state
+```text
+anonymous/pre-login CSRF token A
+↓
+POST /api/v1/auth/google
+with valid token A
+↓
+Google authentication succeeds
+↓
+resulting User is ACTIVE
+↓
+Authentication established
+↓
+configured CsrfAuthenticationStrategy invoked
+↓
+old pre-login CSRF token invalidated
+↓
+BT_ACCESS returned
+↓
+GET /api/v1/auth/csrf
+```
+Expected:
+```text
+login succeeds
+old pre-login CSRF repository token is invalidated
+fresh authenticated CSRF token B is returned
+token B is used for later mutations
+```
+SEC-LOGIN-CSRF-002 – Old pre-login CSRF cannot be reused after login
+```text
+successful Google Login using pre-login token A
+↓
+authentication-success CSRF rotation completes
+↓
+attempt authenticated state-changing request
+using old token A
+```
+Expected:
+```text
+request rejected by CSRF validation
+old pre-login token is not reusable
+frontend must use fresh post-login token B
+```
+SEC-LOGIN-CSRF-003 – Failed/BLOCKED login does not rotate authentication-success CSRF state
+```text
+valid pre-login CSRF token A
+↓
+POST /api/v1/auth/google
+↓
+invalid Google credential
+OR resulting User.status = BLOCKED
+```
+Expected:
+```text
+login fails
+no authenticated Authentication established
+configured CsrfAuthenticationStrategy is not invoked
+no BT_ACCESS cookie is issued
+no authentication-success CSRF rotation is performed
+```
+SEC-LOGOUT-001 – Authenticated logout succeeds
+```text
+Authenticated USER
++
+valid CSRF
+↓
+POST /api/v1/auth/logout
+```
+Expected:
+```text
+HTTP 200
+standard success envelope
+BT_ACCESS deletion Set-Cookie returned
+authentication unusable afterward
+```
+SEC-LOGOUT-002 – Logout requires CSRF
+```text
+authenticated USER
++
+missing/invalid CSRF
+↓
+POST /api/v1/auth/logout
+```
+Expected:
+```text
+403 CSRF_INVALID
+or the project's mapped CSRF rejection response
+```
+SEC-LOGOUT-003 – Protected API rejected after logout
+```text
+successful logout
+↓
+GET protected endpoint using previous browser state
+```
+Expected:
+```text
+401
+```
+SEC-LOGOUT-004 – CSRF lifecycle after logout
+```text
+authenticated CSRF token
+↓
+logout
+↓
+authenticated CSRF repository state cleared
+↓
+frontend clears in-memory CSRF token
+↓
+GET /api/v1/auth/csrf
+↓
+new anonymous/current CSRF token
+```
+SEC-LOGOUT-005 – Authentication cookie deletion attributes
+Verify logout deletion uses the same effective authentication-cookie identity:
+```text
+Name = BT_ACCESS
+Path = /
+Domain = same AUTH_COOKIE_DOMAIN when configured
+Secure = true in production
+HttpOnly = true
+SameSite = Lax
+```
+Expected: browser does not retain the original authenticated `BT_ACCESS` cookie after successful logout.
+103.5. Frontend Tests
+React Testing Library:
+```text
+forms
+route states
+order status actions
+image gallery
+notification state
+
+```
+Playwright:
+```text
+login
+cart
+checkout mock
+my orders
+admin order processing
+responsive desktop/tablet/mobile layouts
+Product Detail zoom/thumbnail/mobile swipe
+
+```
+---
+103.6. NFR Verification
+```text
+NFR-PER-*     → paginated read/list timing on baseline dataset
+NFR-COMPAT-*  → Playwright browser/viewport matrix
+NFR-OBS-*     → structured-log/correlation assertions
+NFR-MAINT-*   → OpenAPI generation + Flyway migration tests
+NFR-DEPLOY-*  → production-profile configuration smoke test
+```
+---
+104. CRITICAL CONCURRENCY TESTS
+CT-001 – Last Product
+```text
+quantity = 1
+reserved = 0
+
+Checkout A q=1
+Checkout B q=1
+
+Expected:
+one reserve success
+one INVENTORY_INSUFFICIENT
+
+```
+---
+CT-002 – Duplicate Checkout
+Two concurrent requests:
+```text
+same User
+same Idempotency-Key
+
+```
+Expected:
+```text
+one CheckoutOperation
+one Order
+one Payment
+one RESERVE per Product
+
+```
+---
+CT-003 – Duplicate Webhook
+Send same verified success event 10 times concurrently.
+Expected:
+```text
+Payment PAID once
+one SALE/Product
+one PAYMENT_SUCCESS
+
+```
+---
+CT-004 – Webhook vs Expiration
+Run concurrently around `Payment.expiresAt`.
+Correctness evaluates:
+```text
+Payment state
++
+expiresAt
++
+verified effective payment-success time
++
+locks
+```
+Allowed internally valid final outcomes include:
+```text
+PAID + Inventory SALE + Order NEW
+```
+when a still-PENDING Payment has verified success time `<= expiresAt`, or:
+```text
+EXPIRED + Order CANCELLED + Inventory RELEASED
+```
+when expiration wins terminal state or verified success is after expiry.
+Never:
+```text
+PAID + RELEASED
+EXPIRED + SALE
+```
+---
+CT-005 – Double Admin Cancellation
+Expected one:
+```text
+RELEASE
+
+```
+or one:
+```text
+CANCEL_ORDER
+
+```
+depending payment state.
+CT-006 – Last ADMIN
+Two active admins concurrently demote/block each other.
+Expected:
+```text
+at least one ACTIVE ADMIN remains
+
+```
+---
+CT-007 – CG-007 Retry
+Fail after payOS success before NEW_ORDER commit.
+Retry 5 times.
+Expected:
+```text
+one Order
+one Payment
+one reservation
+checked CartItem removed once
+one NEW_ORDER
+
+```
+---
+CT-008 – Duplicate Manual Refund
+Two ADMIN requests concurrently.
+Expected:
+```text
+Payment REFUNDED
+one state transition
+zero Inventory mutations
+
+```
+---
+CT-009 – CG-007 vs Terminal Transition
+Run CG-007 finalization concurrently with Payment expiration/admin cancellation.
+Allowed outcomes:
+```text
+CG-007 commits first
+→ finalization completes once
+→ later valid terminal transition follows normal business rule
+```
+or:
+```text
+terminal transition commits first
+→ CG-007 does not clear Cart
+→ CG-007 does not create NEW_ORDER
+→ no successful CheckoutResponse
+```
+Never report a cancelled terminal Order as successfully finalized by late CG-007.
+105. PAYMENT TESTS
+Required baseline:
+```text
+payOS create success
+payOS definitive create failure
+payOS ambiguous timeout + provider lookup
+invalid webhook signature
+amount mismatch
+unknown orderCode
+unknown paymentLinkId
+duplicate webhook
+successful webhook
+expired Payment
+webhook vs expiration
+late success
+provider reference duplicate
+CG-005 compensation
+CG-007 recovery
+```
+Official provider payload/signature samples should be included in adapter contract tests, derived from current payOS documentation.
+105.1. Payment Expiration Arbitration Tests
+PT-EXP-001
+```text
+expiresAt = T
+
+verified payment transaction time < T
+
+webhook arrives after T
+while Payment still PENDING
+```
+Expected:
+```text
+Payment PAID
+Inventory SALE
+Order NEW
+paidAt = verified effective success time
+```
+PT-EXP-002
+```text
+verified payment transaction time > expiresAt
+
+Payment local state still PENDING
+because scheduler is delayed
+```
+Expected:
+```text
+Payment EXPIRED
+Order CANCELLED
+Inventory RELEASE exactly once
+PAYMENT_FAILED actualStatus=EXPIRED
+manualResolutionRequired=true
+```
+PT-EXP-003
+```text
+expiresAt = T
+scheduler executes at T + 25 seconds
+```
+Expected:
+```text
+business expiry remains T
+scheduler execution delay does not extend lifetime
+```
+PT-EXP-004
+Concurrent:
+```text
+scheduler
+vs
+webhook
+```
+Expected only internally valid final outcomes.
+Never:
+```text
+PAID + RELEASED
+EXPIRED + SALE
+```
+PT-EXP-005
+```text
+Payment already EXPIRED
+then verified success arrives
+```
+Expected:
+```text
+no reopen
+no SALE
+manualResolutionRequired=true
+late-success audit/log
+```
+105.2. Pending ADMIN Cancellation Provider Tests
+CT-CANCEL-001
+```text
+Payment = PENDING
+ADMIN cancel
+provider cancel succeeds
+```
+Expected:
+```text
+Order CANCELLED
+Payment CANCELLED
+Inventory RELEASE exactly once
+provider cancel attempted only after local commit
+```
+CT-CANCEL-002
+Provider cancellation fails.
+Expected:
+```text
+local Order remains CANCELLED
+Payment remains CANCELLED
+Inventory remains RELEASED
+warning/error logged
+no rollback of local business result
+```
+CT-CANCEL-003
+Provider receives payment after local cancellation.
+Expected:
+```text
+no Order reopen
+no Inventory SALE
+manualResolutionRequired=true
+late-success audit/log
+```
+---
+106. TEST FIXTURES
+Fixtures are builders/factories:
+```text
+UserFixture
+ProductFixture
+DiscountFixture
+CartFixture
+InventoryFixture
+OrderFixture
+PaymentFixture
+NotificationFixture
+
+```
+No production secret in test source.
+External adapters:
+```text
+FakeGoogleIdentityVerifier
+FakePayOSClient
+FakeObjectStorage
+
+```
+Fixed `BusinessClock`.
+107. IMPLEMENTATION DECISIONS
+ID-001 – Technology Baseline
+Context: greenfield KLTN Modular Monolith.
+Decision: Java 21 + Spring Boot 3.5.16; Next.js 16.2.11 App Router.
+Rationale: stable, supported ecosystem, team-friendly.
+Trade-off: not using newest Spring Boot major.
+Related: ADR-001, ADR-014.
+ID-002 – Primary Key
+Decision: PostgreSQL sequence-generated BIGINT / Java Long.
+Rationale: simple and efficient.
+Trade-off: IDs are enumerable; authorization must never depend on obscurity.
+Related: ADR-002, ADR-015.
+ID-003 – Monetary Type
+Decision: BIGINT/long for VND money; NUMERIC/BigDecimal for percentage.
+Rationale: no floating-point monetary error.
+Related: ADR-010.
+ID-004 – Initial ADMIN Validation
+Decision: prod `ApplicationRunner` fail-fast when no ACTIVE ADMIN and ADMIN_EMAILS empty/invalid.
+Related: Identity architecture.
+ID-005 – Last ADMIN Lock
+Decision: pessimistically lock all ACTIVE ADMIN rows.
+Rationale: simple concurrency correctness.
+Related: NFR-REL-006.
+ID-006 – JWT Storage
+Decision: HttpOnly Secure SameSite=Lax cookie. Authentication-cookie creation and logout deletion use matching effective `Path`/`Domain` semantics.
+Rationale: token inaccessible to frontend JS while logout can reliably remove the same browser cookie.
+Trade-off: requires CSRF protection and same-site production domain configuration.
+ID-007 – JWT Cryptography
+Decision: HS256, 2-hour TTL.
+Rationale: single Backend runtime; no asymmetric key-distribution requirement.
+Trade-off: no refresh token; User re-login after expiration.
+ID-008 – S3 Key / Compensation
+Decision: `products/{productId}/{uuid}.{ext}`; synchronous cleanup retries.
+Related: ADR-005.
+ID-009 – Cart Checkout Scope
+Decision: checkout entire current Cart snapshot.
+Rationale: SRS defines no partial selection.
+ID-010 – Inventory Lock
+Decision: `PESSIMISTIC_WRITE`, sorted by Product ID.
+Rationale: multi-product consistency and simple audit.
+Related: ADR-006.
+ID-011 – Payment / Order State Lock
+Decision: pessimistic Order then Payment lock.
+Rationale: resolve webhook/expiration/cancellation races.
+ID-012 – payOS Adapter
+Decision: Spring `RestClient` adapter behind `PayOSClient`.
+Rationale: isolate provider contract.
+Related: ADR-004.
+ID-013 – Payment Expiration
+Decision: Spring `@Scheduled`, 30-second scan, 100 candidates, transaction per Payment.
+Related: Payment Expiration Architecture.
+ID-014 – Notification Dedup
+Decision: unique `notifications.dedup_key`.
+Related: ADR-013, ADR-016.
+ID-015 – Checkout Idempotency
+Decision: `Idempotency-Key` + PostgreSQL `checkout_operations`.
+Related: FR-ORDER-010, ADR-011.
+ID-016 – CG-007 Recovery
+Decision: explicit CheckoutOperation workflow record + recovery job.
+Rationale: same mechanism solves retry, response replay and Phase C recovery without broker.
+Related: CG-007, ADR-011, ADR-012.
+ID-017 – API Versioning
+Decision: `/api/v1`.
+ID-018 – Database Migration
+Decision: Flyway.
+Related: NFR-MAINT-002.
+ID-019 – Frontend Query / Cache
+Decision: Server Components for public read pages, TanStack Query for authenticated/dynamic state.
+Related: ADR-014.
+ID-020 – Frontend Validation
+Decision: Zod.
+Rationale: reusable typed UX validation.
+ID-021 – Cookie Authentication and CSRF Token Delivery
+Context:
+Browser uses HttpOnly JWT cookie authentication and therefore needs an explicit CSRF lifecycle and a complete framework-owned logout path.
+Decision:
+```text
+JWT:
+HttpOnly
+Secure
+SameSite=Lax
+
+Frontend and Backend:
+same-site production deployment
+
+CSRF:
+GET /api/v1/auth/csrf
+
+Frontend:
+CSRF token in memory
+
+Mutation:
+X-XSRF-TOKEN
+
+Browser fetch:
+credentials: include
+
+Google Login authentication success:
+successful Google authentication
+→ establish authenticated Authentication
+→ explicitly invoke configured CsrfAuthenticationStrategy
+  or equivalent Spring Security authentication-success CSRF cleanup
+→ invalidate old pre-login CSRF token
+→ issue/set BT_ACCESS
+→ frontend GET /api/v1/auth/csrf again
+→ receive/use fresh authenticated CSRF token
+
+Google Login failure/BLOCKED:
+no authenticated Authentication
+→ no authentication-success CSRF rotation
+→ no JWT / BT_ACCESS
+
+Logout:
+Spring Security LogoutFilter / logout DSL handles
+POST /api/v1/auth/logout
+
+Filter order:
+CSRF validation
+→ JwtAuthenticationFilter
+→ LogoutFilter
+
+Authenticated-only logout matcher:
+POST /api/v1/auth/logout
++
+valid authenticated principal
+
+Logout clears:
+SecurityContext
+BT_ACCESS authentication cookie
+CSRF repository state
+
+Logout response:
+HTTP 200 + standard JSON API envelope
+```
+Authentication cookie deletion must match the original effective `Path` and `Domain` used for cookie creation. When `AUTH_COOKIE_DOMAIN` is configured, the logout deletion cookie uses that same effective Domain.
+Rationale:
+Avoid requiring frontend JavaScript to directly read the authentication token or the API-host CSRF cookie; ensure the custom controller-driven Google Login explicitly receives authentication-success CSRF cleanup instead of relying on an unrelated implicit form-login hook; and avoid a custom partial logout implementation that clears `BT_ACCESS` but leaves Spring Security/CSRF state inconsistent.
+Trade-off:
+Deployment must preserve same-site cookie semantics. Logout configuration must preserve Spring Security's CSRF/logout handlers while providing the project-standard JSON success response. An unrelated-site deployment requires security-strategy review before production.
+Related:
+```text
+NFR-SEC-*
+Identity Architecture
+Security Architecture
+```
+---
+ID-022 – Product Image S3 Transaction Boundary
+Context:
+S3 is external to PostgreSQL and Product Image metadata must still respect the maximum-image and ownership rules.
+Decision:
+```text
+S3 PutObject occurs outside PostgreSQL transaction.
+
+Metadata finalization uses a short Product-locked
+PostgreSQL transaction.
+
+If metadata finalization fails after upload,
+compensate with S3 DeleteObject.
+```
+Rationale:
+Do not hold Product DB locks across network I/O while preserving metadata correctness.
+Trade-off:
+A failed compensation can leave an orphan S3 object requiring operational cleanup.
+Related:
+```text
+FR-IMAGE-*
+ADR-005
+```
+---
+ID-023 – Payment Expiration and Verified Success-Time Arbitration
+Context:
+Expiration scheduler and payment-success webhook can race around the frozen 15-minute deadline.
+Decision:
+```text
+Payment.expiresAt is business authority.
+
+Scheduler execution time does not extend Payment window.
+
+Verified provider transaction time determines whether
+a valid payment occurred before expiration where
+the provider contract reliably supports this.
+
+If provider transaction time cannot be safely interpreted,
+the conservative fallback in Section 49 applies;
+the implementation does not silently guess timezone semantics.
+```
+Rationale:
+Avoid accepting a payment as on-time merely because the expiration scheduler had not processed the row yet.
+Trade-off:
+Provider timestamp parsing and timezone semantics must be contract-tested and re-verified against current official payOS documentation.
+Related:
+```text
+FR-PAY-*
+BR-TIME-001
+CG-002
+CG-003
+Payment Expiration Architecture
+```
+---
+ID-024 – Pending Admin Cancellation and payOS Provider Cancellation
+Context:
+A local ADMIN cancellation of a PENDING Payment can leave an active provider payment request unless the provider is also asked to cancel it.
+Decision:
+```text
+Local PostgreSQL cancellation is authoritative.
+
+Provider payment-request cancellation is best-effort
+after local commit.
+
+Provider cancellation failure does not rollback
+Order/Payment/Inventory local outcome.
+```
+Rationale:
+Never hold business DB locks across payOS network I/O and never make frozen local cancellation correctness depend on provider availability.
+Trade-off:
+Provider cancellation can fail after local commit; late verified payment is handled by the existing manual-resolution late-success rule.
+Related:
+```text
+CG-004
+Payment Architecture
+payOS Adapter
+```
+---
+ID-025 – Product Image Maximum Upload Size
+Context:
+Implementation needs an upload protection limit for Product Image binary.
+Decision:
+```text
+Default maximum upload size:
+5 MiB per image
+
+Configuration:
+IMAGE_MAX_BYTES
+```
+Rationale:
+Protect network, memory and storage while supporting normal Product gallery images.
+Trade-off:
+This is a configurable implementation limit, not new SRS business scope.
+Related:
+```text
+FR-IMAGE-*
+```
+---
+108. IMPLEMENTATION TRACEABILITY MATRIX
+SRS / Architecture Ref	Implementation Component	Database / API	Test
+
+FR-AUTH-*	Identity, Security	users, `/auth/*`, `/me`	Auth integration/security
+FR-ADMIN-*	UserAdminService	users, `/admin/users/*`	Last-admin/concurrency
+FR-PRODUCT-*	Product services	products, `/products`	Product API/repository
+FR-COLLECTION-*	Collection services	collections	Collection tests
+FR-DISCOUNT-*	PricingService	discounts	Discount boundary tests
+BR-MONEY-001	PricingService	BIGINT/NUMERIC	Money tests
+FR-IMAGE-*	ProductImageService	S3 external PutObject + short DB metadata finalization + DeleteObject compensation + IMAGE_MAX_BYTES default 5 MiB	Image/S3/size/compensation tests
+FR-CART-*	CartApplicationService	carts/cart_items	Cart tests
+FR-INV-*	Inventory services	inventories/inventory_transactions	concurrency tests
+FR-ORDER-*	Order services	orders/order_items; subtotal derived from totalAmount	Order API/subtotal tests
+FR-PAY-*	Payment services	payments; expiresAt authority + verified success-time arbitration	Webhook/expiration/concurrency tests
+FR-REFUND-*	ManualRefundApplicationService	payments	Refund tests
+FR-NOTIFY-*	NotificationService	notifications/recipients	multi-admin/dedup
+FR-REPORT-*	ReportingQueryService	SQL joins	report tests
+FR-CONTENT-*	Next.js content	no Backend DB	frontend tests
+FR-I18N-*	Next.js i18n + OrderItem	snapshot fields	locale tests
+BR-TIME-001	BusinessClock	TIMESTAMPTZ	fixed-clock tests
+CG-001	CheckoutLocalPreparationService	Order/Inv/Payment	CG001 integration
+CG-002	PaymentResultApplicationService	Payment/Inv/Notification	webhook success
+CG-003	PaymentResultApplicationService	terminal state	failure/expiry
+CG-004	OrderCancellationApplicationService	local pending cancellation + paid cancellation; provider cancel AFTER COMMIT for PENDING	cancellation/provider-cancel tests
+CG-005	Checkout compensation	Payment/Order/Inventory	payOS failure
+CG-006	ManualRefundApplicationService	Payment	refund
+CG-007	CheckoutFinalizationService	checkout_operations	recovery test
+NFR-SEC-*	Spring Security / validation / secret handling	HttpOnly JWT + same-site deployment + explicit CSRF endpoint + credentials: include + CORS + explicit custom-Google-login CsrfAuthenticationStrategy rotation + Spring Security LogoutFilter + matching JWT-cookie deletion + CSRF logout cleanup + provider verification	security/CSRF/login-rotation/logout/CORS tests
+NFR-PER-*	Pagination / indexes / query contracts	DB indexes + pageable APIs	baseline performance tests
+NFR-REL-*	Transactions / locks / idempotency / recovery	business keys + checkout_operations + CG guards	integration/concurrency tests
+NFR-COMPAT-*	Next.js responsive/image interaction	browser/viewport UI	Playwright compatibility
+NFR-OBS-*	Structured logging / AWS log collection	correlationId + business event logs	observability assertions
+NFR-MAINT-*	Springdoc / Flyway / traceability	OpenAPI + migrations	build/repository tests
+NFR-DEPLOY-*	AWS profile / S3 / PostgreSQL configuration	externalized deployment config	deployment smoke tests
+ADR-001	Spring Boot modules	package boundaries	ArchUnit
+ADR-002	PostgreSQL	all core tables	repository tests
+ADR-003	Backend validation	services	API tampering tests
+ADR-004	PayOSClient adapter	payment adapter	contract tests
+ADR-005	S3 adapter	product_images	compensation tests
+ADR-006	Inventory reservation	inventory tables	concurrency
+ADR-007	One Order/Payment	payments.order_id UNIQUE	DB constraint
+ADR-008	Recipient read state	notification_recipients	multi-admin
+ADR-009	BusinessClock	TIMESTAMPTZ	timezone
+ADR-010	PricingService	BIGINT/NUMERIC	rounding
+ADR-011	commerce application	checkout_operations	CG tests
+ADR-012	no external broker	synchronous/in-process	integration
+ADR-013	persist before SSE	notifications	SSE failure
+ADR-014	Next data fetching	Next.js	frontend tests
+ADR-015	shared DB ownership	repository visibility	ArchUnit
+ADR-016	NotificationRecipient	recipients table	notification tests
+ADR-017	frontend static content	`src/content`	frontend content test
+---
+109. MODULE BOUNDARY TESTING
+Use ArchUnit tests:
+```java
+identity must not depend on order/payment/inventory repositories
+
+payment must not depend on order.infrastructure
+payment must not depend on inventory.infrastructure
+payment must not depend on commerce implementation packages
+PayOSWebhookService and PaymentExpirationJob invoke PaymentResultPort only
+
+order must not depend on payment.infrastructure
+order query/controller code must not depend on commerce implementation packages
+cross-module workflow HTTP controllers live under commerce.api
+
+commerce may depend on module application interfaces
+commerce may not depend on module infrastructure packages
+
+reporting may depend on query interfaces
+reporting may not mutate repositories
+
+notification may query identity public interface
+
+```
+---
+110. OPEN DEPLOYMENT DECISIONS
+Các item sau được phép còn open vì `AR-AWS-001` chỉ là recommendation, không phải mandatory architecture freeze:
+OD-001 – AWS Compute Service
+Candidates architecture đã xác định:
+```text
+Frontend:
+AWS Amplify candidate
+
+Backend:
+Elastic Beanstalk / other approved AWS compute candidate
+
+```
+Owner:
+```text
+Deployment Design / Project Plan
+
+```
+Impact on application:
+```text
+none on module boundaries
+
+```
+---
+OD-002 – Production Domain Names
+Exact domain names remain open to Deployment Design, but the selected authentication implementation imposes this non-open constraint:
+```text
+Frontend and Backend production deployment
+must be same-site
+for SameSite=Lax cookie authentication.
+```
+Valid shape:
+```text
+https://www.<domain>
+https://api.<domain>
+```
+under the same registrable site.
+Exact names:
+```text
+Deployment Design
+```
+If Deployment Design proposes unrelated sites, Cookie/CORS/CSRF strategy must be reviewed before production.
+OD-003 – Public Product Image Delivery URL
+`S3_PUBLIC_BASE_URL` abstraction hỗ trợ:
+```text
+direct S3 public delivery
+or
+future CloudFront URL
+
+```
+S3 binary storage vẫn mandatory.
+CloudFront không trở thành SRS requirement.
+OD-004 – payOS External Contract Re-verification
+Current mapping trong tài liệu dựa trên official payOS contract hiện tại.
+Before implementation/prod deployment:
+```text
+verify current:
+endpoint
+headers
+signature algorithm
+request fields
+webhook fields
+limits
+
+```
+Owner:
+```text
+Payment Integration implementer
+
+```
+---
+111. IMPLEMENTATION INVARIANTS
+```text
+1. Backend giữ business-module-first structure.
+
+2. Không module nào direct mutate foreign module repository.
+
+3. Commerce Application Coordination Layer không own authoritative
+   User/Product/Cart/Inventory/Order/Payment state.
+
+4. Commerce technical checkout workflow record không được trở thành
+   alternate Order/Payment source of truth.
+
+5. Product price luôn Backend-calculated.
+
+6. Authoritative VND money không dùng float/double.
+
+7. Product.basePrice là integer VND.
+
+8. FIXED_PRICE là integer VND.
+
+9. PERCENTAGE dùng BigDecimal.
+
+10. PERCENTAGE raw result dùng HALF_UP nearest 1 VND.
+
+11. Rounded sellingPrice được xác lập trước line-total calculation.
+
+12. OrderItem.totalPrice =
+    sellingPrice × quantity.
+
+13. Order.totalAmount =
+    SUM(OrderItem.totalPrice).
+
+14. Payment.amount =
+    Order.totalAmount.
+
+15. Cart display price không authoritative cho Checkout.
+
+16. Checkout luôn recalculate Product/Discount.
+
+17. Inventory reservation concurrency-safe.
+
+18. Inventory lock order theo Product ID.
+
+19. Inventory.quantity >= 0.
+
+20. Inventory.reservedQuantity >= 0.
+
+21. quantity - reservedQuantity >= 0.
+
+22. Inventory RESERVE exactly once về business effect.
+
+23. Inventory SALE exactly once về business effect.
+
+24. Inventory RELEASE exactly once về business effect.
+
+25. Inventory CANCEL_ORDER restore exactly once về business effect.
+
+26. InventoryTransaction lưu before/after physical và reserved quantity.
+
+27. Checkout Idempotency-Key tạo tối đa một logical Order.
+
+28. Một logical checkout tạo tối đa một Payment.
+
+29. Một Order có đúng một Payment.
+
+30. payments.order_id UNIQUE.
+
+31. payOS create success không đồng nghĩa Payment PAID.
+
+32. Payment chỉ chuyển PAID sau verified provider success event.
+
+33. Client redirect không set Payment PAID.
+
+34. Payment.status là authoritative Payment state.
+
+35. Order không persist authoritative paymentStatus duplicate.
+
+36. Payment success giữ Order NEW.
+
+37. NEW → CONFIRMED chỉ khi Payment PAID.
+
+38. CONFIRMED → COMPLETED chỉ khi Payment PAID.
+
+39. USER không có Order cancellation API.
+
+40. COMPLETED Order không được cancel.
+
+41. Pending Payment cancellation releases reservation once.
+
+42. Paid Order cancellation restores physical Inventory once.
+
+43. Paid Order cancellation giữ Payment PAID.
+
+44. Manual Refund chỉ hợp lệ:
+    Order CANCELLED + Payment PAID.
+
+45. Manual Refund API chỉ record external refund success.
+
+46. Manual Refund không gọi automatic refund gateway.
+
+47. Manual Refund không mutate Inventory.
+
+48. FAILED/CANCELLED/EXPIRED Payment phải converge:
+    Order CANCELLED + Inventory RELEASED.
+
+49. Payment expiry = createdAt + 15 minutes and expiresAt is business-authoritative.
+
+50. Payment expiry uses BusinessClock.
+
+51. Webhook and scheduler race phải resolve bằng Payment state + expiresAt + verified effective success time + DB locks.
+
+52. Late verified success không reopen Order.
+
+53. Late verified success không commit released Inventory.
+
+54. Late verified success phải được logged/audited và marked
+    manualResolutionRequired.
+
+55. CG-001 là one local PostgreSQL transaction.
+
+56. External payOS create không nằm trong CG-001 DB transaction.
+
+57. payOS final creation failure chạy CG-005.
+
+58. CG-005 không clear Cart.
+
+59. CG-005 không tạo NEW_ORDER.
+
+60. CG-005 tạo PAYMENT_FAILED actualStatus=FAILED.
+
+61. payOS create success phải được durably captured.
+
+62. CG-007 chỉ chạy sau confirmed external create success.
+
+63. CG-007 remove only checked-out CartItem snapshot effect.
+
+64. CartItem thay đổi sau snapshot không bị blindly delete.
+
+65. CG-007 persist NEW_ORDER với dedup key.
+
+66. CG-007 không tạo second Order.
+
+67. CG-007 không tạo second Payment.
+
+68. CG-007 không reserve Inventory lần hai.
+
+69. Backend không return checkout success trước CG-007 commit.
+
+70. CG-007 retry/recovery phải idempotent.
+
+71. Static FAQ/Policy/Contact nằm trong Next.js.
+
+72. Không có Spring Boot Content module.
+
+73. Product không có Variant.
+
+74. Product không có Size.
+
+75. Product không có Color.
+
+76. Product soft delete dùng deleted_at.
+
+77. Không có DELETED ProductStatus.
+
+78. Product Image binary chỉ ở Amazon S3.
+
+79. PostgreSQL chỉ giữ Product Image metadata/reference.
+
+80. Maximum 10 Product Images per Product.
+
+81. Maximum một thumbnail per Product.
+
+82. Notification được persist trước realtime delivery.
+
+83. Notification read-state là per ADMIN recipient.
+
+84. ADMIN A read không làm ADMIN B read.
+
+85. Notification dedup key ngăn duplicate business Notification.
+
+86. NEW_ORDER được tạo sau successful checkout initiation.
+
+87. NEW_ORDER có thể tồn tại khi Payment PENDING.
+
+88. PAYMENT_SUCCESS chỉ sau verified Payment success và Inventory SALE.
+
+89. PAYMENT_FAILED đại diện FAILED/CANCELLED/EXPIRED
+    và phải chứa actual status.
+
+90. Low Stock Notification chỉ khi transition vào LOW state.
+
+91. Out Of Stock Notification chỉ khi transition vào OUT state.
+
+92. SSE failure không rollback business transaction.
+
+93. Revenue chỉ tính COMPLETED + PAID.
+
+94. Best Selling chỉ tính COMPLETED + PAID.
+
+95. Dashboard New Orders chỉ tính NEW + PAID.
+
+96. Business timezone là Asia/Ho_Chi_Minh.
+
+97. Persistence timestamp dùng UTC Instant/TIMESTAMPTZ.
+
+98. API business timestamps render +07:00 semantics.
+
+99. Runtime authorization dùng authoritative User.role/User.status DB state.
+
+100. JWT role claim không thay database authority.
+
+101. ADMIN_EMAILS chỉ áp dụng cho User chưa tồn tại.
+
+102. Existing demoted bootstrap email không được auto-promote lại.
+
+103. Initial production configuration không được chạy indefinitely
+     mà không có đường tạo ADMIN đầu tiên.
+
+104. Concurrent admin demote/block không được làm mất last ACTIVE ADMIN.
+
+105. JWT nằm HttpOnly cookie.
+
+106. State-changing cookie-authenticated request phải có CSRF protection.
+
+107. Production CORS không dùng wildcard với credentials.
+
+108. Google identity fields chỉ trusted sau Backend verification.
+
+109. payOS Webhook không trusted trước signature verification.
+
+110. Secret không hard-code và không log.
+
+111. Database schema production được quản lý bằng Flyway.
+
+112. Hibernate auto-DDL không phải production schema-management mechanism.
+
+113. Không thêm Kafka.
+
+114. Không thêm RabbitMQ.
+
+115. Không thêm Redis làm correctness dependency.
+
+116. Không thêm Microservices.
+
+117. Không thêm Shipping.
+
+118. Không thêm COD.
+
+119. Không thêm MoMo.
+
+120. Không thêm VNPay.
+
+121. Không thêm Coupon/Voucher.
+
+122. Không thêm Automatic Refund.
+
+123. Không tạo business status mới ngoài SRS.
+
+124. Existing BLOCKED User không được nhận JWT mới sau Google Login.
+
+125. InventoryTransactionType phải gồm IMPORT và ADJUSTMENT bên cạnh RESERVE/RELEASE/SALE/CANCEL_ORDER.
+
+126. IMPORT chỉ tăng physical quantity; Admin adjustment không trực tiếp mutate reservedQuantity.
+
+127. Inventory availability display status là derived, không persist như source of truth.
+
+128. rawSellingPrice không persist; chỉ là calculation intermediate cho PERCENTAGE.
+
+129. Product basePrice update phải revalidate existing Discount trước commit.
+
+130. Product Image S3 PutObject không nằm trong PostgreSQL ACID transaction; metadata limit được revalidate dưới Product lock và S3 object được compensate nếu DB step fail.
+
+131. Xóa current thumbnail chọn remaining image có sortOrder nhỏ nhất, rồi smallest id, làm replacement; nếu không còn image thì không có thumbnail.
+
+132. Backend không return successful checkout initiation trước CG-007 commit.
+
+133. CG-007 phải lock/guard Order + Payment và không finalize success nếu incompatible terminal state đã thắng race.
+
+134. Verified Payment success có thể thắng race trước CG-007; khi đó CG-007 không mutate Payment/Inventory và chỉ hoàn tất Cart + NEW_ORDER + technical operation state.
+
+135. Order.subtotal là derived value bằng Order.totalAmount; không tạo monetary source of truth thứ hai.
+
+136. Admin Inventory list/history phải pageable và Inventory status phải derive từ quantity/reservedQuantity/threshold.
+
+137. OpenAPI contract, NFR traceability, structured logging và production AWS log collection là implementation deliverables.
+
+
+138. Frontend and Backend production deployment must remain same-site
+     for the selected SameSite=Lax cookie-authentication strategy.
+
+139. CSRF token must be obtained through GET /api/v1/auth/csrf
+     and supplied on state-changing browser requests.
+
+140. Frontend browser API calls using Cookie Authentication must send
+     credentials: include where required.
+
+141. Payment.expiresAt is the business-authoritative expiration time.
+
+142. Scheduler execution delay does not extend Payment lifetime.
+
+143. A PENDING Payment cannot become normal PAID solely because the
+     expiration scheduler has not yet processed it.
+
+144. Verified provider payment whose effectivePaymentSuccessTime is
+     after expiresAt does not run normal CG-002.
+
+145. Late verified provider payment after local terminal state does not
+     reopen Order or SALE Inventory.
+
+146. External payOS cancellation must not occur while local
+     Order/Payment/Inventory locks are held.
+
+147. Provider cancellation failure must not rollback authoritative
+     local ADMIN cancellation.
+
+148. S3 PutObject must not occur while Product DB lock is held.
+
+149. 5 MiB Product Image upload limit is an implementation/config
+     decision, not new SRS scope.
+
+150. payOS webhook transactionDateTime must not be assigned a timezone
+     by assumption; provider parsing/timezone semantics require contract
+     verification before it is used as authoritative provider time.
+
+151. State-changing Google Login and Logout browser requests require
+     valid CSRF headers. Because Google Login is a custom controller-driven
+     flow, successful Google authentication must establish authenticated
+     Authentication and explicitly invoke the configured
+     CsrfAuthenticationStrategy or equivalent Spring Security
+     authentication-success CSRF cleanup before BT_ACCESS login completion.
+     The old pre-login CSRF token must not remain reusable. Invalid/BLOCKED
+     login must not invoke authentication-success CSRF rotation or issue JWT.
+
+152. Logout must clear both the authentication cookie and Spring Security
+     CSRF/security state through the Spring Security logout pipeline.
+
+153. BT_ACCESS logout deletion must use matching effective Path/Domain
+     semantics with BT_ACCESS cookie creation.
+
+154. POST /api/v1/auth/logout must be handled by Spring Security LogoutFilter
+     / SecurityFilterChain logout processing, not by a controller that only
+     expires BT_ACCESS.
+
+```
+---
+112. COMPLETION STATUS
+`04_IMPLEMENTATION_SPEC – Version 1.0` đã chốt implementation blueprint cho:
+```text
+Technology baseline
+Backend package tree
+Module internal structure
+Exact component responsibilities
+Persistence strategy
+PK strategy
+Database entities
+Database tables
+Foreign keys
+Unique constraints
+Indexes
+Soft delete
+Business time implementation
+Money implementation
+Enums
+Google Login
+JWT
+ADMIN_EMAILS
+Initial ADMIN bootstrap validation
+Last-admin locking
+Spring Security
+explicit custom Google Login authentication-success CSRF rotation
+Spring Security logout pipeline
+JWT cookie deletion with matching Path/Domain semantics
+Cookie/CSRF delivery
+CSRF logout state cleanup
+same-site cookie security / deployment constraint
+credentialed fetch
+CSRF login/logout lifecycle
+CORS
+Product
+Collection
+Discount
+Product Images
+S3
+Product Image S3 transaction boundary
+Product Image 5 MiB configurable upload limit
+Thumbnail delete replacement
+Image reorder consistency
+Image compression decision
+Cart
+Checkout-all-cart decision
+Inventory locking
+Inventory reserve
+Inventory release
+Inventory sale
+Inventory restore
+Inventory IMPORT / ADJUSTMENT audit
+Inventory list/search/history API
+Order snapshot
+Order subtotal derivation
+Admin Order exact search/filter contract
+Order transition
+Payment
+Payment row locking
+payOS REST adapter
+payOS create mapping
+payOS webhook verification
+External payment identifiers
+Payment expiration
+Payment expiry arbitration
+verified payment success time
+Expiration/Webhook race
+Pending ADMIN cancellation provider handling
+Late success
+Notification persistence
+Notification recipients
+Notification dedup
+Low Stock / Out of Stock detection
+SSE
+Reporting
+Commerce Coordination
+Checkout idempotency
+CG-001
+CG-002
+CG-003
+CG-004
+CG-005
+CG-006
+CG-007
+CG-007 recovery
+Transaction boundaries
+Locking matrix
+Idempotency matrix
+REST endpoints
+Inventory endpoints
+Query parameter contracts
+OpenAPI documentation
+Authorization matrix
+Request DTOs
+Response DTOs
+API response convention
+Error codes
+Validation
+Flyway
+Profiles
+Secrets
+Logging
+Observability
+AWS CloudWatch log collection boundary
+Performance target verification
+Next.js structure
+Responsive/browser compatibility
+Product Image zoom/swipe interaction
+Next.js routes
+Frontend auth
+JWT storage
+Frontend query/cache
+Frontend validation
+Frontend i18n
+Frontend payment flow
+Testing
+Concurrency tests
+Traceability
+Implementation Decisions
+Implementation Invariants
+
+```
+Tài liệu tiếp theo có thể sử dụng trực tiếp:
+```text
+02_SRS_SPEC
+↓
+03_SYSTEM_ARCHITECTURE
+↓
+04_IMPLEMENTATION_SPEC
+↓
+Dependency
++
+Ownership
++
+Milestone Exit Criteria
+↓
+05_PROJECT_PLAN
+
+```
+`02_SRS_SPEC – Version 1.3 – BASELINE / FROZEN` tiếp tục là authoritative business source.
+`03_SYSTEM_ARCHITECTURE – Version 1.0` tiếp tục là authoritative architecture source.
+Mọi task trong `05_PROJECT_PLAN` phải implement theo module ownership, transaction boundaries, concurrency rules, idempotency rules và external integration boundaries đã freeze trong tài liệu này.

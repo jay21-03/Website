@@ -1,0 +1,8 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+logging:
+  pattern:
+    level: "%5p [correlationId=%X{correlationId:-}]"

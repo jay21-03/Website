@@ -1,0 +1,3790 @@
+SYSTEM ARCHITECTURE
+HỆ THỐNG WEBSITE THƯƠNG MẠI ĐIỆN TỬ GỐM BÀU TRÚC
+Document ID: `03_SYSTEM_ARCHITECTURE`
+Version: `1.0`
+Status: `DRAFT FOR IMPLEMENTATION DESIGN`
+Authoritative Requirement Source:
+`02_SRS_SPEC – Version 1.3 – BASELINE / FROZEN`
+Frontend: Next.js
+Backend: Spring Boot
+Architecture Style: Modular Monolith
+Database: PostgreSQL
+Production Cloud: AWS
+Payment Gateway: payOS
+Product Image Storage: Amazon S3
+Authentication: Google Login + JWT
+DOCUMENT INFORMATION
+1.1. Purpose
+Tài liệu `03_SYSTEM_ARCHITECTURE` định nghĩa cách tổ chức hệ thống để thực hiện các requirement đã được freeze trong `02_SRS_SPEC – Version 1.3`.
+SRS xác định hệ thống sử dụng Spring Boot, Next.js, PostgreSQL, AWS, payOS và Amazon S3; đồng thời xác định kiến trúc ứng dụng ở mức requirement là `Modular Monolith`.
+Quan hệ giữa các tài liệu:
+```text
+02_SRS_SPEC
+BASELINE / FROZEN
+↓
+03_SYSTEM_ARCHITECTURE
+↓
+04_IMPLEMENTATION_SPEC
+↓
+05_PROJECT_PLAN
+```
+`02_SRS_SPEC` vẫn là authoritative source đối với business requirement. `03_SYSTEM_ARCHITECTURE` không được thay đổi requirement đã freeze.
+ARCHITECTURE PURPOSE
+Tài liệu này định nghĩa:
+System Context;
+Container Architecture;
+Frontend Architecture;
+Backend Modular Monolith Architecture;
+Business Module Boundaries;
+Data Ownership;
+Module Dependency Rules;
+Integration Boundaries;
+Critical Business Flows;
+Transaction and Consistency Boundaries;
+Concurrency Strategy ở mức kiến trúc;
+Idempotency Responsibilities;
+Security Architecture;
+Notification Architecture;
+Reporting Architecture;
+AWS Deployment Architecture;
+Architecture Decisions;
+Architecture Risks;
+NFR Mapping;
+Requirement-to-Module Mapping;
+Architecture Traceability;
+Implementation boundaries cho `04_IMPLEMENTATION_SPEC`.
+Tài liệu không định nghĩa Java class, JPA mapping, REST contract chi tiết hoặc database DDL.
+---
+ARCHITECTURE SCOPE
+3.1. System Scope
+Hệ thống là E-Commerce Web Application của một cửa hàng duy nhất.
+Actors:
+```text
+GUEST
+USER
+ADMIN
+```
+Application Roles:
+```text
+USER
+ADMIN
+```
+Không tồn tại:
+```text
+SELLER
+STAFF
+DRIVER
+SUPER_ADMIN
+```
+USER không được tự cancel Order; ADMIN quản lý cancellation theo state rule. Runtime ADMIN phải có `role = ADMIN` và `status = ACTIVE` trong authoritative database state.
+3.2. Business Capabilities in Scope
+Architecture hỗ trợ các capability:
+```text
+Identity / Authentication
+User Management
+Product Catalog
+Collection
+Discount / Pricing
+Product Image
+Cart
+Inventory
+Order
+Payment
+Manual Refund Recording
+Notification
+Reporting
+Static Content
+Localization
+Business Time
+VND Monetary Calculation
+```
+---
+3.3. Explicit Architecture Exclusions
+Architecture không được bổ sung:
+```text
+Microservices
+Marketplace
+Multi-vendor
+Shipping Module
+Shipping Fee
+Shipping Tracking
+Product Variant
+Size
+Color
+Additional Payment Gateway
+Automatic Refund
+USER Self Cancel
+Complex Promotion Engine
+Message Broker bắt buộc
+Distributed Cache bắt buộc
+Kubernetes bắt buộc
+```
+---
+ARCHITECTURE DRIVERS
+Các architecture drivers chính được rút ra từ SRS gồm:
+| Driver | Architecture Implication |
+|---|---|
+| Modular Monolith | Một Spring Boot deployable nhưng chia business module rõ |
+| Backend authoritative | Business validation và state transition nằm ở Backend |
+| Inventory concurrency | Reservation phải chống overselling |
+| Checkout idempotency | Duplicate request không tạo duplicate Order |
+| payOS webhook duplication | Payment processing phải idempotent |
+| External payOS call | Cần compensation vì không có distributed transaction |
+| Historical Order data | OrderItem lưu immutable snapshot |
+| VND monetary rule | Một pricing calculation boundary dùng chung |
+| Multi-ADMIN | Notification read-state phải per recipient |
+| Google Login + JWT | Identity boundary riêng |
+| Runtime DB authority | JWT role claim không đủ để authorize |
+| S3 image storage | Binary nằm ngoài PostgreSQL |
+| Reporting | Read-only capability, không own business transaction data |
+| AWS deployment | Runtime phải deploy được trên AWS với PostgreSQL và S3 |
+| Team nhỏ | Tránh microservices và operational overhead không cần thiết |
+SRS xác định `Payment.status` là authoritative, một Order có đúng một Payment, payment success commit Inventory nhưng Order vẫn `NEW`, và unsuccessful terminal payment phải cancel Order/release reservation.
+---
+ARCHITECTURE CONSTRAINTS
+5.1. Mandatory Technology Constraints
+```text
+Frontend = Next.js
+Backend = Spring Boot
+Database = PostgreSQL
+Architecture Style = Modular Monolith
+Production Platform = AWS
+Payment Gateway = payOS
+Image Binary Storage = Amazon S3
+Authentication Provider = Google
+Application Authentication = JWT
+```
+---
+5.2. Architecture Assumptions
+Các nội dung sau là Architecture Assumption, không phải business requirement mới:
+AA-001 – Single Spring Boot Runtime
+Backend business modules được đóng gói và deploy dưới dạng một Spring Boot runtime/deployable.
+AA-002 – Shared PostgreSQL Instance
+Các module cùng sử dụng một PostgreSQL database instance nhưng mỗi module sở hữu logical tables/data của mình.
+Shared database không đồng nghĩa mọi module được phép trực tiếp modify table của module khác.
+AA-003 – In-process Module Communication
+Module communication chủ yếu sử dụng:
+```text
+Application Service Interface
+Read-only Query Interface
+Internal Application Event
+Application Orchestrator
+```
+Không cần distributed message broker.
+AA-004 – Commerce Application Coordination Layer
+Một application-level Commerce Application Coordination Layer chịu trách nhiệm điều phối các cross-module business flow phức tạp.
+Layer này không sở hữu authoritative business data và không phải actor/business feature mới.
+Các logical orchestrator/use case responsibility bên trong layer gồm:
+```text
+Checkout Orchestrator
+Payment Result Orchestrator
+Order Cancellation Orchestrator
+Manual Refund Recording Orchestrator
+```
+Đây là logical responsibility, không phải bốn architecture module độc lập và không bắt buộc ánh xạ một-một thành Java class.
+Exact class/package structure thuộc `04_IMPLEMENTATION_SPEC`.
+AA-005 – Persistent Notification First
+Notification persistence là authoritative notification state.
+SSE, nếu triển khai, chỉ là delivery enhancement.
+ARCHITECTURE PRINCIPLES
+AP-001 – Business Capability First
+Backend không tổ chức toàn bộ codebase theo global packages:
+```text
+controller/
+service/
+repository/
+```
+Thay vào đó:
+```text
+identity/
+catalog/
+cart/
+inventory/
+order/
+payment/
+notification/
+reporting/
+```
+Mỗi module có internal layers riêng.
+AP-002 – Single Data Owner
+Mỗi business entity có đúng một owning module.
+Module khác chỉ:
+```text
+query
+request operation
+consume event
+```
+Không trực tiếp thay đổi authoritative state thuộc module khác.
+AP-003 – Backend Authority
+Browser và Frontend không authoritative đối với:
+```text
+role
+authorization
+price
+discount effectiveness
+rounding
+inventory
+order state
+payment state
+refund eligibility
+business time
+```
+---
+AP-004 – Explicit Cross-module Interaction
+Cross-module call phải thông qua module public application interface hoặc event.
+Không gọi trực tiếp repository/entity nội bộ của module khác.
+AP-005 – Avoid Cyclic Dependencies
+Runtime business flow có thể liên quan nhiều module hai chiều về mặt nghiệp vụ, nhưng compile-time dependency phải được kiểm soát thông qua Commerce Application Coordination Layer, ports hoặc internal event.
+AP-006 – Transactional Core, Compensated External Integration
+PostgreSQL operation có thể dùng local transaction.
+Các external systems:
+```text
+Google
+payOS
+Amazon S3
+```
+không tham gia PostgreSQL ACID transaction.
+Do đó external integration cần:
+```text
+idempotency
+retry khi appropriate
+compensation
+observability
+```
+---
+SYSTEM CONTEXT
+7.1. System Context Diagram
+```mermaid
+flowchart LR
+    Guest[GUEST]
+    User[USER]
+    Admin[ADMIN]
+
+    Web[Next.js Web Application]
+    Backend[Spring Boot E-Commerce Backend]
+
+    Google[Google Identity Provider]
+    PayOS[payOS]
+    DB[(PostgreSQL)]
+    S3[(Amazon S3)]
+    Obs[AWS Logging and Observability]
+
+    Guest --> Web
+    User --> Web
+    Admin --> Web
+
+    Web --> Backend
+
+    Web --> Google
+    Backend --> Google
+
+    Backend --> PayOS
+    PayOS --> Backend
+
+    Backend --> DB
+    Backend --> S3
+    Backend --> Obs
+```
+Architecture Explanation
+GUEST, USER và ADMIN chỉ tương tác với application thông qua Next.js UI và các Backend API tương ứng.
+Google và payOS nằm ngoài system trust boundary.
+PostgreSQL là transactional relational data store.
+Amazon S3 lưu Product Image binary.
+AWS logging/observability nhận application logs và operational signals.
+ARCHITECTURE STYLE
+MODULAR MONOLITH
+8.1. Definition
+System được deploy như:
+```text
+1 Spring Boot Backend Application
+```
+nhưng bên trong chia thành các module business độc lập về logical ownership.
+Không áp dụng microservice boundary.
+8.2. Benefits for Current Scope
+Modular Monolith phù hợp vì:
+business domain chưa cần independent deployment;
+team nhỏ;
+checkout yêu cầu transaction consistency mạnh;
+Order/Payment/Inventory có nhiều invariant liên kết;
+giảm distributed-system complexity;
+vẫn cho phép module ownership rõ;
+dễ chia ownership cho team;
+dễ refactor thành service riêng trong tương lai nếu thực sự cần.
+8.3. Module Encapsulation Rule
+Mỗi module chỉ expose:
+```text
+Application Commands
+Application Queries
+Published Internal Events
+Data Transfer Contracts cần thiết giữa module
+```
+Các thành phần internal như entity/repository không được xem là public dependency.
+CONTAINER / RUNTIME ARCHITECTURE
+9.1. Runtime Diagram
+```mermaid
+flowchart TB
+    Browser[Browser]
+
+    Next[Next.js Application]
+    API[Spring Boot REST API]
+
+    PG[(PostgreSQL)]
+    S3[(Amazon S3)]
+
+    Google[Google Identity]
+    PayOS[payOS]
+    Logs[AWS Logging and Monitoring]
+
+    Browser -->|HTTPS| Next
+    Browser -->|HTTPS REST JSON| API
+
+    Next -->|REST JSON when server-side access is used| API
+
+    API -->|SQL Transaction| PG
+    API -->|Credential Verification| Google
+    API -->|Payment API| PayOS
+    PayOS -->|Verified Webhook| API
+    API -->|Object Operations| S3
+    API -->|Structured Logs| Logs
+```
+Architecture Explanation
+Frontend và Backend là hai runtime boundary riêng.
+Frontend có thể thực hiện client-side hoặc server-side data fetching theo khả năng Next.js, nhưng Backend vẫn là authoritative business API.
+Exact Next.js rendering/data-fetch mode cho từng page thuộc `04_IMPLEMENTATION_SPEC`.
+FRONTEND ARCHITECTURE
+10.1. Frontend Responsibilities
+Next.js chịu trách nhiệm:
+```text
+Routing
+Customer Pages
+Admin Pages
+UI Composition
+API Client
+Authentication Client Boundary
+Locale Selection
+Form UX Validation
+Rendering Product and Order Data
+Cart Interaction UI
+Payment Redirect / Payment Information Display
+Notification Bell UI
+Responsive Layout
+Error Presentation
+```
+---
+10.2. Customer Area
+Customer-facing area gồm logical capability:
+```text
+Home
+Product List
+Product Detail
+Collection
+Cart
+Checkout
+Payment UI
+My Orders
+Order Detail
+FAQ
+Policy
+Contact
+Current User
+```
+---
+10.3. Admin Area
+Admin-facing area gồm:
+```text
+Dashboard
+User Management
+Product Management
+Collection Management
+Discount Management
+Product Image Management
+Inventory Management
+Order Management
+Notification Bell
+Manual Refund Recording
+```
+Frontend chỉ render action hợp lệ; Backend vẫn phải validate toàn bộ authorization và state transition.
+10.4. Authentication Client Boundary
+Frontend chịu trách nhiệm:
+```text
+initiate Google Login
+receive Google credential
+send credential to Backend
+receive JWT
+attach JWT to protected requests
+clear client session on logout
+```
+Exact JWT storage strategy không được khóa trong Architecture.
+Decision để `04_IMPLEMENTATION_SPEC`.
+10.5. API Client Boundary
+Frontend sử dụng một API abstraction thống nhất thay vì để từng UI component tự quản lý network protocol.
+API Client chịu trách nhiệm ở mức logical:
+```text
+base API configuration
+JWT attachment
+response parsing
+401 handling
+403 handling
+business error mapping
+network error mapping
+```
+---
+10.6. Server/Client Data Fetching Boundary
+Architecture Decision ADR-014
+Next.js được phép dùng Server-side hoặc Client-side fetching tùy page.
+Backend API vẫn là authoritative source.
+Các state thay đổi thường xuyên hoặc cần interaction như:
+```text
+Cart
+Inventory display
+Checkout
+Order state
+Notification
+```
+có thể được fetch/refetch ở client-side theo implementation design.
+Public Product/Collection page có thể tận dụng Next.js server rendering nếu phù hợp SEO/performance.
+Exact caching/revalidation strategy thuộc Implementation Specification.
+10.7. Form Validation
+Frontend validation dùng cho:
+```text
+UX feedback
+required field indication
+format checking
+```
+Backend luôn validate lại.
+Frontend validation không phải security boundary.
+10.8. Localization
+Frontend quản lý UI locale:
+```text
+vi
+en
+```
+Product và Collection render trường tương ứng.
+Order history phải render historical bilingual OrderItem snapshot:
+```text
+vi → productNameVi
+en → productNameEn
+```
+SRS yêu cầu OrderItem giữ bilingual historical Product name và không query current Product name để thay thế history.
+BACKEND MODULAR MONOLITH ARCHITECTURE
+11.1. Backend Module Diagram
+```mermaid
+flowchart TB
+    subgraph App[Spring Boot Modular Monolith]
+        Identity[Identity Module]
+        Catalog[Catalog Module]
+        Cart[Cart Module]
+        Inventory[Inventory Module]
+        Order[Order Module]
+        Payment[Payment Module]
+        Notify[Notification Module]
+        Reporting[Reporting Module]
+        Coord[Commerce Application Coordination Layer]
+    end
+
+    Coord --> Identity
+    Coord --> Catalog
+    Coord --> Cart
+    Coord --> Inventory
+    Coord --> Order
+    Coord --> Payment
+    Coord --> Notify
+
+    Cart --> Catalog
+    Cart --> Inventory
+
+    Reporting --> Catalog
+    Reporting --> Inventory
+    Reporting --> Order
+    Reporting --> Payment
+
+    Payment --> PayOS[payOS Adapter]
+    Catalog --> S3[S3 Image Adapter]
+    Identity --> Google[Google Verification Adapter]
+```
+Architecture Explanation
+`Commerce Application Coordination Layer` chỉ điều phối use case xuyên module và không sở hữu authoritative business data.
+Các module business vẫn giữ ownership riêng.
+External integration nằm sau adapter/port boundary.
+`FAQ`, `Policy` và `Contact` không nằm trong Spring Boot Modular Monolith; chúng thuộc Next.js Static Content Capability theo `ADR-017`.
+MODULE CATALOG
+| Module | Business Capability | Owned State |
+|---|---|---|
+| Identity | Authentication + User Management | User |
+| Catalog | Product + Collection + Pricing + Product Image metadata | Product, Collection, Discount, ProductImage |
+| Cart | User shopping cart | Cart, CartItem |
+| Inventory | Stock and reservation | Inventory, InventoryTransaction |
+| Order | Customer purchase history and order state | Order, OrderItem |
+| Payment | payOS payment lifecycle | Payment |
+| Notification | Persistent admin notifications | Notification, NotificationRecipient |
+| Reporting | Dashboard/query capability | No authoritative transactional data |
+| Commerce Application Coordination Layer | Cross-module business orchestration | None |
+Frontend Static Content Capability
+```text
+FAQ
+Policy
+Contact
+→ owned by Next.js static/config
+→ no transactional backend ownership
+→ no Spring Boot Content business module
+→ no Content database tables
+→ no Admin Content CRUD / CMS
+```
+---
+MODULE RESPONSIBILITIES
+13.1. IDENTITY MODULE
+Purpose
+Quản lý authentication identity và runtime authorization-related User state.
+Sub-capabilities
+```text
+authentication
+user-management
+```
+Responsibilities
+```text
+Google credential verification coordination
+Find/Create User
+JWT issuance
+JWT authentication support
+Current User query
+Role/status authority
+ADMIN_EMAILS initial bootstrap
+Promote USER to ADMIN
+Demote ADMIN to USER
+Block User
+Unblock User
+Last Active ADMIN protection
+```
+Owned Business Data
+```text
+User
+```
+Logical User data:
+```text
+id
+googleId
+email
+fullName
+avatarUrl
+role
+status
+createdAt
+updatedAt
+```
+Public Application Interfaces
+Logical interfaces:
+```text
+AuthenticateWithGoogle
+GetCurrentUser
+CheckUserAuthority
+ListUsers
+GetUserDetail
+PromoteUser
+DemoteAdmin
+BlockUser
+UnblockUser
+```
+Không phải Java class names bắt buộc.
+Allowed Dependencies
+```text
+PostgreSQL
+Google Verification Adapter
+Security infrastructure
+```
+Forbidden Dependencies
+Identity không được phụ thuộc:
+```text
+Cart
+Inventory
+Order
+Payment
+Reporting
+```
+cho business state.
+Important Invariants
+```text
+Runtime role/status from database
+No self promotion
+At least one valid ACTIVE ADMIN at runtime
+ADMIN_EMAILS only bootstrap new User
+Existing demoted User not re-promoted
+```
+Initial bootstrap và runtime last-admin protection là hai rule riêng biệt trong SRS.
+Related SRS
+```text
+FR-AUTH-*
+FR-ADMIN-*
+NFR-SEC-002
+NFR-SEC-003
+NFR-SEC-004
+NFR-SEC-009
+NFR-REL-006
+```
+---
+13.2. CATALOG MODULE
+Catalog là business boundary tổng hợp cho:
+```text
+Product
+Collection
+Pricing / Discount
+Product Image metadata
+```
+Các sub-capability vẫn phải tách rõ internal ownership.
+13.2.1. Product Capability
+Purpose
+Quản lý Product core data và public Product query.
+Responsibilities
+```text
+Product create/update
+ACTIVE/INACTIVE
+Soft Delete
+Public Product visibility
+Search
+Filter
+Pagination
+Sorting
+Product Detail
+```
+Owned Data
+```text
+Product
+```
+Important Invariants
+```text
+No Variant
+No Size
+No Color
+Soft delete by deletedAt
+Public = ACTIVE and deletedAt null
+basePrice positive integer VND
+```
+---
+13.2.2. Collection Capability
+Purpose
+Nhóm Product theo Collection.
+Owned Data
+```text
+Collection
+```
+Important Invariants
+```text
+No cascade delete Product
+Collection ownership independent
+Public only active non-deleted
+```
+---
+13.2.3. Pricing / Discount Capability
+Purpose
+Là authoritative boundary cho:
+```text
+basePrice
+Discount
+rawSellingPrice
+sellingPrice
+BR-MONEY-001
+```
+Responsibilities
+```text
+Evaluate active Discount
+Validate PERCENTAGE
+Validate FIXED_PRICE
+Evaluate startAt/endAt
+Calculate sellingPrice
+Apply VND rounding
+```
+Owned Data
+```text
+Discount metadata
+```
+Product basePrice vẫn thuộc Product capability.
+Important Invariants
+```text
+PERCENTAGE:
+rawSellingPrice
+→ HALF_UP nearest 1 VND
+→ sellingPrice
+
+FIXED_PRICE:
+integer VND
+0 < discountValue < basePrice
+
+sellingPrice integer VND
+```
+SRS bắt buộc `Payment.amount = Order.totalAmount` và cùng một `BR-MONEY-001` phải áp dụng từ Product tới Payment.
+Public Interfaces
+```text
+GetCurrentProductPrice
+CalculateSellingPrice
+EvaluateDiscount
+ValidateProductPurchasable
+```
+---
+13.2.4. Product Image Capability
+Purpose
+Quản lý metadata Product Image và integration với S3.
+Responsibilities
+```text
+Upload coordination
+Delete coordination
+Reorder
+Thumbnail selection
+Maximum 10 images
+Maximum 1 thumbnail
+S3 reference management
+```
+Owned Data
+```text
+ProductImage metadata
+```
+External Dependency
+```text
+Amazon S3
+```
+Forbidden
+PostgreSQL không được lưu image binary. SRS yêu cầu image binary nằm ở S3 và database chỉ giữ metadata/reference.
+13.3. CART MODULE
+Purpose
+Quản lý shopping cart riêng của USER.
+Responsibilities
+```text
+View Cart
+Add Item
+Update Quantity
+Remove Item
+Checkout input preparation
+Successful checkout item removal
+Failed checkout item preservation
+```
+Owned Data
+```text
+Cart
+CartItem
+```
+Allowed Dependencies
+Read-only/query dependency:
+```text
+Catalog
+Pricing
+Inventory availability
+```
+Forbidden Dependencies
+Cart không được:
+```text
+modify Inventory reservation
+own authoritative price
+create Payment
+change Order state
+```
+Important Invariants
+```text
+quantity >= 1
+Cart price not authoritative
+Adding CartItem does not reserve Inventory
+Successful checkout removes checked-out items
+Failed pre-payOS-initiation checkout retains items
+```
+SRS xác định Cart price phải được Backend tính lại và cart clearing không thay thế checkout idempotency.
+13.4. INVENTORY MODULE
+Purpose
+Sở hữu physical stock, reserved stock và stock audit.
+Responsibilities
+```text
+View Inventory
+Adjust Inventory
+Reserve
+Release
+Commit Sale
+Restore Cancelled Paid Order
+Concurrency control
+Low Stock detection
+Out of Stock detection
+Inventory transaction audit
+```
+Owned Data
+```text
+Inventory
+InventoryTransaction
+```
+Public Interfaces
+```text
+GetAvailability
+Reserve
+Release
+CommitSale
+RestoreCancelledOrder
+AdjustInventory
+GetInventoryHistory
+```
+Forbidden Dependencies
+Inventory không tự:
+```text
+mark Payment PAID
+cancel Order
+confirm Order
+```
+Inventory chỉ thực hiện stock operation theo authorized business orchestration.
+Important Invariants
+```text
+availableQuantity = quantity - reservedQuantity
+
+quantity >= 0
+reservedQuantity >= 0
+availableQuantity >= 0
+```
+RESERVE:
+```text
+quantity unchanged
+reservedQuantity += q
+```
+RELEASE:
+```text
+quantity unchanged
+reservedQuantity -= q
+```
+SALE:
+```text
+quantity -= q
+reservedQuantity -= q
+```
+CANCEL_ORDER:
+```text
+quantity += q
+reservedQuantity unchanged
+```
+---
+13.5. ORDER MODULE
+Purpose
+Sở hữu Order lifecycle và immutable purchase snapshot.
+Responsibilities
+```text
+Create Order
+Create OrderItems
+Generate logical Order Code
+My Orders
+Order Detail
+Admin Order query
+Order transition validation
+Admin cancellation
+Historical OrderItem snapshot
+```
+Owned Data
+```text
+Order
+OrderItem
+```
+Important Invariants
+Order Status chỉ:
+```text
+NEW
+CONFIRMED
+COMPLETED
+CANCELLED
+```
+Allowed processing:
+```text
+NEW + PAID → CONFIRMED
+CONFIRMED + PAID → COMPLETED
+```
+ADMIN cancellation:
+```text
+NEW → CANCELLED
+CONFIRMED → CANCELLED
+```
+Forbidden:
+```text
+COMPLETED → CANCELLED
+USER cancel
+```
+Historical Snapshot
+OrderItem owns:
+```text
+productId
+productNameVi
+productNameEn
+basePrice
+sellingPrice
+quantity
+totalPrice
+```
+Historical snapshot không phụ thuộc current Catalog state sau Order creation.
+13.6. PAYMENT MODULE
+Purpose
+Sở hữu Payment state và payOS integration boundary.
+Responsibilities
+```text
+Create Payment PENDING
+Enforce one Order one Payment
+Call payOS
+Store external identifier when available
+Verify webhook
+Payment state transition
+Payment expiration
+Webhook idempotency
+Late event detection
+Manual Refund status recording
+```
+Owned Data
+```text
+Payment
+```
+External Dependency
+```text
+payOS
+```
+Public Interfaces
+```text
+CreatePayment
+CreateExternalPaymentInformation
+ProcessVerifiedWebhook
+GetPaymentStatus
+ExpirePayment
+RecordManualRefund
+```
+Important Invariants
+```text
+Payment.status authoritative
+1 Order → exactly 1 Payment
+Payment.amount = Order.totalAmount
+Client redirect cannot mark PAID
+```
+Payment successful:
+```text
+Payment = PAID
+Inventory = COMMITTED
+Order remains NEW
+```
+Unsuccessful:
+```text
+FAILED/CANCELLED/EXPIRED
+→ Order CANCELLED
+→ Inventory RELEASED
+```
+SRS yêu cầu webhook idempotent và payment success không được tự confirm Order.
+13.7. NOTIFICATION MODULE
+Purpose
+Lưu và cung cấp Notification cho nhiều ADMIN.
+Owned Data
+```text
+Notification
+NotificationRecipient
+```
+Architecture Decision ADR-016
+Chọn logical model:
+```text
+Notification
++
+NotificationRecipient
+```
+thay vì duplicate toàn bộ Notification cho từng ADMIN.
+Rationale
+Ưu điểm:
+```text
+business event chỉ lưu một lần
+message/reference nhất quán
+read state tách riêng từng recipient
+giảm duplicate business data
+```
+Trade-off:
+```text
+query notification phải join recipient
+recipient creation phải xử lý nhiều ADMIN
+```
+SRS cho phép cả hai representation nhưng bắt buộc read-state độc lập cho từng ADMIN.
+Trigger Types
+```text
+NEW_ORDER
+PAYMENT_SUCCESS
+PAYMENT_FAILED
+LOW_STOCK
+OUT_OF_STOCK
+```
+`NEW_ORDER` và `PAYMENT_SUCCESS` là hai event riêng.
+13.8. REPORTING MODULE
+Purpose
+Cung cấp read/query model cho Admin Dashboard.
+Responsibilities
+```text
+Total Orders
+Revenue
+New Orders
+Revenue Chart
+Recent Orders
+Best Selling
+Low Stock
+```
+Owned Data
+```text
+None of the authoritative transactional entities
+```
+Reporting không sở hữu:
+```text
+Order
+Payment
+Inventory
+Product
+```
+Allowed Dependencies
+Read-only:
+```text
+Order
+Payment
+Inventory
+Catalog
+```
+Metrics
+Revenue:
+```text
+Order = COMPLETED
+Payment = PAID
+```
+Best Selling:
+```text
+COMPLETED + PAID
+```
+Dashboard New Orders:
+```text
+Order = NEW
+Payment = PAID
+```
+---
+13.9. FRONTEND STATIC CONTENT CAPABILITY
+Purpose
+Cung cấp static content cho:
+```text
+FAQ
+Policy
+Contact
+```
+Architecture Decision ADR-017 – Static Content Is Frontend-owned
+`FAQ`, `Policy` và `Contact` được triển khai bằng:
+```text
+Next.js static/config content
+```
+Không có:
+```text
+Spring Boot Content business module
+Content database tables
+Admin Content CRUD
+CMS
+```
+Static content không tham gia PostgreSQL transactional ownership và không có transactional backend ownership.
+Các requirement `FR-CONTENT-*` map tới Next.js Static Content Capability.
+Architecture revision tương lai muốn thay đổi ownership này phải đi qua scope/architecture change phù hợp; Version hiện tại không bổ sung Backend Content API.
+13.10. COMMERCE APPLICATION COORDINATION LAYER
+Purpose
+Điều phối cross-module use case mà không làm các business module phụ thuộc vòng lẫn nhau.
+Owned Business Data
+```text
+NONE
+```
+Coordination Layer không sở hữu:
+```text
+User
+Product
+Cart
+Inventory
+Order
+Payment
+Notification
+```
+Logical Orchestrator Responsibilities
+```text
+Checkout Orchestrator
+Payment Result Orchestrator
+Order Cancellation Orchestrator
+Manual Refund Recording Orchestrator
+```
+Các tên trên mô tả logical responsibility/use case trong cùng một Commerce Application Coordination Layer; không phải các independent architecture module và không bắt buộc là Java class.
+Allowed Responsibilities
+Coordination Layer được phép:
+```text
+call module public command interfaces
+call module public query interfaces
+coordinate cross-module consistency
+coordinate compensation
+trigger persistent Notification through Notification public interface
+```
+Forbidden Responsibilities
+Coordination Layer không được:
+```text
+own authoritative business data
+directly access foreign repositories
+own Order lifecycle state
+own Payment state
+own Inventory state
+own Cart state
+own User state
+own Product state
+```
+Architecture Rule
+Complex multi-module workflow đi qua `Commerce Application Coordination Layer`.
+Exact Java class structure, package structure và transaction placement thuộc `04_IMPLEMENTATION_SPEC`.
+MODULE DEPENDENCY RULES
+14.1. Dependency Direction
+```mermaid
+flowchart LR
+    Coord[Commerce Coordination]
+
+    Identity[Identity]
+    Catalog[Catalog]
+    Cart[Cart]
+    Inventory[Inventory]
+    Order[Order]
+    Payment[Payment]
+    Notification[Notification]
+    Reporting[Reporting]
+
+    Coord --> Identity
+    Coord --> Catalog
+    Coord --> Cart
+    Coord --> Inventory
+    Coord --> Order
+    Coord --> Payment
+    Coord --> Notification
+
+    Cart --> Catalog
+    Cart --> Inventory
+
+    Reporting --> Catalog
+    Reporting --> Inventory
+    Reporting --> Order
+    Reporting --> Payment
+
+    Payment --> PayOS[payOS Port]
+    Identity --> Google[Google Port]
+    Catalog --> S3[S3 Port]
+```
+Architecture Explanation
+Dependency graph ưu tiên một chiều.
+Các cross-module state changes phức tạp đi qua Commerce Application Coordination Layer thay vì tạo:
+```text
+Order → Payment → Order
+```
+hoặc:
+```text
+Payment → Inventory → Payment
+```
+compile-time cycle.
+14.2. Dependency Rules
+Rule MD-001
+Module chỉ được query module khác qua public query interface.
+Rule MD-002
+Module không được access repository của module khác.
+Rule MD-003
+Cross-module mutation phải thông qua public command/application interface.
+Rule MD-004
+Notification side effect có thể được kích hoạt bởi Commerce Application Coordination Layer hoặc internal application event.
+Rule MD-005
+Reporting được đọc nhiều module nhưng không được write source tables.
+Rule MD-006
+External adapters không được chứa business state machine.
+MODULE DEPENDENCY MATRIX
+| Caller Module | Target Module | Purpose | Dependency Type | Allowed? |
+|---|---|---|---|---|
+| Identity | Google Adapter | Verify Google credential | External Port | Yes |
+| Cart | Catalog | Product purchasability | Read Query | Yes |
+| Cart | Pricing | Current display price | Read Query | Yes |
+| Cart | Inventory | Current availability | Read Query | Yes |
+| Cart | Payment | Payment manipulation | Direct | No |
+| Catalog | Inventory | Modify stock | Direct | No |
+| Catalog Image | S3 Adapter | Image object operation | External Port | Yes |
+| Commerce Coordination | Cart | Validate/read/clear checkout items | Command/Query | Yes |
+| Commerce Coordination | Catalog | Validate Product | Query | Yes |
+| Commerce Coordination | Pricing | Calculate sellingPrice | Query/Domain Service | Yes |
+| Commerce Coordination | Inventory | Reserve/commit/release/restore | Command | Yes |
+| Commerce Coordination | Order | Create/change Order | Command | Yes |
+| Commerce Coordination | Payment | Create/update Payment | Command | Yes |
+| Commerce Coordination | Notification | Persist Notification | Command | Yes |
+| Payment | payOS Adapter | External payment operation | External Port | Yes |
+| Payment | Order Repository | Direct Order mutation | Repository | No |
+| Payment | Inventory Repository | Direct stock mutation | Repository | No |
+| Order | Catalog Repository | Historical product lookup after creation | Direct Repository | No |
+| Notification | Identity | Resolve ADMIN recipients | Read Query | Yes |
+| Reporting | Order | Metrics/read | Read Query | Yes |
+| Reporting | Payment | Metrics/read | Read Query | Yes |
+| Reporting | Inventory | Low Stock/read | Read Query | Yes |
+| Reporting | Catalog | Product metadata for report | Read Query | Yes |
+---
+DATA OWNERSHIP
+16.1. Data Ownership Matrix
+| Module | Owned Data | May Read | Must Not Directly Modify |
+|---|---|---|---|
+| Identity | User | None required from Commerce | Product, Cart, Inventory, Order, Payment |
+| Catalog/Product | Product | Collection | Cart, Inventory, Order, Payment |
+| Catalog/Collection | Collection | Product references for integrity | Product state outside its own use case |
+| Catalog/Pricing | Discount metadata | Product basePrice | OrderItem history, Payment |
+| Catalog/Image | ProductImage metadata | Product | Order, Payment, Inventory |
+| Cart | Cart, CartItem | Product, Pricing, Inventory availability | Inventory, Order, Payment |
+| Inventory | Inventory, InventoryTransaction | Product identifier/reference | Order, Payment |
+| Order | Order, OrderItem | Payment status through application coordination/read port | Product, Inventory, Payment |
+| Payment | Payment | Order total/reference via orchestration | Order, Inventory |
+| Notification | Notification, NotificationRecipient | ADMIN recipients | User role, Order, Payment |
+| Reporting | None authoritative | Product, Order, Payment, Inventory | All authoritative source data |
+| Commerce Application Coordination Layer | None | Public command/query interfaces of business modules | All authoritative business state and foreign repositories |
+---
+DATABASE ARCHITECTURE
+17.1. PostgreSQL Role
+PostgreSQL là relational transactional source of truth cho core business data.
+Logical ownership:
+```text
+Identity
+→ User
+
+Catalog
+→ Product
+→ Collection
+→ Discount
+→ ProductImage metadata
+
+Cart
+→ Cart
+→ CartItem
+
+Inventory
+→ Inventory
+→ InventoryTransaction
+
+Order
+→ Order
+→ OrderItem
+
+Payment
+→ Payment
+
+Notification
+→ Notification
+→ NotificationRecipient
+```
+---
+17.2. Shared Database, Separate Ownership
+Architecture Decision ADR-015
+Một PostgreSQL database được dùng bởi Modular Monolith.
+Module boundaries được bảo vệ ở application architecture chứ không yêu cầu database riêng cho từng module.
+17.3. Cross-module Foreign References
+Module có thể giữ identifier reference như:
+```text
+Order.userId
+OrderItem.productId
+Inventory.productId
+Payment.orderId
+Notification.referenceId
+```
+nhưng identifier reference không cấp quyền cho module trực tiếp mutate source entity.
+17.4. Database Constraints
+Architecture yêu cầu constraint để bảo vệ invariant, nhưng không định nghĩa exact DDL.
+Ví dụ logical constraints:
+```text
+unique user identity
+unique orderCode
+one Inventory per Product
+one Payment per Order
+maximum valid state invariants where practical
+```
+Exact syntax thuộc `04_IMPLEMENTATION_SPEC`.
+INTEGRATION ARCHITECTURE
+External integration gồm:
+```text
+Google
+payOS
+Amazon S3
+AWS Observability
+```
+---
+18.1. Google Boundary
+Google là external identity provider.
+Identity module sử dụng Google Verification Port.
+Google data không được tin tưởng cho đến khi Backend verification hoàn tất.
+18.2. payOS Boundary
+payOS chỉ xuất hiện sau Payment integration port.
+Business modules khác không gọi payOS trực tiếp.
+```text
+Order
+Inventory
+Cart
+Notification
+```
+không chứa payOS SDK/API knowledge.
+18.3. S3 Boundary
+S3 chỉ xuất hiện sau Product Image storage port.
+Catalog Product core logic không phụ thuộc trực tiếp AWS SDK semantics.
+AUTHENTICATION & AUTHORIZATION ARCHITECTURE
+19.1. Authentication Sequence
+```mermaid
+sequenceDiagram
+    actor U as USER
+    participant FE as Next.js
+    participant G as Google
+    participant ID as Identity Module
+    participant DB as PostgreSQL
+
+    U->>FE: Start Google Login
+    FE->>G: Authenticate
+    G-->>FE: Google credential
+    FE->>ID: Submit Google credential
+    ID->>G: Verify credential
+    G-->>ID: Verified identity
+    ID->>DB: Find User
+
+    alt User not found
+        ID->>ID: Evaluate ADMIN_EMAILS bootstrap
+        ID->>DB: Create USER or ADMIN
+    end
+
+    ID->>DB: Read authoritative role and status
+    ID-->>FE: JWT + current user
+    FE-->>U: Authenticated session
+```
+Architecture Explanation
+Google credential verification xảy ra ở Backend.
+JWT được phát hành sau khi authoritative User được resolve.
+`ADMIN_EMAILS` chỉ tác động tới lần tạo User đầu tiên.
+19.2. Protected API Authorization
+```text
+Request
+↓
+JWT validation
+↓
+Resolve authenticated userId
+↓
+Load/validate authoritative User.role/User.status
+↓
+RBAC check
+↓
+Business operation
+```
+JWT role claim có thể hỗ trợ request context nhưng không được là runtime source duy nhất.
+19.3. Blocked User
+Nếu:
+```text
+status = BLOCKED
+```
+Backend phải reject protected business operation dù token cũ có role claim hợp lệ.
+Exact per-request authority lookup/caching decision thuộc Implementation Spec.
+ADMIN BOOTSTRAP ARCHITECTURE
+Hai mechanism độc lập:
+20.1. Initial Bootstrap Validation
+```text
+No valid ADMIN in DB
++
+ADMIN_EMAILS empty or invalid
+=
+Invalid production configuration
+```
+Architecture cần startup/deployment validation capability.
+Exact fail-fast mechanism để `04_IMPLEMENTATION_SPEC`.
+20.2. Bootstrap Login
+```text
+Google verified email
+↓
+User does not exist
+↓
+Email in ADMIN_EMAILS?
+├─ Yes → ADMIN ACTIVE
+└─ No  → USER ACTIVE
+```
+Existing User:
+```text
+use database role/status only
+```
+---
+20.3. Runtime Last-ADMIN Protection
+Operations:
+```text
+Demote ADMIN
+Block ADMIN
+```
+phải kiểm tra rằng sau operation vẫn còn ít nhất một:
+```text
+ACTIVE ADMIN
+```
+Concurrent operations phải được bảo vệ.
+Exact DB lock/version strategy thuộc Implementation Spec.
+CATALOG / PRICING ARCHITECTURE
+21.1. Pricing Authority
+Catalog/Pricing module là authoritative boundary cho Product price calculation.
+```text
+Product.basePrice
+↓
+Evaluate effective Discount
+↓
+rawSellingPrice
+↓
+HALF_UP if percentage
+↓
+sellingPrice
+```
+---
+21.2. Monetary Pipeline
+```text
+basePrice
+↓
+effective Discount
+↓
+rawSellingPrice
+↓
+HALF_UP nearest 1 VND
+↓
+sellingPrice
+↓
+sellingPrice × quantity
+↓
+OrderItem.totalPrice
+↓
+SUM line totals
+↓
+Order.totalAmount
+↓
+Payment.amount
+```
+SRS yêu cầu authoritative monetary values là integer VND và Product, Cart, Checkout, Order, Payment phải dùng cùng một rounding rule.
+21.3. Cart Price
+Cart dùng Pricing query cho display.
+Cart price không được dùng làm authoritative checkout input.
+21.4. Checkout Price
+Checkout luôn recalculate:
+```text
+current Product
+current effective Discount
+BR-TIME-001
+BR-MONEY-001
+```
+---
+CART ARCHITECTURE
+22.1. Cart State
+Cart chỉ chứa:
+```text
+Product reference
+Quantity
+```
+Không lưu authoritative selling price để phục vụ checkout.
+22.2. Cart to Checkout Boundary
+Commerce Application Coordination Layer đọc Cart snapshot rồi revalidate:
+```text
+Product exists
+Product ACTIVE
+not deleted
+quantity valid
+current availability
+current sellingPrice
+```
+---
+22.3. Successful Checkout
+CartItem chỉ được clear khi:
+```text
+Order created
+OrderItems created
+Inventory reserved
+Payment record created
+payOS Payment Information successfully created
+```
+---
+22.4. Failed Initiation
+Nếu payOS creation chưa thành công:
+```text
+Cart retained
+```
+---
+INVENTORY ARCHITECTURE
+23.1. Inventory State Model
+```text
+quantity
+reservedQuantity
+availableQuantity = quantity - reservedQuantity
+```
+---
+23.2. RESERVE
+```text
+quantity = unchanged
+reservedQuantity += q
+```
+Creates logical:
+```text
+InventoryTransaction.RESERVE
+```
+---
+23.3. RELEASE
+```text
+quantity = unchanged
+reservedQuantity -= q
+```
+Creates:
+```text
+InventoryTransaction.RELEASE
+```
+---
+23.4. SALE / COMMIT
+```text
+quantity -= q
+reservedQuantity -= q
+```
+Creates:
+```text
+InventoryTransaction.SALE
+```
+---
+23.5. CANCEL_ORDER RESTORE
+```text
+quantity += q
+reservedQuantity unchanged
+```
+Creates:
+```text
+InventoryTransaction.CANCEL_ORDER
+```
+---
+23.6. Audit Model
+Transaction record phải đủ audit:
+```text
+beforeQuantity
+afterQuantity
+beforeReservedQuantity
+afterReservedQuantity
+referenceId
+business type
+```
+---
+ORDER ARCHITECTURE
+24.1. Order State Machine
+```text
+NEW + PAID
+→ CONFIRMED
+
+CONFIRMED + PAID
+→ COMPLETED
+
+NEW
+→ CANCELLED
+
+CONFIRMED
+→ CANCELLED
+```
+No:
+```text
+SHIPPING
+```
+---
+24.2. Payment Preconditions
+Order transition module không tin action button từ Frontend.
+Commerce Application Coordination Layer / Order application flow phải lấy authoritative:
+```text
+Payment.status
+```
+trước khi thực hiện `CONFIRMED` hoặc `COMPLETED`.
+24.3. Historical OrderItem Snapshot
+Order module snapshot tại Order creation:
+```text
+productId
+productNameVi
+productNameEn
+basePrice
+sellingPrice
+quantity
+totalPrice
+```
+Sau snapshot:
+```text
+Product rename
+basePrice change
+Discount change
+disable
+soft-delete
+```
+không làm thay đổi Order history.
+PAYMENT ARCHITECTURE
+25.1. Payment Ownership
+Payment module là owner duy nhất của:
+```text
+Payment.status
+Payment.amount
+external payment correlation state
+```
+---
+25.2. One Order One Payment
+Architecture enforce:
+```text
+Order
+1
+↕
+1
+Payment
+```
+Cancelled Order không tạo Payment attempt mới.
+User mua lại bằng new checkout.
+25.3. External Identifier Lifecycle
+Payment có thể được tạo:
+```text
+status = PENDING
+externalTransactionIdentifier = unavailable
+```
+Sau khi payOS trả external identifier:
+```text
+persist identifier
+```
+Identifier khi tồn tại cần consistency/idempotency protection.
+25.4. Payment Expiration Processor
+Architecture yêu cầu một background capability:
+```text
+Expiration Processor
+```
+trong Spring Boot runtime.
+Nhiệm vụ:
+```text
+find PENDING payment past expiresAt
+transition EXPIRED
+cancel Order
+release Inventory
+create RELEASE audit
+create PAYMENT_FAILED notification
+```
+Exact:
+```text
+scheduler technology
+frequency
+batch size
+locking
+```
+để `04_IMPLEMENTATION_SPEC`.
+NOTIFICATION ARCHITECTURE
+26.1. Persistent Model
+Recommended logical model:
+```text
+Notification
+1
+↓
+many
+NotificationRecipient
+```
+Notification:
+```text
+type
+title
+message
+referenceId
+createdAt
+```
+Recipient:
+```text
+adminId
+isRead
+readAt
+```
+---
+26.2. NEW_ORDER
+Trigger sau successful checkout initiation:
+```text
+Order = NEW
+Payment = PENDING
+Inventory = RESERVED
+```
+---
+26.3. PAYMENT_SUCCESS
+Trigger sau:
+```text
+verified webhook
+Payment = PAID
+Inventory = COMMITTED
+Order = NEW
+```
+---
+26.4. PAYMENT_FAILED
+Logical type này đại diện:
+```text
+FAILED
+CANCELLED
+EXPIRED
+```
+Detail phải chứa actual status.
+26.5. LOW_STOCK
+```text
+availableQuantity > 0
+AND
+availableQuantity <= lowStockThreshold
+```
+---
+26.6. OUT_OF_STOCK
+```text
+availableQuantity = 0
+```
+Notification được tạo khi transition vào state, không phải liên tục cho unchanged state.
+REAL-TIME NOTIFICATION
+Persistent Notification Database là required capability.
+SSE:
+```text
+SHOULD
+```
+Architecture:
+```text
+Business Operation
+↓
+Persist Notification
+↓
+Commit
+↓
+Optional SSE delivery
+```
+Nếu SSE unavailable:
+```text
+Notification remains queryable from persistent storage
+```
+SSE failure không được làm rollback business Payment/Order operation chỉ vì realtime delivery thất bại.
+REPORTING ARCHITECTURE
+28.1. Read-only Query Capability
+Reporting module không own authoritative transaction state.
+---
+28.2. Query Sources
+```text
+Order
+Payment
+Inventory
+Catalog
+```
+---
+28.3. Revenue
+```text
+OrderStatus = COMPLETED
+AND
+Payment.status = PAID
+```
+---
+28.4. Best Selling
+```text
+COMPLETED
++
+PAID
+```
+Dựa trên historical OrderItem quantity.
+28.5. Dashboard New Orders
+```text
+OrderStatus = NEW
+AND
+Payment.status = PAID
+```
+---
+28.6. NEW_ORDER vs Dashboard New Orders
+Không đồng nghĩa.
+```text
+NEW_ORDER Notification
+=
+successful checkout initiation
+Payment thường PENDING
+```
+```text
+Dashboard New Orders
+=
+NEW + PAID
+actionable for ADMIN
+```
+SRS phân biệt rõ hai semantics này.
+STATIC CONTENT ARCHITECTURE
+Static content:
+```text
+FAQ
+Policy
+Contact
+```
+Theo `ADR-017`, architecture decision là:
+```text
+Next.js Static Content Capability
+→ static/config content
+```
+Không có:
+```text
+Spring Boot Content business module
+Content database tables
+Admin Content CRUD
+CMS
+```
+Static content không tham gia transactional PostgreSQL ownership.
+CRITICAL BUSINESS FLOWS
+30.1. CANONICAL CHECKOUT SEQUENCE
+```mermaid
+sequenceDiagram
+    actor U as USER
+    participant FE as Next.js
+    participant C as Commerce Coordination
+    participant Cart as Cart
+    participant Cat as Catalog Pricing
+    participant Inv as Inventory
+    participant Ord as Order
+    participant Pay as Payment
+    participant Ext as payOS
+    participant Noti as Notification
+
+    U->>FE: Checkout
+    FE->>C: Checkout request
+
+    C->>Cart: Load and validate Cart
+    Cart-->>C: Cart items
+
+    C->>Cat: Validate Product and evaluate Discount
+    Cat->>Cat: Apply BR-TIME-001
+    Cat->>Cat: Apply BR-MONEY-001
+    Cat-->>C: Authoritative rounded sellingPrice
+
+    C->>C: Calculate Order total
+
+    C->>Inv: Validate availability
+    Inv-->>C: Availability valid
+
+    C->>Ord: Create Order
+    C->>Ord: Create OrderItems
+    Ord-->>C: Order NEW
+
+    C->>Inv: Reserve Inventory
+    Inv->>Inv: Record InventoryTransaction.RESERVE
+    Inv-->>C: RESERVED + RESERVE audit
+
+    C->>Pay: Create Payment PENDING
+    Pay-->>C: Local Payment
+
+    C->>Pay: Create payOS payment information
+    Pay->>Ext: Create payment
+    Ext-->>Pay: Payment information
+    Pay->>Pay: Persist external correlation when available
+    Pay-->>C: External payment information created
+
+    C->>Cart: Remove checked-out items
+    C->>Noti: Persist NEW_ORDER
+
+    C-->>FE: Payment information
+    FE-->>U: Show QR or payment link
+```
+Architecture Explanation
+Canonical checkout phải giữ đúng mutation order authoritative từ SRS:
+```text
+USER Checkout
+↓
+Load Cart
+↓
+Validate Cart Items
+↓
+Validate Product
+↓
+Recalculate authoritative sellingPrice
+↓
+Apply BR-TIME-001
+↓
+Apply BR-MONEY-001
+↓
+Calculate Order total
+↓
+Validate Inventory availability
+↓
+Create Order
+↓
+Create OrderItems
+↓
+Reserve Inventory
+↓
+Create InventoryTransaction.RESERVE
+↓
+Create Payment PENDING
+↓
+Call payOS Create Payment Information
+↓
+payOS creation succeeds
+↓
+Persist external payment correlation data when available
+↓
+Remove checked-out CartItems
+↓
+Create NEW_ORDER Notification
+↓
+Return payment information
+```
+`Availability Validation` không phải `Inventory Reservation Mutation`.
+Inventory availability có thể được validate trước Order creation, nhưng mutation `Reserve Inventory` phải xảy ra sau `Create Order` và `Create OrderItems`.
+Successful checkout initiation kết thúc với:
+```text
+Order = NEW
+Payment = PENDING
+Inventory = RESERVED
+checked-out CartItems = removed
+NEW_ORDER = persisted
+```
+Pricing được recalculate và rounded ở Backend. Payment chưa `PAID` tại giai đoạn này.
+Tất cả logical orchestrator trong sequence thuộc cùng `Commerce Application Coordination Layer` và không sở hữu business state.
+External payOS creation success không tự động đồng nghĩa toàn bộ checkout initiation đã được local-finalized. Successful checkout initiation response chỉ được trả sau khi required Phase C finalization outcome đã hoàn tất.
+Nếu Phase C bị gián đoạn sau khi payOS creation đã thành công, operation phải đi vào `CG-007 – Successful Checkout Finalization` recoverable finalization path.
+Recovery capability không cho phép Backend coi checkout là successfully finalized trước khi required Phase C outcome thực sự hoàn tất.
+30.2. CHECKOUT CONSISTENCY BOUNDARY
+PostgreSQL transaction không thể bao trùm payOS external system.
+Architecture chia flow thành logical phases nhưng không khóa exact Spring transaction boundary.
+Phase A – Local Preparation
+```text
+Create Order
+Create OrderItems
+Reserve Inventory
+Create InventoryTransaction.RESERVE
+Create Payment PENDING
+```
+Các state này phải đạt một consistent business outcome theo `CG-001`.
+Phase B – External Payment Creation
+```text
+Call payOS Create Payment Information
+```
+External payOS operation không thuộc PostgreSQL ACID transaction.
+Phase C – Successful Checkout Finalization
+```text
+Persist external correlation data when available
+Clear checked-out CartItems
+Persist NEW_ORDER Notification
+Return payment information
+```
+Phase C phải tuân theo `CG-007 – Successful Checkout Finalization`.
+Return payment information chỉ xảy ra sau khi các required local finalization action trước đó đã hoàn tất thành công.
+Nếu Phase B đã SUCCESS nhưng Phase C local finalization chưa hoàn tất, Backend không được return successful checkout initiation result. Operation phải đi vào `CG-007` recoverable finalization path.
+Trường hợp này không được classify như Phase B/payOS creation failure, không được xử lý như `CG-005`, và không được coi recovery capability là sự thay thế cho Phase C completion.
+Failure Compensation
+Nếu Phase B thất bại cuối cùng:
+```text
+Payment = FAILED
+Order = CANCELLED
+Inventory = RELEASED
+InventoryTransaction.RELEASE recorded
+Cart retained
+No NEW_ORDER
+```
+Operation phải idempotent, consistent và observable.
+Vì `Payment = FAILED` là terminal unsuccessful state, persistent `PAYMENT_FAILED` handling tuân theo `CG-003` và SRS Notification semantics; điều này không làm `NEW_ORDER` được tạo.
+Exact local transaction split, compensation transaction, retry và `@Transactional` placement thuộc `04_IMPLEMENTATION_SPEC`.
+30.3. PAYOS CREATION FAILURE SEQUENCE
+```mermaid
+sequenceDiagram
+    participant C as Commerce Coordination
+    participant Ord as Order
+    participant Inv as Inventory
+    participant Pay as Payment
+    participant Ext as payOS
+    participant Cart as Cart
+    participant Noti as Notification
+
+    C->>Ord: Order already NEW with OrderItems
+    C->>Inv: Inventory already RESERVED
+    C->>Pay: Payment already PENDING
+
+    Pay->>Ext: Create payment information
+    Ext--xPay: Failure
+    Pay-->>C: External creation failed
+
+    C->>Pay: Transition FAILED
+    C->>Ord: Transition CANCELLED
+    C->>Inv: RELEASE reservation exactly once
+    Inv->>Inv: Record RELEASE transaction
+    C->>Cart: Keep CartItems
+    C->>Noti: Persist PAYMENT_FAILED with FAILED status
+```
+Architecture Explanation
+`NEW_ORDER` không được tạo trong flow này.
+Compensation outcome:
+```text
+Payment = FAILED
+Order = CANCELLED
+Inventory = RELEASED
+InventoryTransaction.RELEASE recorded
+Cart retained
+No NEW_ORDER
+```
+Operation phải idempotent, consistent và observable để retry compensation không release stock nhiều lần.
+`PAYMENT_FAILED` persistence phản ánh actual terminal status `FAILED` theo SRS Notification semantics.
+30.4. PAYMENT SUCCESS WEBHOOK SEQUENCE
+```mermaid
+sequenceDiagram
+    participant Ext as payOS
+    participant API as Webhook Boundary
+    participant Pay as Payment
+    participant Coord as Commerce Coordination
+    participant Inv as Inventory
+    participant Ord as Order
+    participant Noti as Notification
+
+    Ext->>API: Webhook
+    API->>Pay: Verify authenticity and locate Payment
+
+    Pay->>Pay: Idempotency check
+
+    alt Already processed
+        Pay-->>API: No duplicate business effect
+    else Valid new success
+        Pay->>Pay: Transition to PAID
+        Pay-->>Coord: Payment success result
+        Coord->>Inv: Commit reserved Inventory
+        Inv->>Inv: Record SALE transaction
+        Coord->>Ord: Keep Order NEW
+        Coord->>Noti: Create PAYMENT_SUCCESS
+        Coord-->>API: Processing complete
+    end
+```
+Architecture Explanation
+Client browser redirect không có authority để mark Payment `PAID`.
+Chỉ verified payOS webhook/event có thể kích hoạt payment-success transition.
+Order vẫn `NEW` sau payment success. SRS xác định `Payment → PAID`, Inventory commit exactly once và Order remains `NEW`.
+30.5. PAYMENT FAILURE / CANCELLATION / EXPIRATION
+```mermaid
+sequenceDiagram
+    participant Trigger as Payment Event or Expiration Processor
+    participant Pay as Payment
+    participant Coord as Commerce Coordination
+    participant Ord as Order
+    participant Inv as Inventory
+    participant Noti as Notification
+
+    Trigger->>Pay: FAILED or CANCELLED or EXPIRED
+    Pay->>Pay: Validate current state and idempotency
+    Pay-->>Coord: Terminal unsuccessful result
+
+    Coord->>Ord: Set CANCELLED
+    Coord->>Inv: RELEASE reservation exactly once
+    Inv->>Inv: Record RELEASE transaction
+    Coord->>Noti: Create PAYMENT_FAILED with actual status
+```
+Architecture Explanation
+Các terminal unsuccessful Payment đều converge về:
+```text
+Order = CANCELLED
+Inventory = RELEASED
+```
+`PAYMENT_FAILED` chứa actual Payment Status.
+30.6. PAYMENT EXPIRATION
+Authoritative expiration:
+```text
+expiresAt =
+Backend payment creation timestamp + 15 minutes
+```
+Background application process tìm expired `PENDING` Payment.
+SRS yêu cầu Backend authoritative time, 15 phút, idempotent cleanup.
+30.7. LATE PAYMENT SUCCESS
+Nếu current state:
+```text
+Payment = FAILED/CANCELLED/EXPIRED
+Order = CANCELLED
+Inventory = RELEASED
+```
+và late verified success event đến:
+```text
+Do not reopen Order
+Do not commit Inventory
+Do not automatically change Payment back to PAID
+```
+Architecture response:
+```text
+record audit
+structured warning log
+flag for manual resolution
+```
+Exact operational resolution workflow không được tự invent trong Architecture.
+30.8. ORDER MANAGEMENT FLOW
+```text
+Payment webhook success
+↓
+Payment = PAID
+Inventory = COMMITTED
+Order = NEW
+↓
+ADMIN
+↓
+NEW + PAID → CONFIRMED
+↓
+ADMIN
+↓
+CONFIRMED + PAID → COMPLETED
+```
+Backend Order transition service phải verify current Payment Status trước transition.
+Frontend chỉ hiển thị action tương ứng.
+30.9. ADMIN CANCELLATION SEQUENCE
+```mermaid
+sequenceDiagram
+    actor A as ADMIN
+    participant FE as Next.js Admin
+    participant C as Commerce Coordination
+    participant Ord as Order
+    participant Pay as Payment
+    participant Inv as Inventory
+
+    A->>FE: Cancel Order
+    FE->>C: Cancel request
+    C->>Ord: Read Order state
+    C->>Pay: Read Payment state
+
+    alt Payment PENDING
+        C->>Ord: NEW to CANCELLED
+        C->>Pay: PENDING to CANCELLED
+        C->>Inv: RELEASE reservation
+    else Payment PAID and Order NEW or CONFIRMED
+        C->>Ord: Set CANCELLED
+        C->>Inv: RESTORE committed quantity exactly once
+        Note over Pay: Payment remains PAID
+    end
+```
+Architecture Explanation
+Pending cancellation và paid cancellation có Inventory semantics khác nhau.
+Paid cancellation không automatic refund.
+30.10. MANUAL REFUND SEQUENCE
+```mermaid
+sequenceDiagram
+    actor A as ADMIN
+    participant External as External Refund Process
+    participant FE as Next.js Admin
+    participant Coord as Commerce Coordination
+    participant Ord as Order
+    participant Pay as Payment
+    participant Inv as Inventory
+
+    Note over Ord,Inv: Order CANCELLED, Payment PAID, Inventory already RESTORED
+
+    A->>External: Perform refund outside application
+    External-->>A: Refund successful
+
+    A->>FE: Record Manual Refund
+    FE->>Coord: Refund recording request
+
+    Coord->>Ord: Verify CANCELLED
+    Coord->>Pay: Verify PAID
+    Coord->>Pay: Transition REFUNDED
+
+    Note over Inv: No Inventory change
+```
+Architecture Explanation
+Manual Refund chỉ thay Payment/audit state.
+Không release hoặc restore Inventory lần hai. SRS explicitly cấm duplicate restoration khi record `REFUNDED`.
+TRANSACTION & CONSISTENCY ARCHITECTURE
+31.1. Local Transaction
+Các operation nằm hoàn toàn trong PostgreSQL có thể được bảo vệ bằng local transaction.
+Critical local business groups:
+```text
+Order + OrderItems creation
+Inventory state + InventoryTransaction
+Payment state transition
+Order state transition
+Notification persistence where tied to business transition
+Admin role/status mutation
+```
+---
+31.2. External Operation
+Không thể coi các operation sau là cùng PostgreSQL transaction:
+```text
+Google verification
+payOS API call
+S3 object operation
+```
+---
+31.3. Consistency Pattern
+Architecture sử dụng nguyên tắc:
+```text
+Prepare local state
+↓
+Call external boundary
+↓
+Finalize local state
+OR
+Compensate local state
+```
+---
+31.4. No Distributed Transaction Requirement
+Không triển khai distributed two-phase commit với payOS/S3.
+Business consistency được bảo vệ bằng:
+```text
+state validation
+idempotency
+compensating operation
+audit
+retry where safe
+```
+---
+31.5. CROSS-MODULE BUSINESS CONSISTENCY GROUPS
+Các Business Consistency Group định nghĩa required consistent business outcome cho cross-module flow.
+```text
+Business Consistency Group
+≠
+exact Spring transaction implementation
+```
+`03_SYSTEM_ARCHITECTURE` định nghĩa state/outcome phải nhất quán. `04_IMPLEMENTATION_SPEC` quyết định exact `@Transactional` placement, propagation, locking, isolation, atomic SQL, event timing và retry.
+CG-001 – Checkout Local Preparation
+Required business state:
+```text
+Order created
++
+OrderItems created
++
+Inventory RESERVED
++
+InventoryTransaction.RESERVE recorded
++
+Payment PENDING created
+```
+Các state này không được kết thúc ở inconsistent partial state không được xử lý.
+Ví dụ không hợp lệ nếu local preparation được xem là thành công:
+```text
+Order exists
++
+Payment PENDING exists
++
+Inventory not reserved
+```
+Architecture phải yêu cầu consistency hoặc rollback/compensation tương ứng.
+Exact transaction boundary thuộc `04_IMPLEMENTATION_SPEC`.
+CG-002 – Payment Success
+Verified payment success phải tạo consistent business outcome:
+```text
+Payment → PAID
++
+Inventory RESERVED → COMMITTED
++
+InventoryTransaction.SALE recorded
++
+Order remains NEW
+```
+Sau business success, `PAYMENT_SUCCESS` Notification phải được persisted theo Notification Reliability Architecture.
+Không được tồn tại authoritative state như:
+```text
+Payment = PAID
+Inventory still RESERVED indefinitely
+```
+mà không có failure recovery/consistency handling.
+Exact local transaction/event implementation thuộc `04_IMPLEMENTATION_SPEC`.
+CG-003 – Terminal Unsuccessful Payment
+Đối với:
+```text
+FAILED
+CANCELLED
+EXPIRED
+```
+consistent outcome:
+```text
+Payment = actual terminal status
++
+Order = CANCELLED
++
+Inventory reservation RELEASED exactly once
++
+InventoryTransaction.RELEASE recorded
++
+PAYMENT_FAILED Notification persisted
+```
+`PAYMENT_FAILED` detail phải giữ actual Payment status.
+CG-004 – Paid Order Cancellation
+Precondition:
+```text
+Order = NEW or CONFIRMED
+Payment = PAID
+Inventory = COMMITTED
+```
+Outcome:
+```text
+Order → CANCELLED
++
+Inventory physical quantity RESTORED exactly once
++
+InventoryTransaction.CANCEL_ORDER recorded
++
+Payment remains PAID
+```
+Không automatic refund.
+CG-005 – payOS Creation Failure Compensation
+Nếu local preparation đã đạt `CG-001` nhưng payOS Payment Information creation thất bại cuối cùng, outcome phải là:
+```text
+Payment → FAILED
++
+Order → CANCELLED
++
+Inventory → RELEASED
++
+InventoryTransaction.RELEASE recorded
++
+Cart retained
++
+No NEW_ORDER
+```
+Operation phải idempotent, consistent và observable.
+Vì Payment kết thúc ở `FAILED`, Notification handling tuân theo `CG-003`; không tạo `NEW_ORDER`.
+CG-006 – Manual Refund Recording
+Precondition:
+```text
+Order = CANCELLED
+Payment = PAID
+Inventory already RESTORED
+```
+Sau khi ADMIN xác nhận external refund đã thành công:
+```text
+Payment → REFUNDED
+```
+Không có Inventory mutation và không restore Inventory lần hai.
+CG-007 – Successful Checkout Finalization
+`CG-007` áp dụng khi `CG-001` đã hoàn tất và payOS Create Payment Information đã CONFIRMED SUCCESS, nhưng một hoặc nhiều local operation thuộc Phase C chưa hoàn tất.
+Precondition:
+```text
+Order = NEW
+OrderItems created
+Inventory = RESERVED
+InventoryTransaction.RESERVE recorded
+Payment = PENDING
+payOS Payment Information creation = CONFIRMED SUCCESS
+```
+External payment correlation data có thể đã được persist hoặc đang chờ hoàn tất trong local finalization.
+Required final outcome:
+```text
+external payment correlation persisted when available
++
+checked-out CartItems removed
++
+NEW_ORDER persisted
++
+Order remains NEW
++
+Payment remains PENDING
++
+Inventory remains RESERVED
+```
+Backend chỉ được return successful checkout initiation result sau khi toàn bộ required Phase C finalization outcome đã hoàn tất thành công.
+`Recoverability ≠ Successful Finalization`.
+Nếu payOS Create Payment Information đã thành công nhưng một local operation sau đó thất bại, ví dụ:
+```text
+persist external correlation fails
+or
+clear checked-out CartItems fails
+or
+persist NEW_ORDER fails
+```
+thì đây không phải `CG-005 – payOS Creation Failure Compensation` và Backend không được return successful checkout initiation result. Architecture phải đưa operation vào `CG-007` recoverable finalization path để retry/resume.
+Nếu Phase C bị gián đoạn sau payOS creation success, hệ thống phải giữ đủ correlation/recovery information để operation có thể được retry/resume idempotently. Recovery capability không làm thay đổi canonical order và không cho phép mô hình normal flow kiểu `Return Success → recover Cart later → create NEW_ORDER later`.
+Retry/resume/recovery phải có idempotent logical effect để bảo đảm:
+```text
+one logical checkout
+→ one Order
+→ one Payment
+→ one Inventory reservation
+→ one logical Cart clearing effect
+→ one logical NEW_ORDER business notification
+```
+Retry/resume không được:
+```text
+create duplicate Order
+create duplicate OrderItems
+create duplicate Payment
+create second payOS Payment Information without explicit allowed correlation behavior
+reserve Inventory twice
+create duplicate InventoryTransaction.RESERVE
+remove unrelated CartItems
+create uncontrolled duplicate NEW_ORDER
+```
+Cart finalization chỉ được remove các `checked-out CartItems` thuộc logical checkout operation; không được blindly clear toàn bộ Cart. Retry Cart finalization phải giữ idempotent logical effect.
+`NEW_ORDER` vẫn đại diện successful checkout initiation. Retry Phase C phải dùng logical business-event deduplication để không tạo uncontrolled duplicate Notification. Exact deduplication key/schema thuộc `04_IMPLEMENTATION_SPEC`.
+Trong `CG-007`:
+```text
+Payment remains PENDING
+Inventory remains RESERVED
+Order remains NEW
+```
+payOS Payment Information creation success không có authority để chuyển Payment sang `PAID`, và Inventory không được `COMMIT SALE` cho tới verified payment success webhook/event. Retryable local finalization error sau external success không tự tạo business cancellation rule mới và không tự release Inventory trái với frozen business semantics.
+`03_SYSTEM_ARCHITECTURE` chỉ định required consistent/recoverable business outcome. Exact `@Transactional` placement, retry library/count/backoff, recovery/outbox/workflow storage, idempotency key format, database schema, Java class và scheduler thuộc `04_IMPLEMENTATION_SPEC`.
+CONCURRENCY ARCHITECTURE
+32.1. Critical Race Conditions
+| Race Condition | Risk | Required Architecture Outcome |
+|---|---|---|
+| Concurrent checkout same Product | Oversell | Only valid stock reservation succeeds |
+| Duplicate checkout | Duplicate Order | Same logical operation produces one Order |
+| Duplicate webhook | Double stock commit | One Payment business transition |
+| Concurrent expiration/webhook | Release and commit race | One valid terminal outcome |
+| Concurrent Inventory adjustment | Invalid quantity | Inventory invariants maintained |
+| Concurrent ADMIN demote/block | Zero ADMIN | At least one ACTIVE ADMIN remains |
+| Duplicate cancellation | Double restore/release | Exactly-once business effect |
+| Duplicate manual refund request | Invalid repeated refund status | Single valid transition |
+---
+32.2. Architecture Goal
+```text
+No Oversell
+No Duplicate Order
+No Double Commit
+No Double Release
+No Double Restore
+No Duplicate Payment Transition
+No Lost Last ADMIN
+```
+Exact technique:
+```text
+pessimistic locking
+optimistic version
+atomic SQL
+unique constraint
+transaction isolation
+```
+không được quyết định tại Architecture level.
+Decision thuộc `04_IMPLEMENTATION_SPEC`.
+IDEMPOTENCY ARCHITECTURE
+33.1. Checkout Idempotency
+Input retries từ:
+```text
+double click
+browser retry
+network retry
+```
+phải map tới một logical checkout operation.
+Outcome:
+```text
+one logical checkout
+→ maximum one Order
+```
+Exact idempotency key format/storage để Implementation Spec.
+33.2. Payment Webhook Idempotency
+Duplicate payOS event:
+```text
+same business payment event
+```
+không được:
+```text
+transition twice
+commit twice
+release twice
+create duplicate SALE transaction
+create uncontrolled duplicate PAYMENT_SUCCESS
+```
+---
+33.3. Inventory Commit Idempotency
+`SALE` effect cho một Order/Payment chỉ xảy ra một lần.
+33.4. Inventory Release Idempotency
+Reservation release cho một failed/cancelled/expired checkout chỉ xảy ra một lần.
+33.5. Inventory Restore Idempotency
+Paid Order cancellation chỉ restore physical stock một lần.
+33.6. Notification Deduplication
+Technical duplicate event không được tạo duplicate business Notification.
+Deduplication identity có thể dựa trên:
+```text
+event type
+referenceId
+business transition identity
+```
+Exact schema thuộc Implementation Spec.
+SECURITY ARCHITECTURE
+34.1. Security Trust Model
+Backend được xem là authoritative enforcement boundary.
+Browser input và frontend data luôn untrusted.
+---
+34.2. Authentication
+```text
+Google credential
+→ Backend verification
+→ User resolution
+→ JWT issuance
+```
+---
+34.3. Authorization
+```text
+JWT valid
++
+User.role from DB
++
+User.status from DB
++
+Business rule
+```
+---
+34.4. RBAC
+Roles:
+```text
+USER
+ADMIN
+```
+No additional privilege level.
+34.5. Blocked User Enforcement
+Blocked User không được tiếp tục protected business operations.
+34.6. Input Validation
+Backend phải validate:
+```text
+Product data
+Discount data
+Cart quantity
+Inventory mutation
+Receiver information
+Order transition
+Payment amount
+Refund eligibility
+Image file properties
+```
+---
+34.7. Webhook Security
+Webhook được xem là:
+```text
+untrusted
+```
+cho đến khi:
+```text
+authenticity/signature verification
+business correlation
+amount validation
+state validation
+```
+hoàn tất.
+34.8. Secret Management
+Secrets không được hard-code.
+Production secret source có thể là:
+```text
+secure environment configuration
+AWS Secrets Manager
+```
+Exact choice thuộc AWS/Implementation decision.
+34.9. HTTPS
+Production public communication phải qua HTTPS.
+34.10. Sensitive Logging Protection
+Không log:
+```text
+JWT Secret
+Full JWT
+Google sensitive credential
+payOS secret
+AWS credential
+database password
+```
+SRS security requirements enforce Backend RBAC, Google verification, webhook verification và secret protection.
+TRUST BOUNDARIES
+| Boundary | Trusted? | Required Protection |
+|---|---|---|
+| Browser → Next.js | No | Input validation, XSS-safe rendering, secure session handling |
+| Browser/Next.js → Spring Boot | No from Backend perspective | HTTPS, JWT, Backend validation |
+| Spring Boot → Google | External | TLS, credential verification |
+| Google response → Spring Boot | Not until verified | Provider verification |
+| Spring Boot → payOS | External | TLS, request correlation, secret protection |
+| payOS → Webhook | No until verified | Signature/authenticity verification, idempotency |
+| Spring Boot → PostgreSQL | Internal controlled boundary | Authenticated DB connection, least privilege, transaction |
+| Spring Boot → S3 | External managed resource | IAM permissions, key validation, secure object operation |
+| Spring Boot → Logging | Controlled | Secret filtering, structured logging |
+---
+ERROR HANDLING ARCHITECTURE
+Architecture-level error categories:
+```text
+Validation Error
+Authentication Error
+Authorization Error
+Resource Not Found
+Business Rule Violation
+Conflict / Concurrent Operation
+Insufficient Inventory
+Invalid State Transition
+External Integration Failure
+Idempotency Conflict
+Internal Error
+```
+Mapping rule:
+```text
+Transport Error
+≠
+Business Error
+```
+External payOS/S3 failure phải được translated thành application-level integration outcome.
+Exact HTTP response JSON/error codes thuộc:
+```text
+04_IMPLEMENTATION_SPEC
+```
+Production response không expose stack trace hoặc secret.
+TIME & MONETARY ARCHITECTURE
+37.1. Business Time
+Business timezone:
+```text
+Asia/Ho_Chi_Minh
+UTC+07:00
+```
+Backend authoritative cho:
+```text
+Discount effectiveness
+Payment expiration
+Reporting date interpretation
+```
+Frontend dùng Backend-provided timestamp semantics để display.
+37.2. Time Storage
+Architecture không khóa storage representation.
+Possible implementation:
+```text
+UTC persistence
+→ business timezone conversion
+```
+nhưng exact implementation thuộc `04_IMPLEMENTATION_SPEC`.
+37.3. Monetary Authority
+Currency:
+```text
+VND
+```
+Authoritative monetary values:
+```text
+basePrice
+sellingPrice
+OrderItem.totalPrice
+Order.totalAmount
+Payment.amount
+```
+là integer VND.
+37.4. Percentage Rounding
+```text
+rawSellingPrice
+↓
+HALF_UP nearest 1 VND
+↓
+sellingPrice
+```
+---
+37.5. Payment Amount
+Invariant:
+```text
+Payment.amount
+=
+Order.totalAmount
+```
+---
+OBSERVABILITY ARCHITECTURE
+38.1. Required Operational Events
+Architecture phải tạo đủ log context cho:
+```text
+Authentication failure
+ADMIN promotion/demotion
+User block/unblock
+Order creation
+Order status change
+Order cancellation
+Payment creation
+payOS creation result
+Webhook verification result
+Payment state transition
+Payment expiration
+Late payment event
+Inventory reserve
+Inventory commit
+Inventory release
+Inventory restore
+Inventory adjustment
+Manual Refund recording
+Notification creation failure
+Unexpected exception
+```
+---
+38.2. Correlation
+Critical flow log nên cho phép correlation bằng:
+```text
+request reference
+orderCode/orderId
+payment reference
+productId
+business event type
+```
+không cần expose sensitive data.
+Exact logging MDC/trace configuration thuộc Implementation Spec.
+38.3. AWS Compatibility
+Production logs phải có khả năng được thu thập bởi AWS logging/monitoring environment.
+CloudWatch configuration detail không thuộc Architecture baseline.
+PRODUCT IMAGE / S3 CONSISTENCY ARCHITECTURE
+39.1. Boundary
+```text
+Admin Frontend
+↓
+Spring Boot Product Image Capability
+↓
+S3 Storage Port
+↓
+Amazon S3
+```
+Metadata:
+```text
+ProductImage
+```
+nằm PostgreSQL.
+Binary:
+```text
+Amazon S3
+```
+---
+39.2. Consistency Challenge
+S3 operation và PostgreSQL metadata transaction không phải distributed transaction.
+Potential failure:
+```text
+S3 upload succeeds
+DB metadata fails
+```
+hoặc:
+```text
+DB metadata changed
+S3 delete fails
+```
+Architecture yêu cầu:
+```text
+compensation
+retry where safe
+observability
+```
+Exact upload/delete ordering và cleanup algorithm thuộc Implementation Spec.
+DOMAIN EVENTS / APPLICATION EVENTS
+40.1. Candidate Internal Events
+Internal application events phù hợp cho:
+```text
+CheckoutInitiatedSuccessfully
+PaymentPaid
+PaymentFailed
+InventoryEnteredLowStock
+InventoryEnteredOutOfStock
+```
+---
+40.2. Architecture Decision Reference – ADR-012
+Không sử dụng Kafka/RabbitMQ.
+Nếu internal event được dùng:
+```text
+in-process Spring Boot application event
+```
+hoặc application-level event abstraction tương đương.
+40.3. Critical Persistence Rule
+Business-critical persistence không được phụ thuộc vào best-effort asynchronous event delivery.
+Ví dụ `PAYMENT_SUCCESS` Notification là persistent requirement.
+Architecture ưu tiên:
+```text
+Payment transition
++
+Inventory commit
++
+persistent Notification creation
+```
+được Commerce Application Coordination Layer đảm bảo consistent về business effect.
+SSE delivery có thể xảy ra sau commit.
+SYNCHRONOUS VS EVENT-DRIVEN DECISION
+| Interaction | Recommended Mode | Reason |
+|---|---|---|
+| Google login verification | Synchronous external call | Login cần kết quả ngay |
+| Product query | Synchronous | Request-response |
+| Cart validation | Synchronous | Immediate user feedback |
+| Checkout Product validation | Synchronous | Required before Order |
+| Price calculation | Synchronous | Required before snapshot |
+| Inventory reservation | Synchronous | Must know checkout success/failure |
+| Order creation | Synchronous | Core checkout state |
+| Payment local record creation | Synchronous | Core checkout state |
+| payOS payment creation | Synchronous external operation | Frontend cần payment information |
+| Cart clearing | Synchronous finalization | Required checkout lifecycle |
+| NEW_ORDER persistence | Synchronous or reliable in-process follow-up | Persistent requirement |
+| Webhook processing | Synchronous verification + local transaction | payOS state needs deterministic result |
+| PAYMENT_SUCCESS persistence | Synchronous/reliable local follow-up | Avoid lost Notification |
+| SSE delivery | Event-driven optional | Delivery enhancement only |
+| Low Stock notification | Internal event or synchronous follow-up | Decouple inventory from notification |
+| Reporting | Synchronous read query | No distributed processing needed |
+| Payment expiration | Background scheduled process | Time-triggered business rule |
+---
+AWS DEPLOYMENT ARCHITECTURE
+42.1. Mandatory AWS Boundary
+SRS freezes:
+```text
+Production on AWS
+PostgreSQL on AWS
+Product Images on Amazon S3
+AWS-compatible logging
+```
+SRS không freeze compute service cụ thể.
+42.2. AWS DEPLOYMENT CANDIDATES
+Frontend Candidate A – AWS Amplify Hosting
+AWS documentation states that Amplify Hosting supports deployment of Next.js SSR applications and handles Next.js hosting as a managed capability.
+Advantages:
+```text
+low operational overhead
+Git-based deployment
+good Next.js fit
+managed frontend hosting
+```
+Trade-off:
+```text
+AWS-specific hosting behavior
+runtime feature compatibility must be checked against chosen Next.js version
+```
+---
+Backend Candidate A – Elastic Beanstalk
+AWS currently provides a Java SE Elastic Beanstalk platform for applications that run from a compiled JAR, and Elastic Beanstalk manages underlying environment resources such as EC2 infrastructure and health management.
+Advantages:
+```text
+good Spring Boot JAR fit
+less infrastructure management than raw EC2
+supports managed deployment lifecycle
+appropriate complexity for small team
+```
+Trade-off:
+```text
+still based on AWS environment resources
+some platform-specific configuration required
+```
+---
+Backend Candidate B – AWS App Runner
+AWS App Runner can deploy a web application from source or a container image as a managed service and is designed to reduce infrastructure management.
+Advantages:
+```text
+simple managed web-service deployment
+container-friendly
+low operations burden
+```
+Trade-off:
+```text
+database private connectivity and runtime configuration need architecture attention
+container build path may add complexity if team does not already use containers
+```
+---
+Backend Candidate C – EC2
+Architecture candidate:
+```text
+Spring Boot on manually managed EC2
+```
+Advantages:
+```text
+maximum control
+simple conceptual runtime model
+```
+Trade-off:
+```text
+more server administration
+patching
+process management
+deployment management
+HTTPS/reverse proxy management
+```
+Không phải preferred KLTN option nếu không cần kiểm soát hạ tầng ở mức thấp.
+Database Candidate A – Amazon RDS for PostgreSQL
+AWS RDS supports PostgreSQL and provides managed relational database operation capabilities, including backups and common database administration functions.
+Advantages:
+```text
+managed PostgreSQL
+lower DBA operational overhead
+backup capability
+standard PostgreSQL compatibility
+```
+---
+Database Candidate B – PostgreSQL on EC2
+Không khuyến nghị cho current project vì team phải tự vận hành database server, backup và patching.
+42.3. AR-AWS-001 – RECOMMENDED KLTN DEPLOYMENT CANDIDATE
+Architecture Recommendation — NOT SRS Requirement — NOT Final Mandatory Compute Selection
+Recommended candidate cho team 4 người và scope hiện tại:
+```text
+Next.js
+→ AWS Amplify Hosting
+
+Spring Boot
+→ AWS Elastic Beanstalk Java SE
+
+PostgreSQL
+→ Amazon RDS for PostgreSQL
+
+Product Images
+→ Amazon S3
+
+Application Logs
+→ Amazon CloudWatch
+```
+Đây là `AR-AWS-001 – Recommended KLTN Deployment Candidate`, không phải mandatory architecture freeze và không thay đổi SRS.
+Rationale:
+```text
+low operational complexity
+native fit với Next.js và Spring Boot
+managed PostgreSQL
+S3 đã được freeze
+không cần Kubernetes
+không cần microservices
+phù hợp team size nhỏ
+```
+`04_IMPLEMENTATION_SPEC` / Deployment Design có thể finalize compute/deployment detail như:
+```text
+Amplify
+Elastic Beanstalk
+App Runner
+EC2
+RDS configuration
+VPC
+Load Balancer
+DNS
+TLS
+Secrets
+```
+nhưng phải giữ các constraint đã freeze:
+```text
+AWS
+PostgreSQL
+Amazon S3 for Product Images
+```
+---
+42.4. AWS DEPLOYMENT DIAGRAM
+```mermaid
+flowchart TB
+    Internet[Internet Users]
+
+    subgraph AWS[AWS Cloud]
+        Next[Next.js Hosting]
+        Backend[Spring Boot Runtime]
+        DB[(Managed PostgreSQL)]
+        S3[(Amazon S3)]
+        Logs[Logging and Monitoring]
+    end
+
+    Google[Google Identity]
+    PayOS[payOS]
+
+    Internet -->|HTTPS| Next
+    Internet -->|HTTPS API| Backend
+
+    Next -->|HTTPS API| Backend
+
+    Backend --> DB
+    Backend --> S3
+    Backend --> Logs
+
+    Backend --> Google
+    Backend --> PayOS
+    PayOS -->|Webhook HTTPS| Backend
+```
+Architecture Explanation
+Diagram chỉ thể hiện logical AWS topology.
+Diagram không hard-code recommended compute candidate thành mandatory topology.
+Final selection/configuration:
+```text
+Amplify
+Elastic Beanstalk
+App Runner
+EC2
+RDS configuration
+VPC
+Load Balancer
+DNS
+TLS
+Secrets
+```
+được finalize tại `04_IMPLEMENTATION_SPEC` / Deployment Design trong phạm vi AWS, PostgreSQL và Amazon S3 đã freeze.
+42.5. Deployment Environments
+Development
+Có thể chạy:
+```text
+Next.js local
+Spring Boot local
+PostgreSQL local/dev database
+development S3 alternative/config
+```
+Exact environment config thuộc Implementation Spec.
+Testing / Staging
+Architecture Recommendation, không phải mandatory SRS requirement.
+Một staging environment hữu ích cho:
+```text
+payOS integration test
+Google auth test
+AWS integration test
+migration verification
+```
+Nếu resource/cost constraint không cho phép, team có thể dùng shared testing environment.
+Production
+Production phải tuân theo SRS AWS deployment constraints.
+ARCHITECTURE DECISIONS
+ADR-001 – Modular Monolith
+Context
+Business capability liên quan chặt chẽ và team nhỏ.
+Decision
+Một Spring Boot runtime với business module boundaries.
+Rationale
+Giảm distributed-system complexity nhưng giữ maintainability.
+Consequences
+Modules phải enforce internal visibility và ownership.
+Related SRS
+```text
+Architecture Constraint
+NFR-MAINT-*
+```
+---
+ADR-002 – PostgreSQL as Transactional Source of Truth
+Context
+Order, Payment, Inventory và User yêu cầu strong transactional consistency.
+Decision
+PostgreSQL giữ authoritative relational business state.
+Rationale
+Phù hợp SRS và transaction model của Modular Monolith.
+Consequences
+Cross-module data access phải respect ownership.
+ADR-003 – Backend Authoritative Business Rules
+Context
+Frontend không phải security/business trust boundary.
+Decision
+Backend tính giá, validate state, authorize role/status và quyết định expiration.
+Rationale
+Ngăn client manipulation và giữ business rule nhất quán.
+Consequences
+Frontend chỉ hỗ trợ UX và render authoritative response.
+ADR-004 – payOS Isolated Behind Payment Boundary
+Context
+payOS là external system và là payment gateway duy nhất.
+Decision
+Chỉ Payment module/integration adapter biết payOS protocol.
+Rationale
+Giảm coupling và không làm Order/Inventory phụ thuộc external payment protocol.
+Consequences
+Order/Inventory/Cart không import payOS-specific types hoặc protocol knowledge.
+ADR-005 – Amazon S3 for Product Image Binary
+Context
+SRS freeze Amazon S3 cho Product Image binary.
+Decision
+Binary nằm S3, PostgreSQL lưu metadata/reference.
+Rationale
+Tách object binary khỏi relational transactional data và tuân thủ SRS.
+Consequences
+Architecture phải handle DB/S3 partial failure bằng consistency, compensation/retry khi phù hợp và observability.
+ADR-006 – Inventory Reservation Model
+Context
+Checkout cần chống oversell trước Payment success.
+Decision
+Dùng logical model:
+```text
+quantity
+reservedQuantity
+availableQuantity
+```
+Rationale
+Reservation tách stock đang chờ Payment khỏi physical quantity đã commit.
+Consequences
+Reservation phải reserve/release/commit exactly once về business effect và giữ Inventory invariants.
+ADR-007 – One Order One Payment
+Context
+SRS freeze cardinality một Order có đúng một Payment.
+Decision
+Một Order chỉ có một Payment; failed/cancelled/expired Order không reuse cho Payment attempt mới.
+Rationale
+Giữ payment lifecycle đơn nghĩa và phù hợp frozen SRS.
+Consequences
+User muốn mua lại phải thực hiện checkout mới → Order mới → Payment mới.
+ADR-008 – Per-recipient Notification Read State
+Context
+Nhiều ADMIN đọc cùng Notification độc lập.
+Decision
+Logical model:
+```text
+Notification
+1
+→ many
+NotificationRecipient
+```
+Rationale
+Một business Notification có thể dùng chung nội dung nhưng read-state phải độc lập theo ADMIN recipient.
+Consequences
+Notification query cần recipient relationship; không dùng global ADMIN `isRead`.
+ADR-009 – Business Time Handling
+Context
+Discount, reporting, expiration và business-facing time cần cùng semantics.
+Decision
+Business timezone:
+```text
+Asia/Ho_Chi_Minh
+UTC+07:00
+```
+Backend authoritative.
+Rationale
+Tránh khác biệt interpretation giữa Frontend, Backend và reporting/business rules.
+Consequences
+Persistence representation phải normalize consistently; exact representation thuộc `04_IMPLEMENTATION_SPEC`.
+ADR-010 – VND Monetary Calculation Boundary
+Context
+PERCENTAGE Discount có thể tạo fractional VND.
+Decision
+Pricing boundary áp dụng:
+```text
+rawSellingPrice
+→ HALF_UP nearest 1 VND
+→ sellingPrice
+```
+trước line-total calculation.
+Rationale
+Giữ authoritative monetary values là integer VND và đồng nhất từ Product tới Payment.
+Consequences
+Frontend không recalculate authoritative values; `Payment.amount = Order.totalAmount` phải được bảo toàn.
+ADR-011 – Commerce Application Coordination Layer for Cross-module Flows
+Context
+Checkout, payment result, cancellation và manual refund liên quan nhiều data owner.
+Decision
+Commerce Application Coordination Layer orchestrates public module interfaces và business consistency groups.
+Rationale
+Tránh circular module dependency trong khi vẫn điều phối cross-module consistency.
+Consequences
+Commerce Application Coordination Layer không own authoritative business data/domain state và không direct access foreign repositories.
+ADR-012 – No External Message Broker
+Context
+Current SRS không yêu cầu Kafka/RabbitMQ và scope/team chưa cần distributed messaging infrastructure.
+Decision
+Use synchronous orchestration và optional in-process application events; không yêu cầu external message broker.
+Rationale
+Giảm operational/distributed complexity cho Modular Monolith hiện tại.
+Consequences
+Business-critical persistence không phụ thuộc best-effort asynchronous delivery; future external broker cần architecture revision.
+ADR-013 – Persistent Notifications Before Real-time Delivery
+Context
+Persistent Notification là required capability; SSE chỉ SHOULD.
+Decision
+Persist Notification trước; realtime delivery là secondary enhancement.
+Rationale
+Không để realtime connection availability quyết định durability của business Notification.
+Consequences
+Notification remains queryable after SSE failure và SSE failure không rollback core business operation.
+ADR-014 – Next.js Server/Client Data Fetching Boundary
+Context
+Next.js hỗ trợ cả server-side và client-side data fetching, trong khi từng page/use case có yêu cầu interaction, SEO và freshness khác nhau.
+Decision
+Next.js có thể sử dụng Server-side hoặc Client-side data fetching tùy use case. Backend API vẫn là authoritative source.
+Rationale
+Giữ flexibility của Next.js mà không chuyển business authority sang Frontend.
+Consequences
+Exact caching, rendering, revalidation và page-level fetching strategy thuộc `04_IMPLEMENTATION_SPEC`.
+ADR-015 – Shared PostgreSQL with Logical Module Ownership
+Context
+Modular Monolith sử dụng một PostgreSQL database instance nhưng các module cần ownership rõ để tránh coupling và foreign mutation.
+Decision
+```text
+One PostgreSQL database instance
++
+logical module ownership
++
+no direct foreign repository mutation
+```
+Rationale
+Giữ transactional simplicity của Modular Monolith mà vẫn bảo vệ module boundaries.
+Consequences
+Không tạo database-per-module; cross-module read/mutation phải đi qua public module interfaces hoặc Commerce Application Coordination Layer.
+ADR-016 – Notification + NotificationRecipient Model
+Context
+Notification được gửi tới nhiều ADMIN nhưng read-state cần độc lập theo từng recipient.
+Decision
+```text
+Notification
+1
+→ many
+NotificationRecipient
+```
+Read state thuộc từng ADMIN recipient.
+Rationale
+Tránh duplicate toàn bộ business Notification trong khi vẫn giữ independent read state.
+Consequences
+Notification persistence/query phải hỗ trợ recipient relationship; không có one global ADMIN `isRead`.
+ADR-017 – Static Content Is Frontend-owned
+Context
+SRS chỉ yêu cầu static `FAQ`, `Policy`, `Contact` và không có Backend Admin CRUD/CMS.
+Decision
+```text
+FAQ
+Policy
+Contact
+→ Next.js static/config
+```
+Không có Spring Boot Content Module, Content DB table, CMS hoặc Admin Content CRUD.
+Rationale
+Phù hợp frozen scope và loại bỏ transactional/backend ownership không cần thiết.
+Consequences
+`FR-CONTENT-*` map tới Next.js Static Content Capability; static content không tham gia PostgreSQL transactional ownership.
+ARCHITECTURE RISKS
+| Risk | Impact | Architecture Mitigation |
+|---|---|---|
+| Overselling | Order vượt tồn kho | Atomic/concurrency-safe Inventory reservation |
+| Duplicate Checkout | Duplicate Order/Reservation | Checkout idempotency |
+| Duplicate payOS Webhook | Double stock commit | Payment idempotency + state guard |
+| payOS unavailable | Checkout partial state | Compensation flow |
+| payOS creation succeeds but local checkout finalization fails | External payment information exists while Cart / Notification / correlation state may be partially finalized | Idempotent and recoverable CG-007 finalization with correlation and observable recovery state |
+| payOS late success | Money/state mismatch | No automatic reopen; audit/manual resolution |
+| Concurrent expiration and success | Commit/release race | State transition concurrency guard |
+| Double Inventory release | Wrong available stock | Idempotent release |
+| Double Inventory restore | Inflated physical stock | Cancellation business identity guard |
+| Last ADMIN race | No administration capability | Concurrency-safe last-admin protection |
+| S3 upload DB failure | Orphan image | Compensation/cleanup |
+| S3 delete failure | Stale object | Retry/observability |
+| JWT stale role claim | Unauthorized access | DB role/status authority |
+| Reporting heavy queries | Slow dashboard | Pagination/index/read optimization |
+| Notification duplication | Admin noise | Business-event deduplication |
+| Notification realtime outage | Missed realtime signal | Persistent storage fallback |
+| Incorrect timezone conversion | Wrong Discount/report result | Backend time authority |
+| Monetary mismatch | Payment discrepancy | Central BR-MONEY-001 |
+| Module boundary erosion | High coupling | Public interfaces + data ownership enforcement |
+---
+NFR MAPPING
+| NFR Area | Architecture Response |
+|---|---|
+| Security | Google verification, JWT, DB RBAC authority, Backend validation |
+| Reliability | Local transaction, compensation, idempotency + recoverable checkout finalization |
+| Data Integrity | PostgreSQL + module ownership + consistency groups + CG-007 recovery semantics |
+| Inventory Reliability | Reservation + concurrency safety + audit |
+| Payment Reliability | Webhook verification + idempotency + terminal-state guards |
+| Performance | Pagination, backend filtering, indexing strategy |
+| Maintainability | Modular Monolith business boundaries |
+| Compatibility | REST/JSON + responsive Next.js |
+| Observability | Structured logging + AWS-compatible monitoring |
+| Deployment | AWS runtime + PostgreSQL + S3 |
+| Time Consistency | Backend-authoritative Asia/Ho_Chi_Minh semantics |
+| Monetary Consistency | Central VND HALF_UP pricing boundary |
+| Notification Reliability | Persistent Notification + recipient state |
+---
+REQUIREMENT → MODULE MAPPING
+| SRS Requirement Group | Owning Architecture Module |
+|---|---|
+| `FR-AUTH-*` | Identity / Authentication |
+| `FR-ADMIN-*` | Identity / User Management |
+| `FR-PRODUCT-*` | Catalog / Product |
+| `FR-COLLECTION-*` | Catalog / Collection |
+| `FR-DISCOUNT-*` | Catalog / Pricing |
+| `BR-MONEY-001` | Catalog / Pricing + cross-module monetary rule |
+| `FR-IMAGE-*` | Catalog / Product Image |
+| `FR-CART-*` | Cart |
+| `FR-INV-*` | Inventory |
+| `FR-ORDER-*` | Order |
+| `FR-PAY-*` | Payment |
+| `FR-REFUND-*` | Payment + Order/Inventory coordination |
+| `FR-NOTIFY-*` | Notification |
+| `FR-REPORT-*` | Reporting |
+| `FR-CONTENT-*` | Next.js Static Content Capability |
+| `FR-I18N-*` | Frontend + Catalog + Order historical snapshot |
+| `BR-TIME-001` | Cross-cutting Backend Time Boundary |
+| `NFR-SEC-*` | Security Cross-cutting + Identity |
+| `NFR-REL-*` | Transaction/Concurrency/Idempotency architecture |
+| `NFR-PER-*` | Query/Data architecture |
+| `NFR-OBS-*` | Observability |
+| `NFR-MAINT-*` | Modular boundary/documentation/migration |
+| `NFR-DEPLOY-*` | AWS Deployment Architecture |
+---
+ARCHITECTURE TRACEABILITY MATRIX
+| SRS ID / Rule | Architecture Component | Architecture Mechanism | Downstream Spec |
+|---|---|---|---|
+| FR-AUTH-001 | Identity | Google verification port | 04_IMPLEMENTATION_SPEC |
+| FR-AUTH-003 | Identity/Security | JWT issuance | 04_IMPLEMENTATION_SPEC |
+| FR-AUTH-005 | Identity/Security | DB role/status authority | 04_IMPLEMENTATION_SPEC |
+| FR-ADMIN-001 | Identity | ADMIN_EMAILS bootstrap | 04_IMPLEMENTATION_SPEC |
+| FR-ADMIN-004/005 | User Management | Last-admin concurrency guard | 04_IMPLEMENTATION_SPEC |
+| FR-ADMIN-007 | Identity/Deployment | Initial bootstrap validation | 04_IMPLEMENTATION_SPEC |
+| FR-PRODUCT-* | Catalog | Product capability | 04_IMPLEMENTATION_SPEC |
+| FR-COLLECTION-* | Catalog | Collection capability | 04_IMPLEMENTATION_SPEC |
+| FR-DISCOUNT-* | Pricing | Discount evaluation boundary | 04_IMPLEMENTATION_SPEC |
+| BR-MONEY-001 | Pricing | VND HALF_UP calculation | 04_IMPLEMENTATION_SPEC |
+| FR-IMAGE-* | Product Image | S3 storage port + metadata ownership | 04_IMPLEMENTATION_SPEC |
+| FR-CART-* | Cart | Cart module + checkout coordination | 04_IMPLEMENTATION_SPEC |
+| FR-INV-004 | Inventory | Reservation operation | 04_IMPLEMENTATION_SPEC |
+| FR-INV-005 | Inventory | Sale commit | 04_IMPLEMENTATION_SPEC |
+| FR-INV-006 | Inventory | Release operation | 04_IMPLEMENTATION_SPEC |
+| FR-INV-008 | Inventory | Concurrency boundary | 04_IMPLEMENTATION_SPEC |
+| FR-ORDER-001 | Order/Commerce Coordination | Canonical checkout + CG-001 + CG-007 | 04_IMPLEMENTATION_SPEC |
+| FR-ORDER-006 | Order | Payment-gated state machine | 04_IMPLEMENTATION_SPEC |
+| FR-ORDER-009 | Order | Immutable bilingual snapshot | 04_IMPLEMENTATION_SPEC |
+| FR-ORDER-010 | Commerce Coordination | Checkout idempotency | 04_IMPLEMENTATION_SPEC |
+| FR-ORDER-011 | Payment/Order | One-to-one logical cardinality | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-001 | Payment | Authoritative Payment.status | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-003 | Payment/Commerce Coordination | payOS creation boundary + CG-007 finalization | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-004 | Commerce Coordination | payOS failure compensation CG-005 | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-005 | Payment | Verified webhook boundary | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-006 | Payment/Inventory | PAID + commit; Order remains NEW | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-009 | Payment | Expiration processor | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-010 | Payment | Webhook idempotency | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-011 | Payment | Late event manual-resolution flag | 04_IMPLEMENTATION_SPEC |
+| FR-PAY-012 | Payment | External identifier lifecycle | 04_IMPLEMENTATION_SPEC |
+| FR-REFUND-001 | Payment/Commerce Coordination | CANCELLED + PAID precondition | 04_IMPLEMENTATION_SPEC |
+| FR-REFUND-002 | Inventory/Payment | No second restore | 04_IMPLEMENTATION_SPEC |
+| FR-NOTIFY-001 | Notification | NotificationRecipient model | 04_IMPLEMENTATION_SPEC |
+| FR-NOTIFY-004 | Notification/Frontend | Optional SSE | 04_IMPLEMENTATION_SPEC |
+| FR-NOTIFY-005 | Notification | Trigger semantics | 04_IMPLEMENTATION_SPEC |
+| FR-REPORT-002 | Reporting | COMPLETED + PAID revenue query | 04_IMPLEMENTATION_SPEC |
+| FR-REPORT-003 | Reporting | Valid-order best-selling query | 04_IMPLEMENTATION_SPEC |
+| FR-REPORT-005 | Reporting | NEW + PAID metric | 04_IMPLEMENTATION_SPEC |
+| FR-CONTENT-* | Next.js Static Content | Frontend-owned FAQ/Policy/Contact capability | 04_IMPLEMENTATION_SPEC |
+| BR-TIME-001 | Cross-cutting | Backend business-time service/rule | 04_IMPLEMENTATION_SPEC |
+| NFR-SEC-* | Security | Trust boundary + JWT/RBAC/secret controls | 04_IMPLEMENTATION_SPEC |
+| NFR-REL-* | Core architecture | Transaction/idempotency/concurrency + CG-007 recoverability | 04_IMPLEMENTATION_SPEC |
+| NFR-PER-* | Data/query | Pagination/index strategy | 04_IMPLEMENTATION_SPEC |
+| NFR-OBS-* | Observability | Structured logs | 04_IMPLEMENTATION_SPEC |
+| NFR-DEPLOY-* | AWS | AWS deployment topology | 04_IMPLEMENTATION_SPEC |
+---
+IMPLEMENTATION BOUNDARIES
+WHAT `03_SYSTEM_ARCHITECTURE` DOES NOT DEFINE
+Các nội dung sau cố ý chưa được xác định và phải chuyển sang:
+```text
+04_IMPLEMENTATION_SPEC
+```
+bao gồm:
+```text
+Exact Java package tree
+
+Exact class names
+
+Controller class names
+
+Service implementation names
+
+Repository names
+
+DTO structures
+
+Exact REST endpoint paths
+
+Exact request JSON
+
+Exact response JSON
+
+JPA Entity mapping
+
+JPA relationship annotations
+
+DDL
+
+Database column data types
+
+Exact foreign-key syntax
+
+Exact unique constraint syntax
+
+Exact database indexes
+
+Spring Security configuration code
+
+JWT library
+
+JWT signing algorithm configuration
+
+JWT expiry configuration values nếu SRS không khóa
+
+JWT client storage strategy
+
+Google SDK implementation
+
+Google verification library
+
+payOS SDK choice
+
+payOS DTOs
+
+payOS API field mapping
+
+payOS signature verification implementation
+
+payOS error mapping detail
+
+@Transactional placement
+
+Exact transaction propagation
+
+Exact CG-007 retry/resume/recovery mechanism
+
+Recovery/outbox/workflow storage design if used
+
+Retry library/count/backoff
+
+Pessimistic lock SQL
+
+Optimistic version strategy
+
+Atomic SQL implementation
+
+Isolation level selection
+
+Idempotency key format
+
+Idempotency table schema
+
+Webhook deduplication schema
+
+Notification deduplication schema
+
+Scheduler library
+
+Scheduler frequency
+
+Expiration batch size
+
+Expiration locking strategy
+
+Retry library
+
+Retry count
+
+Retry backoff configuration
+
+S3 SDK code
+
+S3 object key format
+
+S3 upload compensation implementation
+
+S3 delete compensation implementation
+
+Exact AWS compute service final configuration
+
+AWS networking detail
+
+Load balancer configuration
+
+DNS configuration
+
+TLS certificate configuration
+
+AWS IaC
+
+IAM policies
+
+Environment variable complete list
+
+Secrets Manager configuration
+
+CloudWatch log group configuration
+
+Frontend exact folder tree
+
+Frontend state/query library decision
+
+Frontend exact caching/revalidation policy
+
+Frontend component hierarchy
+
+Testing framework details
+```
+Architecture Decisions trong tài liệu này phải được implement mà không phá các business module boundary.
+FINAL ARCHITECTURE INVARIANTS
+```text
+1. Hệ thống là Modular Monolith.
+
+2. Backend Spring Boot là authoritative business boundary.
+
+3. PostgreSQL là transactional source of truth.
+
+4. Frontend không quyết định authoritative authorization, Product price,
+   Discount effectiveness, Order total, Payment status, Inventory state,
+   Refund eligibility hoặc business time.
+
+5. Product không có Variant.
+
+6. Product không có Size.
+
+7. Product không có Color.
+
+8. Order Status chỉ gồm:
+   NEW,
+   CONFIRMED,
+   COMPLETED,
+   CANCELLED.
+
+9. Không tồn tại SHIPPING Order Status.
+
+10. Một Order có đúng một Payment.
+
+11. payOS là payment gateway duy nhất.
+
+12. Payment.status là authoritative Payment state.
+
+13. Payment success không auto-confirm Order.
+
+14. Payment success giữ:
+    Order = NEW,
+    Payment = PAID,
+    Inventory = COMMITTED.
+
+15. NEW → CONFIRMED chỉ hợp lệ khi Payment = PAID.
+
+16. CONFIRMED → COMPLETED chỉ hợp lệ khi Payment = PAID.
+
+17. USER không được tự cancel Order.
+
+18. ADMIN chỉ cancel NEW hoặc CONFIRMED theo SRS state rules.
+
+19. Inventory reservation phải concurrency-safe.
+
+20. availableQuantity = quantity - reservedQuantity.
+
+21. RESERVE chỉ tăng reservedQuantity.
+
+22. RELEASE chỉ giảm reservedQuantity.
+
+23. SALE giảm quantity và reservedQuantity.
+
+24. CANCEL_ORDER restore tăng quantity và không thay đổi reservedQuantity.
+
+25. Inventory commit/release/restore phải exactly-once về business effect.
+
+26. Checkout phải chống duplicate Order.
+
+27. payOS Webhook phải được verify.
+
+28. payOS Webhook processing phải idempotent.
+
+29. Duplicate webhook không được commit Inventory hai lần.
+
+30. Duplicate webhook không được tạo duplicate Payment transition.
+
+31. Payment FAILED/CANCELLED/EXPIRED phải dẫn tới:
+    Order = CANCELLED
+    Inventory = RELEASED.
+
+32. Payment timeout là 15 minutes.
+
+33. Payment expiration dùng Backend authoritative timestamp.
+
+34. Late success event không tự reopen Order.
+
+35. Late success event không tự commit released Inventory.
+
+36. Manual Refund chỉ hợp lệ với:
+    Order = CANCELLED
+    Payment = PAID.
+
+37. Manual Refund không restore Inventory lần hai.
+
+38. Automatic refund không thuộc Architecture.
+
+39. Product Image binary nằm ở Amazon S3.
+
+40. PostgreSQL chỉ lưu Product Image metadata/reference.
+
+41. Mỗi Product tối đa 10 Product Images.
+
+42. Mỗi Product tối đa một thumbnail.
+
+43. Notification read-state là per ADMIN recipient.
+
+44. Global isRead chung cho mọi ADMIN bị cấm.
+
+45. NEW_ORDER được tạo sau successful checkout initiation.
+
+46. NEW_ORDER không đồng nghĩa Payment đã PAID.
+
+47. PAYMENT_SUCCESS chỉ được tạo sau verified Payment success
+    và successful Inventory commit.
+
+48. Dashboard New Orders chỉ tính:
+    Order = NEW
+    Payment = PAID.
+
+49. Reporting không sở hữu Order, Payment hoặc Inventory authoritative state.
+
+50. Revenue chỉ tính COMPLETED + PAID.
+
+51. Best Selling chỉ dựa trên COMPLETED + PAID.
+
+52. Business timezone = Asia/Ho_Chi_Minh UTC+07:00.
+
+53. Backend authoritative cho Discount time và Payment expiration.
+
+54. Currency = VND.
+
+55. Authoritative monetary values phải là integer VND.
+
+56. PERCENTAGE fractional price dùng HALF_UP nearest 1 VND.
+
+57. Rounded sellingPrice phải được dùng trước khi tính OrderItem.totalPrice.
+
+58. Order.totalAmount = SUM(OrderItem.totalPrice).
+
+59. Payment.amount = Order.totalAmount.
+
+60. Product, Cart, Checkout, Order và Payment phải dùng cùng
+    monetary calculation rule.
+
+61. OrderItem giữ historical:
+    productNameVi,
+    productNameEn,
+    basePrice,
+    sellingPrice,
+    quantity,
+    totalPrice.
+
+62. Product rename/price change/discount change/disable/soft-delete
+    không được mutate historical OrderItem.
+
+63. Locale vi sử dụng OrderItem.productNameVi.
+
+64. Locale en sử dụng OrderItem.productNameEn.
+
+65. Runtime ADMIN authority dựa trên User.role/User.status trong database.
+
+66. ADMIN_EMAILS chỉ bootstrap initial role.
+
+67. ADMIN_EMAILS không re-promote existing demoted User.
+
+68. Runtime operation không được làm mất last ACTIVE ADMIN.
+
+69. Initial bootstrap validation và last-admin runtime protection
+    là hai concern riêng.
+
+70. Browser và Frontend input là untrusted đối với Backend.
+
+71. External payOS Webhook là untrusted cho đến khi verified.
+
+72. Google credential là untrusted cho đến khi Backend verified.
+
+73. payOS protocol knowledge nằm trong Payment integration boundary.
+
+74. S3 protocol knowledge nằm trong Product Image integration boundary.
+
+75. Reporting chỉ read source business data.
+
+76. FAQ, Policy và Contact vẫn là static content.
+
+77. Shipping nằm ngoài scope.
+
+78. Không được thêm Shipping Provider.
+
+79. Không được thêm Shipping Fee.
+
+80. Không được thêm Delivery Tracking.
+
+81. Architecture không yêu cầu Kafka/RabbitMQ.
+
+82. Architecture không yêu cầu Redis.
+
+83. Architecture không yêu cầu Kubernetes.
+
+84. Module không được direct modify repository/table-owned state
+    của module khác thông qua internal repository abstraction.
+
+85. Cross-module mutation phải thông qua public application interface
+    hoặc Commerce Application Coordination Layer.
+
+86. Cross-module dependency không được tạo circular dependency
+    không kiểm soát.
+
+87. Commerce Application Coordination Layer không sở hữu authoritative business data.
+
+88. PostgreSQL transaction không được xem là distributed transaction
+    với payOS hoặc S3.
+
+89. External integration failure phải có consistency,
+    idempotency, compensation và observability phù hợp.
+
+90. Implementation document không được phá module ownership
+    và dependency boundary đã định nghĩa trong 03_SYSTEM_ARCHITECTURE.
+
+91. Canonical Checkout mutation order phải giữ:
+    Create Order
+    → Create OrderItems
+    → Reserve Inventory
+    → Create Payment PENDING.
+
+92. Inventory availability có thể được validate trước Order creation,
+    nhưng Inventory reservation mutation phải xảy ra sau
+    Order và OrderItems creation.
+
+93. Cross-module business flow phải thỏa các
+    Business Consistency Groups được định nghĩa trong
+    Transaction & Consistency Architecture.
+
+94. Commerce Application Coordination Layer không sở hữu
+    authoritative business data; logical orchestrator bên trong layer
+    chỉ điều phối qua public module interfaces.
+
+95. FAQ, Policy và Contact thuộc Next.js static content capability,
+    không phải Spring Boot transactional business module.
+
+96. Recommended AWS compute topology không được xem là
+    mandatory SRS requirement hoặc final mandatory compute selection
+    nếu chưa được finalize ở downstream Deployment Design.
+
+97. Mermaid diagrams phải sử dụng Mermaid code fence hợp lệ.
+
+98. Markdown architecture tables phải có column structure hợp lệ.
+
+99. Nếu payOS Payment Information creation đã thành công,
+    local checkout finalization failure không được classify
+    thành payOS creation failure.
+
+100. Successful checkout finalization phải có recoverable
+     và idempotent business effect theo CG-007.
+
+101. Retry/resume CG-007 không được tạo duplicate Order,
+     Payment, Inventory reservation hoặc NEW_ORDER business effect.
+
+102. Payment vẫn PENDING và Inventory vẫn RESERVED
+     trong successful checkout initiation finalization.
+
+103. Payment chỉ chuyển PAID và Inventory chỉ COMMIT
+     sau verified Payment success event.
+
+104. Cart finalization chỉ được remove checked-out CartItems.
+
+105. Exact retry/resume/recovery mechanism của CG-007
+     thuộc 04_IMPLEMENTATION_SPEC.
+
+106. Recoverability của CG-007 không cho phép Backend
+     return successful checkout initiation trước khi
+     required Phase C finalization outcome hoàn tất.
+
+107. Successful checkout initiation chỉ được xem là finalized
+     khi checked-out CartItems đã được remove và NEW_ORDER
+     đã được persisted theo canonical flow.
+
+108. payOS Payment Information creation success không đồng nghĩa
+     checkout initiation đã hoàn tất.
+
+109. Phase C recovery phải preserve:
+     Order = NEW,
+     Payment = PENDING,
+     Inventory = RESERVED,
+     cho tới khi verified payment success hoặc một terminal
+     business transition hợp lệ khác xảy ra.
+```
+---
+COMPLETION STATUS
+`03_SYSTEM_ARCHITECTURE – Version 1.0` đã xác định architecture baseline cho:
+```text
+System Context
+Architecture Style
+Container Architecture
+Frontend Architecture
+Backend Modular Monolith
+Frontend Static Content Capability
+Commerce Application Coordination Layer
+Module Catalog
+Module Responsibility
+Module Dependency
+Data Ownership
+Database Architecture
+Google Integration
+payOS Integration
+Amazon S3 Integration
+Authentication
+Authorization
+Admin Bootstrap
+Catalog
+Pricing
+BR-MONEY-001
+Cart
+Inventory
+Order
+Historical OrderItem Snapshot
+Payment
+Notification
+Reporting
+Business Time
+Critical Checkout
+Payment Webhook
+Payment Failure
+Payment Expiration
+Admin Cancellation
+Manual Refund
+Transaction Boundary
+Cross-module Business Consistency Groups (CG-001..CG-007)
+Compensation
+Concurrency
+Idempotency
+Security
+Trust Boundary
+Error Handling
+Observability
+AWS Deployment Candidates
+AR-AWS-001 Recommended KLTN Deployment Candidate
+Architecture Decisions (ADR-001..ADR-017)
+Architecture Risks
+NFR Mapping
+Requirement Mapping
+Architecture Traceability
+Implementation Boundary
+Final Architecture Invariants
+```
+Authoritative business requirement vẫn là:
+```text
+02_SRS_SPEC
+Version 1.3
+Status: BASELINE / FROZEN
+```
+`03_SYSTEM_ARCHITECTURE` là đầu vào trực tiếp cho:
+```text
+04_IMPLEMENTATION_SPEC
+```
+và sau đó:
+```text
+05_PROJECT_PLAN
+```
+Mọi implementation decision trong tài liệu downstream phải bảo toàn:
+```text
+Business Scope
+Module Ownership
+Module Dependency Rules
+State Machines
+Consistency Invariants
+Security Boundaries
+Monetary Rules
+Business Time Rules
+```
+đã được xác định bởi SRS và System Architecture.
