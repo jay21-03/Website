@@ -6,6 +6,7 @@ import java.util.Set;
 import com.bautruc.ecommerce.common.config.ApplicationProperties;
 import com.bautruc.ecommerce.common.exception.BusinessException;
 import com.bautruc.ecommerce.common.exception.ConflictException;
+import com.bautruc.ecommerce.common.security.JwtTokenService;
 import com.bautruc.ecommerce.common.time.BusinessClock;
 import com.bautruc.ecommerce.identity.domain.User;
 import com.bautruc.ecommerce.identity.domain.UserRole;
@@ -24,6 +25,7 @@ public class GoogleAuthenticationService {
     private final AdminEmailsParser adminEmailsParser;
     private final ApplicationProperties properties;
     private final BusinessClock businessClock;
+    private final JwtTokenService jwtTokenService;
     private final TransactionTemplate transactionTemplate;
 
     public GoogleAuthenticationService(
@@ -32,6 +34,7 @@ public class GoogleAuthenticationService {
             AdminEmailsParser adminEmailsParser,
             ApplicationProperties properties,
             BusinessClock businessClock,
+            JwtTokenService jwtTokenService,
             PlatformTransactionManager transactionManager
     ) {
         this.googleIdentityVerifier = googleIdentityVerifier;
@@ -39,6 +42,7 @@ public class GoogleAuthenticationService {
         this.adminEmailsParser = adminEmailsParser;
         this.properties = properties;
         this.businessClock = businessClock;
+        this.jwtTokenService = jwtTokenService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -53,7 +57,7 @@ public class GoogleAuthenticationService {
 
     private GoogleAuthenticationResult authenticateVerifiedIdentity(VerifiedGoogleIdentity identity) {
         return userRepository.findByGoogleId(identity.sub())
-                .map(user -> new GoogleAuthenticationResult(requireActive(user), false))
+                .map(user -> result(requireActive(user), false))
                 .orElseGet(() -> createUser(identity));
     }
 
@@ -75,13 +79,17 @@ public class GoogleAuthenticationService {
                 now,
                 now
         );
-        return new GoogleAuthenticationResult(userRepository.saveAndFlush(user), true);
+        return result(userRepository.saveAndFlush(user), true);
     }
 
     private GoogleAuthenticationResult resolveAfterConcurrentCreate(VerifiedGoogleIdentity identity) {
         return transactionTemplate.execute(status -> userRepository.findByGoogleId(identity.sub())
-                .map(user -> new GoogleAuthenticationResult(requireActive(user), false))
+                .map(user -> result(requireActive(user), false))
                 .orElseThrow(() -> new ConflictException("Google identity conflicts with an existing user.")));
+    }
+
+    private GoogleAuthenticationResult result(User user, boolean created) {
+        return new GoogleAuthenticationResult(user, created, jwtTokenService.createAccessToken(user));
     }
 
     private User requireActive(User user) {

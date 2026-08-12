@@ -1,11 +1,8 @@
 package com.bautruc.ecommerce.common.security;
 
-import java.util.UUID;
-
 public record AuthenticatedUser(
-        UUID id,
+        Long userId,
         String email,
-        String role,
-        String status
+        String role
 ) {
 }
