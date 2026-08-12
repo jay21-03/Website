@@ -89,7 +89,13 @@ public class GoogleAuthenticationService {
     }
 
     private GoogleAuthenticationResult result(User user, boolean created) {
-        return new GoogleAuthenticationResult(user, created, jwtTokenService.createAccessToken(user));
+        String accessToken = jwtTokenService.createAccessToken(user);
+        return new GoogleAuthenticationResult(
+                user,
+                created,
+                accessToken,
+                jwtTokenService.parseAndValidate(accessToken).expiresAt()
+        );
     }
 
     private User requireActive(User user) {

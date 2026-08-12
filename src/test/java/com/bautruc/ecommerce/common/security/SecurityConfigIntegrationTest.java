@@ -137,7 +137,8 @@ class SecurityConfigIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value(SecurityErrorCodes.CSRF_INVALID));
 
         mockMvc.perform(post("/api/v1/auth/google").with(csrf().asHeader()))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -161,7 +162,8 @@ class SecurityConfigIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/google")
                         .cookie(csrfCookie)
                         .header("X-XSRF-TOKEN", csrfToken))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -369,19 +371,9 @@ class SecurityConfigIntegrationTest {
             return ResponseEntity.ok("collection");
         }
 
-        @PostMapping("/api/v1/auth/google")
-        ResponseEntity<String> google() {
-            return ResponseEntity.ok("google");
-        }
-
         @PostMapping("/api/v1/payments/webhook/payos")
         ResponseEntity<String> payos() {
             return ResponseEntity.ok("payos");
-        }
-
-        @GetMapping("/api/v1/me")
-        ResponseEntity<String> me() {
-            return ResponseEntity.ok("me");
         }
 
         @PostMapping("/api/v1/cart/test")
