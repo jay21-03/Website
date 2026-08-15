@@ -874,6 +874,14 @@ select {
     background: linear-gradient(140deg, #764aff, #ed3e93)
 }
 
+.facebook {
+    background: #1877f2;
+    font-family: Arial, sans-serif;
+    font-size: 27px;
+    font-weight: 700;
+    text-transform: lowercase
+}
+
 .toast {
     position: fixed;
     right: 25px;
@@ -1478,6 +1486,8 @@ select {
 
 /* Backend-integrated storefront states */
 .state-box{padding:2rem;border:1px solid var(--line,#ddd4c8);background:#fff;text-align:center;border-radius:4px}
+.contact-card{padding:28px;background:#fff;border:1px solid var(--line,#ddd4c8)}
+.contact-card h2{margin-top:0}.contact-card p{line-height:1.7;overflow-wrap:anywhere}.contact-card a{color:var(--accent,#a44f2c)}
 .state-box a{color:var(--terracotta,#a54f32);text-decoration:underline}
 .checkout-form textarea{width:100%;min-height:90px;padding:12px;border:1px solid #d8d0c6;background:#fff;font:inherit;resize:vertical}
 .checkout-item button{border:1px solid #d8d0c6;background:#fff;min-width:27px;min-height:27px;cursor:pointer}
