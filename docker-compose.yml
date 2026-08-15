@@ -21,33 +21,59 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
+
     depends_on:
       postgres:
         condition: service_healthy
+
     environment:
       SPRING_PROFILES_ACTIVE: local
       SERVER_PORT: 8080
+
+      # PostgreSQL
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-bautruc_ecommerce}
       DB_USERNAME: ${DB_USERNAME:-bautruc}
       DB_PASSWORD: ${DB_PASSWORD:-bautruc_local}
+
+      # JWT
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?JWT_SECRET_BASE64 is required}
       JWT_ISSUER: ${JWT_ISSUER:-bautruc-ecommerce}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-7200}
+
+      # Google
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+
+      # Admin
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+
+      # Frontend / CORS
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+
+      # payOS
       PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
       PAYOS_API_KEY: ${PAYOS_API_KEY:-}
       PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
       PAYOS_BASE_URL: ${PAYOS_BASE_URL:-}
-      AWS_REGION: ${AWS_REGION:-}
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
-      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-}
+
+      # AWS credentials - LOCAL DEVELOPMENT ONLY
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}
+
+      # AWS / S3
+      AWS_REGION: ${AWS_REGION:?AWS_REGION is required}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:?S3_BUCKET_NAME is required}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:?S3_PUBLIC_BASE_URL is required}
       IMAGE_MAX_BYTES: ${IMAGE_MAX_BYTES:-5242880}
+
+      # Cookie
       AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+
+      # Timezone
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Duser.timezone=Asia/Ho_Chi_Minh}
+
     ports:
       - "8080:8080"
 
