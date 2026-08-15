@@ -25,7 +25,7 @@ bautruc:
     client-id: ${PAYOS_CLIENT_ID}
     api-key: ${PAYOS_API_KEY}
     checksum-key: ${PAYOS_CHECKSUM_KEY}
-    base-url: ${PAYOS_BASE_URL}
+    base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
   aws:
     region: ${AWS_REGION}
     s3:

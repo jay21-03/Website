@@ -1,0 +1,3 @@
+package com.bautruc.ecommerce.commerce.application;
+import java.nio.charset.StandardCharsets;import java.security.*;import java.util.HexFormat;import org.springframework.stereotype.Component;
+@Component public class CheckoutRequestHasher{public String hash(NormalizedCheckoutRequest r){String canonical=field(r.receiverName())+"\n"+field(r.phone())+"\n"+field(r.email())+"\n"+field(r.address())+"\n"+field(r.note());try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8)));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}private String field(String value){String v=value==null?"":value;return v.length()+":"+v;}}

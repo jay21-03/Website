@@ -1,0 +1,2 @@
+package com.bautruc.ecommerce.inventory.application;
+public final class InventoryErrorCodes{private InventoryErrorCodes(){}public static final String INVENTORY_NOT_FOUND="INVENTORY_NOT_FOUND";public static final String INVENTORY_INSUFFICIENT="INVENTORY_INSUFFICIENT";public static final String INVENTORY_INVALID_ADJUSTMENT="INVENTORY_INVALID_ADJUSTMENT";public static final String INVENTORY_STATE_CONFLICT="INVENTORY_STATE_CONFLICT";}

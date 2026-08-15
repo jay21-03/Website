@@ -1,0 +1,22 @@
+package com.bautruc.ecommerce.catalog.api;
+import com.bautruc.ecommerce.catalog.api.request.*;import com.bautruc.ecommerce.catalog.api.response.*;import com.bautruc.ecommerce.catalog.application.CatalogService;import com.bautruc.ecommerce.catalog.application.ProductImageService;import com.bautruc.ecommerce.catalog.domain.*;
+import com.bautruc.ecommerce.common.logging.LogContext;import com.bautruc.ecommerce.common.response.*;import com.bautruc.ecommerce.common.time.BusinessClock;
+import jakarta.validation.Valid;import org.springframework.http.HttpStatus;import org.springframework.web.bind.annotation.*;
+@RestController
+public class CatalogController{
+ private final CatalogService service;private final ProductImageService imageService;private final BusinessClock clock;public CatalogController(CatalogService s,ProductImageService i,BusinessClock c){service=s;imageService=i;clock=c;}
+ @GetMapping("/api/v1/products") public ApiResponse<PageResponse<ProductResponse>> products(@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="20")int size){return ok(PageResponse.from(service.publicProducts(page,size).map(this::product)));}
+ @GetMapping("/api/v1/products/{id}") public ApiResponse<ProductResponse> product(@PathVariable Long id){Product p=service.requireProduct(id);if(!p.isPurchasable())throw new com.bautruc.ecommerce.common.exception.ResourceNotFoundException("PRODUCT_NOT_FOUND","Product not found.");return ok(product(p));}
+ @GetMapping("/api/v1/collections") public ApiResponse<java.util.List<CollectionResponse>> collections(){return ok(service.publicCollections().stream().map(CollectionResponse::from).toList());}
+ @GetMapping("/api/v1/collections/{id}") public ApiResponse<CollectionResponse> collection(@PathVariable Long id){ProductCollection c=service.requireCollection(id);if(c.getStatus()!=CollectionStatus.ACTIVE)throw new com.bautruc.ecommerce.common.exception.ResourceNotFoundException("COLLECTION_NOT_FOUND","Collection not found.");return ok(CollectionResponse.from(c));}
+ @PostMapping("/api/v1/admin/products") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<ProductResponse> createProduct(@Valid @RequestBody ProductRequest r){return ok(product(service.createProduct(r)));}
+ @PutMapping("/api/v1/admin/products/{id}") public ApiResponse<ProductResponse> updateProduct(@PathVariable Long id,@Valid @RequestBody ProductRequest r){return ok(product(service.updateProduct(id,r)));}
+ @DeleteMapping("/api/v1/admin/products/{id}") public ApiResponse<Void> deleteProduct(@PathVariable Long id){service.deleteProduct(id);return ok(null);}
+ @PostMapping("/api/v1/admin/collections") @ResponseStatus(HttpStatus.CREATED) public ApiResponse<CollectionResponse> createCollection(@Valid @RequestBody CollectionRequest r){return ok(CollectionResponse.from(service.createCollection(r)));}
+ @PutMapping("/api/v1/admin/collections/{id}") public ApiResponse<CollectionResponse> updateCollection(@PathVariable Long id,@Valid @RequestBody CollectionRequest r){return ok(CollectionResponse.from(service.updateCollection(id,r)));}
+ @DeleteMapping("/api/v1/admin/collections/{id}") public ApiResponse<Void> deleteCollection(@PathVariable Long id){service.deleteCollection(id);return ok(null);}
+ @PutMapping("/api/v1/admin/products/{id}/discount") public ApiResponse<DiscountResponse> discount(@PathVariable Long id,@Valid @RequestBody DiscountRequest r){return ok(DiscountResponse.from(service.upsertDiscount(id,r)));}
+ @DeleteMapping("/api/v1/admin/products/{id}/discount") public ApiResponse<Void> deleteDiscount(@PathVariable Long id){service.deleteDiscount(id);return ok(null);}
+ private ProductResponse product(Product p){java.util.List<ProductImageResponse> images=imageService.images(p.getId()).stream().map(i->ProductImageResponse.from(i,imageService.publicUrl(i))).toList();String thumbnail=images.stream().filter(ProductImageResponse::thumbnail).map(ProductImageResponse::url).findFirst().orElse(null);return new ProductResponse(p.getId(),p.getNameVi(),p.getNameEn(),p.getDescriptionVi(),p.getDescriptionEn(),p.getBasePrice(),service.sellingPrice(p),p.getStatus(),p.getCollectionId(),thumbnail,images,p.getCreatedAt(),p.getUpdatedAt());}
+ private <T>ApiResponse<T> ok(T d){return ApiResponse.success(d,null,clock.businessNow().toOffsetDateTime(),LogContext.currentCorrelationId());}
+}

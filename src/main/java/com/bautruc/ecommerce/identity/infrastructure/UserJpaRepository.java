@@ -19,6 +19,8 @@ public interface UserJpaRepository extends JpaRepository<User, Long>, JpaSpecifi
 
     long countByRoleAndStatus(UserRole role, UserStatus status);
 
+    List<User> findByRoleAndStatusOrderById(UserRole role, UserStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select u

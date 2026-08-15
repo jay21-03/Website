@@ -1,0 +1,1 @@
+package com.bautruc.ecommerce.commerce.infrastructure;import java.util.List;import com.bautruc.ecommerce.commerce.domain.CheckoutOperationItem;import org.springframework.data.jpa.repository.JpaRepository;public interface CheckoutOperationItemJpaRepository extends JpaRepository<CheckoutOperationItem,Long>{List<CheckoutOperationItem> findByCheckoutOperationId(Long id);}

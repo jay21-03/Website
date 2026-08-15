@@ -68,6 +68,12 @@ public class UserQueryService {
         return findRequired(id);
     }
 
+    @Transactional(readOnly = true)
+    public java.util.List<Long> activeAdminIds() {
+        return userRepository.findByRoleAndStatusOrderById(UserRole.ADMIN, UserStatus.ACTIVE)
+                .stream().map(User::getId).toList();
+    }
+
     User findRequired(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(

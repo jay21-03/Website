@@ -24,7 +24,20 @@
         <testcontainers.version>1.21.3</testcontainers.version>
         <google-api-client.version>2.9.0</google-api-client.version>
         <google-http-client-gson.version>2.2.0</google-http-client-gson.version>
+        <aws-sdk.version>2.46.8</aws-sdk.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -74,6 +87,10 @@
             <groupId>com.google.http-client</groupId>
             <artifactId>google-http-client-gson</artifactId>
             <version>${google-http-client-gson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

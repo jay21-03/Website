@@ -1,0 +1,1 @@
+package com.bautruc.ecommerce.payment.application;import java.util.*;import com.bautruc.ecommerce.payment.domain.PaymentStatus;public interface PaymentQueryPort{PaymentStatus statusForOrder(Long orderId);PaymentStatus statusForOrderForUpdate(Long orderId);Map<Long,PaymentStatus> statusesForOrders(Collection<Long> orderIds);}

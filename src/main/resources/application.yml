@@ -1,6 +1,10 @@
 spring:
   application:
     name: bautruc-ecommerce
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:6MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:6MB}
   jpa:
     open-in-view: false
     hibernate:
@@ -29,6 +33,10 @@ management:
         enabled: true
 
 bautruc:
+  reporting:
+    dashboard-size: ${DASHBOARD_SIZE:10}
+  notification:
+    sse-timeout-ms: ${NOTIFICATION_SSE_TIMEOUT_MS:1800000}
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173}
   google-client-id: ${GOOGLE_CLIENT_ID:}
@@ -42,7 +50,7 @@ bautruc:
     client-id: ${PAYOS_CLIENT_ID:}
     api-key: ${PAYOS_API_KEY:}
     checksum-key: ${PAYOS_CHECKSUM_KEY:}
-    base-url: ${PAYOS_BASE_URL:}
+    base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
   aws:
     region: ${AWS_REGION:}
     s3:
@@ -50,5 +58,7 @@ bautruc:
       public-base-url: ${S3_PUBLIC_BASE_URL:}
   image:
     max-bytes: ${IMAGE_MAX_BYTES:5242880}
+  inventory:
+    default-low-stock-threshold: ${INVENTORY_DEFAULT_LOW_STOCK_THRESHOLD:5}
   auth:
     cookie-domain: ${AUTH_COOKIE_DOMAIN:}

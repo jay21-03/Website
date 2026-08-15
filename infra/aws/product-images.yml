@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Private product image storage, CloudFront delivery, and least-privilege backend policy.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  BucketName:
+    Type: String
+    Default: ""
+    Description: Optional globally unique bucket name. Leave empty for a generated name.
+
+Conditions:
+  HasExplicitBucketName: !Not [!Equals [!Ref BucketName, ""]]
+
+Resources:
+  ProductImagesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !If [HasExplicitBucketName, !Ref BucketName, !Ref AWS::NoValue]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  ProductImagesOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "bautruc-${Environment}-product-images-oac"
+        Description: Signed CloudFront access to the private product image bucket
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  ProductImagesDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub "Bau Truc product images (${Environment})"
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: ProductImagesS3Origin
+            DomainName: !GetAtt ProductImagesBucket.RegionalDomainName
+            OriginAccessControlId: !Ref ProductImagesOriginAccessControl
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: ProductImagesS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          MinTTL: 0
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  ProductImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ProductImagesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${ProductImagesBucket.Arn}/products/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${ProductImagesDistribution}"
+
+  ProductImagesBackendPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Allow the Bau Truc backend to upload and delete product image objects only.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ManageProductImages
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource: !Sub "${ProductImagesBucket.Arn}/products/*"
+
+Outputs:
+  BucketName:
+    Description: Set this as S3_BUCKET_NAME.
+    Value: !Ref ProductImagesBucket
+  AwsRegion:
+    Description: Set this as AWS_REGION.
+    Value: !Ref AWS::Region
+  PublicBaseUrl:
+    Description: Set this as S3_PUBLIC_BASE_URL.
+    Value: !Sub "https://${ProductImagesDistribution.DomainName}"
+  CloudFrontDistributionId:
+    Value: !Ref ProductImagesDistribution
+  BackendManagedPolicyArn:
+    Description: Attach this policy to the IAM role used by the backend runtime.
+    Value: !Ref ProductImagesBackendPolicy

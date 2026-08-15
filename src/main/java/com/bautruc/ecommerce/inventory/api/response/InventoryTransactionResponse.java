@@ -1,0 +1,4 @@
+package com.bautruc.ecommerce.inventory.api.response;
+import java.time.Instant;import com.bautruc.ecommerce.inventory.domain.*;
+public record InventoryTransactionResponse(Long id,Long productId,InventoryTransactionType type,long quantityDelta,long reservedQuantityDelta,long beforeQuantity,long afterQuantity,long beforeReservedQuantity,long afterReservedQuantity,String referenceType,Long referenceId,String reason,Long createdByUserId,Instant createdAt){
+ public static InventoryTransactionResponse from(InventoryTransaction t){return new InventoryTransactionResponse(t.getId(),t.getProductId(),t.getType(),t.getQuantityDelta(),t.getReservedQuantityDelta(),t.getBeforeQuantity(),t.getAfterQuantity(),t.getBeforeReservedQuantity(),t.getAfterReservedQuantity(),t.getReferenceType(),t.getReferenceId(),t.getReason(),t.getCreatedByUserId(),t.getCreatedAt());}}

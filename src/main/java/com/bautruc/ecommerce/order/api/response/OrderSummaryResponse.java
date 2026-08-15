@@ -1,0 +1,1 @@
+package com.bautruc.ecommerce.order.api.response;import java.time.Instant;import com.bautruc.ecommerce.order.domain.*;import com.bautruc.ecommerce.payment.domain.PaymentStatus;public record OrderSummaryResponse(Long id,String orderCode,Instant createdAt,long totalAmount,OrderStatus orderStatus,PaymentStatus paymentStatus){}

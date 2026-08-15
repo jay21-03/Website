@@ -169,7 +169,7 @@ class SecurityConfigIntegrationTest {
     @Test
     void payosWebhookIsCsrfExempt() throws Exception {
         mockMvc.perform(post("/api/v1/payments/webhook/payos"))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -369,11 +369,6 @@ class SecurityConfigIntegrationTest {
         @GetMapping("/api/v1/collections/test")
         ResponseEntity<String> collection() {
             return ResponseEntity.ok("collection");
-        }
-
-        @PostMapping("/api/v1/payments/webhook/payos")
-        ResponseEntity<String> payos() {
-            return ResponseEntity.ok("payos");
         }
 
         @PostMapping("/api/v1/cart/test")

@@ -1,0 +1,1 @@
+package com.bautruc.ecommerce.commerce.application;import com.bautruc.ecommerce.commerce.domain.CheckoutOperationState;public record CheckoutLocalPreparationResult(Long checkoutOperationId,Long orderId,String orderCode,Long paymentId,long totalAmount,CheckoutOperationState state){}

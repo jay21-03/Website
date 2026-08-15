@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -92,6 +93,15 @@ public class GlobalExceptionHandler {
                 VALIDATION_FAILED,
                 "Validation failed."
         );
+        return ResponseEntity.badRequest().body(failure(error));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = ApiError.of("PRODUCT_IMAGE_TOO_LARGE", "Image exceeds the configured maximum size.");
         return ResponseEntity.badRequest().body(failure(error));
     }
 
