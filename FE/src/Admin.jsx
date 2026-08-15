@@ -36,9 +36,24 @@ function SimpleTable({ heads, rows, actions }) { return <div className="table-wr
 
 function Products({ products, collections, notify }) {
   const [editing, setEditing] = useState(null), [open, setOpen] = useState(false)
-  async function save(e) { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); v.basePrice = Number(v.basePrice); v.collectionId = Number(v.collectionId); try { editing ? await api.updateProduct(editing.id, v) : await api.createProduct(v); notify('Đã lưu sản phẩm.'); setOpen(false); window.location.reload() } catch (x) { notify(x.message) } }
+  async function save(e) {
+    e.preventDefault()
+    const form = new FormData(e.currentTarget), files = form.getAll('images').filter(file => file.size > 0)
+    const v = Object.fromEntries(form); delete v.images
+    v.basePrice = Number(v.basePrice); v.collectionId = Number(v.collectionId)
+    if (files.length > 10) return notify('Mỗi sản phẩm được tải tối đa 10 hình ảnh.')
+    if (files.some(file => !file.type.startsWith('image/'))) return notify('Chỉ chấp nhận tập tin hình ảnh.')
+    try {
+      const product = editing ? await api.updateProduct(editing.id, v) : await api.createProduct(v)
+      const uploaded = []
+      for (const file of files) uploaded.push(await api.uploadProductImage(product.id, file))
+      if (uploaded.length && !product.images?.some(image => image.thumbnail)) await api.setProductThumbnail(product.id, uploaded[0].id)
+      notify(files.length ? `Đã lưu sản phẩm và tải lên ${files.length} hình ảnh.` : 'Đã lưu sản phẩm.')
+      setOpen(false); window.location.reload()
+    } catch (x) { notify(x.message) }
+  }
   async function remove(item) { if (!confirm(`Xóa sản phẩm “${item.nameVi}”?`)) return; try { await api.deleteProduct(item.id); notify('Đã xóa sản phẩm.'); window.location.reload() } catch (x) { notify(x.message) } }
-  return <Panel title="Danh sách sản phẩm" action={<button className="admin-primary" onClick={() => { setEditing(null); setOpen(true) }}>+ Thêm sản phẩm</button>}><SimpleTable heads={['Tên sản phẩm', 'Giá bán', 'Trạng thái']} rows={products.map(x => [<><b>{x.nameVi}</b><small>{x.nameEn}</small></>, cash(x.sellingPrice), <Status value={x.status} />])} actions={i => <><button onClick={() => { setEditing(products[i]); setOpen(true) }}>Sửa</button><button className="danger" onClick={() => remove(products[i])}>Xóa</button></>} />{open && <Modal title={editing ? 'Cập nhật sản phẩm' : 'Thêm sản phẩm'} close={() => setOpen(false)}><form className="admin-form" onSubmit={save}><label>Tên tiếng Việt<input name="nameVi" defaultValue={editing?.nameVi} required /></label><label>Tên tiếng Anh<input name="nameEn" defaultValue={editing?.nameEn} required /></label><label>Mô tả VI<textarea name="descriptionVi" defaultValue={editing?.descriptionVi} /></label><label>Mô tả EN<textarea name="descriptionEn" defaultValue={editing?.descriptionEn} /></label><label>Giá gốc<input name="basePrice" type="number" min="1" defaultValue={editing?.basePrice} required /></label><label>Bộ sưu tập<select name="collectionId" defaultValue={editing?.collectionId} required>{collections.map(x => <option value={x.id} key={x.id}>{x.nameVi}</option>)}</select></label><label>Trạng thái<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><button className="admin-primary">Lưu sản phẩm</button></form></Modal>}</Panel>
+  return <Panel title="Danh sách sản phẩm" action={<button className="admin-primary" onClick={() => { setEditing(null); setOpen(true) }}>+ Thêm sản phẩm</button>}><SimpleTable heads={['Hình', 'Tên sản phẩm', 'Giá bán', 'Trạng thái']} rows={products.map(x => [<img className="admin-product-thumb" src={x.thumbnailUrl || '/assets/images/vase.jpg'} alt="" />, <><b>{x.nameVi}</b><small>{x.nameEn}</small></>, cash(x.sellingPrice), <Status value={x.status} />])} actions={i => <><button onClick={() => { setEditing(products[i]); setOpen(true) }}>Sửa</button><button className="danger" onClick={() => remove(products[i])}>Xóa</button></>} />{open && <Modal title={editing ? 'Cập nhật sản phẩm' : 'Thêm sản phẩm'} close={() => setOpen(false)}><form className="admin-form" onSubmit={save}><label>Tên tiếng Việt<input name="nameVi" defaultValue={editing?.nameVi} required /></label><label>Tên tiếng Anh<input name="nameEn" defaultValue={editing?.nameEn} required /></label><label>Mô tả VI<textarea name="descriptionVi" defaultValue={editing?.descriptionVi} /></label><label>Mô tả EN<textarea name="descriptionEn" defaultValue={editing?.descriptionEn} /></label><label>Giá gốc<input name="basePrice" type="number" min="1" defaultValue={editing?.basePrice} required /></label><label>Bộ sưu tập<select name="collectionId" defaultValue={editing?.collectionId} required>{collections.map(x => <option value={x.id} key={x.id}>{x.nameVi}</option>)}</select></label><label>Trạng thái<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><label className="image-picker">Hình ảnh sản phẩm<input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple /><small>JPEG, PNG hoặc WebP · tối đa 10 hình · ảnh đầu tiên làm ảnh đại diện</small></label>{editing?.images?.length > 0 && <div className="existing-images">{editing.images.map(image => <img src={image.url} alt="" key={image.id} />)}</div>}<button className="admin-primary">Lưu sản phẩm</button></form></Modal>}</Panel>
 }
 
 function Collections({ collections, notify }) {
@@ -50,7 +65,7 @@ function Collections({ collections, notify }) {
 function Inventory({ notify }) {
   const [data, setData] = useState(null), [selected, setSelected] = useState(null), [query, setQuery] = useState('')
   const load = () => api.adminInventory(new URLSearchParams({ keyword: query, size: 100 })).then(setData).catch(e => notify(e.message))
-  useEffect(load, [])
+  useEffect(() => { load() }, [])
   async function adjust(e) { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); v.quantityChange = Number(v.quantityChange); try { await api.adminAdjustInventory(selected.productId, v); setSelected(null); load(); notify('Đã cập nhật tồn kho.') } catch (x) { notify(x.message) } }
   const rows = pageContent(data)
   return <Panel title="Tồn kho" action={<form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Tìm sản phẩm" /><button>Tìm</button></form>}><SimpleTable heads={['Sản phẩm', 'Tổng', 'Đang giữ', 'Khả dụng', 'Trạng thái']} rows={rows.map(x => [x.productNameVi, x.quantity, x.reservedQuantity, x.availableQuantity, <Status value={x.status} />])} actions={i => <button onClick={() => setSelected(rows[i])}>Điều chỉnh</button>} />{selected && <Modal title={`Điều chỉnh: ${selected.productNameVi}`} close={() => setSelected(null)}><form className="admin-form" onSubmit={adjust}><label>Loại<select name="type"><option>IMPORT</option><option>ADJUSTMENT</option></select></label><label>Số lượng thay đổi<input name="quantityChange" type="number" required /></label><label>Lý do<textarea name="reason" required /></label><button className="admin-primary">Xác nhận</button></form></Modal>}</Panel>
@@ -58,21 +73,21 @@ function Inventory({ notify }) {
 
 function Orders({ notify }) {
   const [data, setData] = useState(null), [detail, setDetail] = useState(null)
-  const load = () => api.adminOrders('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(load, [])
+  const load = () => api.adminOrders('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(() => { load() }, [])
   const rows = pageContent(data)
   async function transition(status) { try { setDetail(await api.adminOrderStatus(detail.id, status)); load(); notify('Đã cập nhật đơn hàng.') } catch (x) { notify(x.message) } }
   return <Panel title="Đơn hàng"><SimpleTable heads={['Mã đơn', 'Ngày tạo', 'Đơn hàng', 'Thanh toán', 'Tổng tiền']} rows={rows.map(x => [x.orderCode, when(x.createdAt), <Status value={x.orderStatus} />, <Status value={x.paymentStatus} />, cash(x.totalAmount)])} actions={i => <button onClick={() => api.adminOrder(rows[i].id).then(setDetail).catch(e => notify(e.message))}>Chi tiết</button>} />{detail && <Modal title={`Đơn hàng ${detail.orderCode}`} close={() => setDetail(null)}><div className="order-admin-detail"><p><b>Người nhận:</b> {detail.receiverName} · {detail.phone}</p><p><b>Địa chỉ:</b> {detail.address}</p>{detail.items.map(x => <p key={x.productId}>{x.productNameVi} × {x.quantity} <b>{cash(x.totalPrice)}</b></p>)}<h3>Tổng cộng: {cash(detail.totalAmount)}</h3><div className="admin-actions"><button onClick={() => transition('CONFIRMED')}>Xác nhận</button><button onClick={() => transition('COMPLETED')}>Hoàn thành</button><button className="danger" onClick={() => api.adminCancelOrder(detail.id).then(setDetail).then(load).catch(e => notify(e.message))}>Hủy đơn</button></div></div></Modal>}</Panel>
 }
 
 function Users({ notify, currentId }) {
-  const [data, setData] = useState(null); const load = () => api.adminUsers('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(load, [])
+  const [data, setData] = useState(null); const load = () => api.adminUsers('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(() => { load() }, [])
   const rows = pageContent(data)
   async function action(item, name) { if (item.id === currentId && ['demote', 'block'].includes(name) && !confirm('Thao tác trên chính tài khoản hiện tại. Tiếp tục?')) return; try { await api.adminUserAction(item.id, name); load(); notify('Đã cập nhật người dùng.') } catch (x) { notify(x.message) } }
   return <Panel title="Người dùng"><SimpleTable heads={['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Ngày tạo']} rows={rows.map(x => [x.fullName, x.email, x.role, <Status value={x.status} />, when(x.createdAt)])} actions={i => { const x = rows[i]; return <div className="row-actions">{x.role === 'USER' ? <button onClick={() => action(x, 'promote')}>Cấp Admin</button> : <button onClick={() => action(x, 'demote')}>Hạ quyền</button>}{x.status === 'ACTIVE' ? <button className="danger" onClick={() => action(x, 'block')}>Chặn</button> : <button onClick={() => action(x, 'unblock')}>Bỏ chặn</button>}</div> }} /></Panel>
 }
 
 function Notifications({ notify }) {
-  const [data, setData] = useState(null); const load = () => api.adminNotifications('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(load, [])
+  const [data, setData] = useState(null); const load = () => api.adminNotifications('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(() => { load() }, [])
   const rows = pageContent(data)
   return <Panel title={`Thông báo (${rows.filter(x => !x.isRead).length} chưa đọc)`}><div className="notification-list">{rows.map(x => <article className={x.isRead ? '' : 'unread'} key={x.id}><div><b>{x.title}</b><p>{x.message}</p><small>{when(x.createdAt)}</small></div>{!x.isRead && <button onClick={() => api.adminReadNotification(x.id).then(load).catch(e => notify(e.message))}>Đánh dấu đã đọc</button>}</article>)}</div></Panel>
 }

@@ -45,6 +45,7 @@ function Layout({ children }) {
 
 function DirectGoogleLogin() {
   const { lang, setUser, setCart, notify } = useStore()
+  const navigate = useNavigate()
   const [ready, setReady] = useState(Boolean(window.google?.accounts?.id))
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
   const callbackRef = useRef(null)
@@ -54,7 +55,7 @@ function DirectGoogleLogin() {
       setUser(result.user)
       if (result.user.role === 'USER') setCart(await api.cart())
       notify(pick(lang, 'Đăng nhập thành công.', 'Signed in successfully.'))
-      if (result.user.role === 'ADMIN') window.location.assign('/admin')
+      if (result.user.role === 'ADMIN') navigate('/admin', { replace: true })
     } catch (error) { notify(error.message) }
   }
   useEffect(() => {

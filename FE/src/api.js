@@ -58,6 +58,13 @@ export const api = {
   createProduct: values => request('/admin/products', { method: 'POST', body: JSON.stringify(values) }),
   updateProduct: (id, values) => request(`/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(values) }),
   deleteProduct: id => request(`/admin/products/${id}`, { method: 'DELETE' }),
+  uploadProductImage: (productId, file) => {
+    const body = new FormData()
+    body.append('file', file)
+    return request(`/admin/products/${productId}/images`, { method: 'POST', body })
+  },
+  setProductThumbnail: (productId, imageId) => request(`/admin/products/${productId}/images/${imageId}/thumbnail`, { method: 'PUT' }),
+  deleteProductImage: (productId, imageId) => request(`/admin/products/${productId}/images/${imageId}`, { method: 'DELETE' }),
   createCollection: values => request('/admin/collections', { method: 'POST', body: JSON.stringify(values) }),
   updateCollection: (id, values) => request(`/admin/collections/${id}`, { method: 'PUT', body: JSON.stringify(values) }),
   deleteCollection: id => request(`/admin/collections/${id}`, { method: 'DELETE' }),
