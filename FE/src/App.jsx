@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { api } from './api'
+import Admin from './Admin'
 
 const Store = createContext(null)
 const fallbackImage = '/assets/images/vase.jpg'
@@ -21,10 +22,11 @@ function StoreProvider({ children }) {
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
   const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
   const [catalogLoading, setCatalogLoading] = useState(true), [toast, setToast] = useState('')
+  const [authLoading, setAuthLoading] = useState(true)
   const notify = message => { setToast(message); window.setTimeout(() => setToast(''), 2500) }
   useEffect(() => {
     Promise.all([api.products(), api.collections()]).then(([page, groups]) => { setProducts(page.content); setCollections(groups) }).catch(error => notify(error.message)).finally(() => setCatalogLoading(false))
-    api.me().then(current => { setUser(current); return current.role === 'USER' ? api.cart() : null }).then(value => value && setCart(value)).catch(() => {})
+    api.me().then(current => { setUser(current); return current.role === 'USER' ? api.cart() : null }).then(value => value && setCart(value)).catch(() => {}).finally(() => setAuthLoading(false))
   }, [])
   useEffect(() => { localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang])
   async function add(productId) {
@@ -32,7 +34,7 @@ function StoreProvider({ children }) {
     if (user.role !== 'USER') { notify('Tài khoản quản trị không có giỏ hàng.'); return false }
     try { setCart(await api.addCart(productId)); notify('Đã thêm vào giỏ hàng.'); return true } catch (error) { notify(error.message); return false }
   }
-  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, catalogLoading, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
+  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, catalogLoading, authLoading, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
 const useStore = () => useContext(Store)
 
@@ -52,6 +54,7 @@ function DirectGoogleLogin() {
       setUser(result.user)
       if (result.user.role === 'USER') setCart(await api.cart())
       notify(pick(lang, 'Đăng nhập thành công.', 'Signed in successfully.'))
+      if (result.user.role === 'ADMIN') window.location.assign('/admin')
     } catch (error) { notify(error.message) }
   }
   useEffect(() => {
@@ -191,4 +194,11 @@ function OrderDetail() {
 }
 function Support() { const { lang } = useStore(); return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">{pick(lang, 'Hỗ trợ', 'Support')}</span><h1>{pick(lang, 'Liên hệ với chúng tôi', 'Contact us')}</h1></div><div className="support-layout"><section className="contact-card"><h2>{pick(lang, 'Cơ sở gốm Bàu Trúc Đàng Xem', 'Dang Xem Bau Truc Pottery')}</h2><p><b>Email:</b> <a href={`mailto:${contact.email}`}>{contact.email}</a></p><p><b>Zalo:</b> {contact.phones.map((phone, index) => <span key={phone}>{index > 0 && ' · '}<a href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">{phone}</a></span>)}</p><p><b>Facebook:</b> <a href={contact.facebook} target="_blank" rel="noreferrer">{pick(lang, 'Xem trang Facebook', 'Open Facebook page')}</a></p><p><b>{pick(lang, 'Địa chỉ', 'Address')}:</b> <a href={contact.map} target="_blank" rel="noreferrer">{contact.address}</a></p></section><section className="faq-list"><details open><summary>{pick(lang, 'Gốm Bàu Trúc có dùng bàn xoay không?', 'Is Bau Truc pottery made with a wheel?')}</summary><p>{pick(lang, 'Không. Sản phẩm được tạo hình hoàn toàn bằng tay theo kỹ thuật truyền thống của người Chăm.', 'No. Every piece is shaped entirely by hand using traditional Cham techniques.')}</p></details><details><summary>{pick(lang, 'Làm sao theo dõi đơn hàng?', 'How can I track an order?')}</summary><p>{pick(lang, 'Đăng nhập và mở mục Đơn hàng trên thanh điều hướng.', 'Sign in and open Orders in the navigation bar.')}</p></details></section></div></main></Layout> }
 
-export default function App() { return <StoreProvider><Routes><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/support" element={<Support />} /><Route path="*" element={<Home />} /></Routes></StoreProvider> }
+function AdminPortal() {
+  const store = useStore()
+  async function logout() { try { await api.logout() } finally { store.setUser(null); window.location.assign('/') } }
+  if (store.authLoading) return <div className="admin-state">Đang xác thực quyền quản trị...</div>
+  return <Admin user={store.user} products={store.products} collections={store.collections} notify={store.notify} onLogout={logout} />
+}
+
+export default function App() { return <StoreProvider><Routes><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/support" element={<Support />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<Home />} /></Routes></StoreProvider> }
