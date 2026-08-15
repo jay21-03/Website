@@ -3,6 +3,6 @@ dist/
 target/
 .env
 .env.local
-server/data/users.json
+FE/legacy/server/data/users.json
 npm-debug.log*
 .vscode/

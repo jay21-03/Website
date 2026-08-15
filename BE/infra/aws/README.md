@@ -11,7 +11,7 @@ The S3 bucket is retained if the CloudFormation stack is deleted. Delete retaine
 
 ## Deploy
 
-Install AWS CLI v2 and authenticate first. From the repository root:
+Install AWS CLI v2 and authenticate first. From the `BE` directory:
 
 ```powershell
 .\scripts\deploy-product-images-aws.ps1 `
