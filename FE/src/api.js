@@ -1,8 +1,20 @@
+import { apiErrorMessage } from './utils/apiError'
+
 const API_ROOT = '/api/v1'
 let csrfToken = null
 
 function messageOf(payload, fallback) {
   return payload?.error?.message || payload?.message || fallback
+}
+
+export class ApiError extends Error {
+  constructor(message, status, code, fieldErrors = []) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.fieldErrors = fieldErrors
+  }
 }
 
 export async function request(path, options = {}) {
@@ -22,10 +34,8 @@ export async function request(path, options = {}) {
   const payload = await response.json().catch(() => null)
   if (!response.ok || payload?.success === false) {
     if (response.status === 403 && payload?.error?.code === 'CSRF_INVALID') csrfToken = null
-    const error = new Error(messageOf(payload, 'Không thể xử lý yêu cầu.'))
-    error.status = response.status
-    error.code = payload?.error?.code
-    throw error
+    const code = payload?.error?.code
+    throw new ApiError(apiErrorMessage(code, messageOf(payload, 'Không thể xử lý yêu cầu.')), response.status, code, payload?.error?.fieldErrors)
   }
   if (path === '/auth/google' || path === '/auth/logout') csrfToken = null
   return payload?.data

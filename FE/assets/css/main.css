@@ -653,6 +653,21 @@ select {
     gap: 18px
 }
 
+.field-error { color: #a32121; display: block; font-size: .82rem; margin-top: .35rem; }
+.form-error { background: #fff1f0; border: 1px solid #d99; color: #811; margin-bottom: 1rem; padding: .8rem; }
+.state-box.error { color: #811; }
+.state-box.error button { margin-left: 1rem; }
+.pagination { align-items: center; display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
+.order-summary small { display: block; font-weight: normal; margin-top: .25rem; }
+
+@media (max-width: 720px) {
+  .checkout-grid, .order-detail { grid-template-columns: minmax(0, 1fr); }
+  .checkout-form, .order-summary, .checkout-item, .order-row { min-width: 0; }
+  .order-row { align-items: flex-start; grid-template-columns: 1fr; gap: .45rem; }
+  .checkout-item { grid-template-columns: 64px minmax(0, 1fr); }
+  .checkout-item > :last-child { grid-column: 2; }
+}
+
 .form-grid label {
     display: grid;
     gap: 8px;
