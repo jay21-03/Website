@@ -132,7 +132,7 @@ async function mockApi(page, role = 'USER') {
     if (path === '/admin/users') return ok({ content: adminUsers, page: Number(url.searchParams.get('page') || 0), size: Number(url.searchParams.get('size') || 20), totalElements: 42, totalPages: 3, first: true, last: false })
     if (path === '/admin/workshops') return ok([{ id: 5, title: 'Lam gom co ban', description: 'Trai nghiem tao hinh gom.', priceAmount: 150000, durationMinutes: 120, maxParticipants: 10, status: 'ACTIVE' }])
     if (path === '/admin/workshop/bookings') return ok({ content: [{ id: 9, workshopId: 5, fullName: 'Nguyen Van A', email: 'a@example.com', phone: '0909000000', preferredAt: order.createdAt, participants: 2, status: 'NEW' }], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true })
-    if (path === '/admin/inventory') return ok({ content: [{ productId: product.id, productNameVi: product.nameVi, quantity: 10, reservedQuantity: 1, availableQuantity: 9, status: 'AVAILABLE' }], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true })
+    if (path === '/admin/inventory') return ok({ content: [{ productId: product.id, productNameVi: product.nameVi, quantity: 10, reservedQuantity: 1, availableQuantity: 9, status: 'IN_STOCK' }], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true })
     if (path === '/admin/orders') return ok({ content: [order], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true })
     if (path === '/admin/orders/77') return ok(order)
     return ok(null)

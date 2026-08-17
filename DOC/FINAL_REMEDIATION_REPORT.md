@@ -4,39 +4,41 @@
 
 Implementation status: `SOURCE REMEDIATED`
 
-Verification status: `PENDING INDEPENDENT RETEST`
+Retest status: `INDEPENDENT RETEST PENDING`
 
-PAYOS: `EXTERNAL VERIFICATION PENDING`
+PAYOS: `EXTERNAL CONTRACT CHECK PENDING`
 
 DEPLOYMENT: `PENDING`
 
-This report reflects source changes after the latest remediation pass. No tests, lint, typecheck, build, E2E, Docker startup, backend startup, or runtime smoke verification were executed during this pass.
+This report reflects source edits after the latest remediation pass. No tests, lint, typecheck, build, E2E, Docker startup, backend startup, or runtime smoke commands were executed during this pass.
 
 ## 2. Frozen Change Decisions
 
 - CD-001: Frontend remains React + Vite + React Router + TanStack Query + Zod.
 - CD-002: Workshop, Workshop Booking, and Support Settings remain in scope.
 - CD-003: Shipping remains out of scope. No shipping fee is shown or included.
-- CD-004: payOS external contract is pending. Local code keeps mocked/provider-boundary separation.
+- CD-004: payOS external contract remains pending. Local code keeps mocked/provider-boundary separation.
 
 ## 3. Remediation Matrix
 
-| Item | Implementation status | Verification status | Notes |
+| Item | Implementation status | Retest status | Notes |
 | --- | --- | --- | --- |
-| Admin Product / Collection admin API | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Admin catalog screens use admin endpoints, not public Store catalog. |
-| Admin Product / Collection backend query | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Admin product/collection query support remains database-backed in source. |
-| Checkout idempotency terminal failure | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Terminal `PAYOS_REQUEST_FAILED` clears frontend checkout idempotency key; ambiguous states retain it. |
-| Admin Users / Orders pagination | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Admin user/order screens use backend query params and page controls. |
-| Admin Inventory pagination/filter/sort | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Main inventory list sends `keyword`, `status`, `page`, `size`, and `sort`; search submit applies keyword. |
-| Admin Notifications pagination/count | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Notification management now uses pageable list params and a separate unread count query using `totalElements`. |
-| Product collection selector over 100 collections | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Product form/filter collection options load all admin collection pages until `last=true`. |
-| Business timezone | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Business display and discount datetime conversion are centralized around `Asia/Ho_Chi_Minh`. |
-| Public/Admin i18n gaps | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Key public checkout/order/workshop/support strings and touched admin inventory/notification labels use existing `pick`/admin text convention. |
-| Local hostname consistency | SOURCE REMEDIATED | PENDING INDEPENDENT RETEST | Browser-facing local docs/config use `127.0.0.1`; Docker database service networking is preserved. |
-| Playwright reporting clarity | DOCUMENTED | PENDING INDEPENDENT RETEST | Browser suite should be described as mock-backed UI contract coverage, not full-stack Spring/PostgreSQL E2E. |
-| Typecheck reporting clarity | DOCUMENTED | PENDING INDEPENDENT RETEST | `tsc --noEmit` command exists, but JS semantic checking remains limited while `checkJs=false`. |
+| Admin Product / Collection admin API | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Admin catalog screens use admin endpoints, not public Store catalog. |
+| Admin Product / Collection backend query | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Admin product/collection query support remains database-backed in source. |
+| Checkout idempotency terminal failure | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Terminal `PAYOS_REQUEST_FAILED` clears frontend checkout idempotency key; ambiguous states retain it. |
+| Admin Users / Orders pagination | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Admin user/order screens use backend query params and page controls. |
+| Admin Inventory pagination/filter/sort | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Main inventory list sends `keyword`, `status`, `page`, `size`, and `sort`; search submit applies keyword. |
+| Admin Notifications pagination/count | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Notification management uses pageable list params and a separate unread count query using `totalElements`. |
+| Product collection selector over 100 collections | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Product form/filter collection options load all admin collection pages until `last=true`. |
+| Business timezone | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Business display and discount datetime conversion are centralized around `Asia/Ho_Chi_Minh`. |
+| Public i18n VI/EN | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Public cart, checkout, orders, product detail, collections, workshop, support, FAQ/policy, and auth-facing messages use the existing `pick(lang, vi, en)` convention where touched. |
+| Admin i18n VI/EN | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Admin shell, dashboard, reports, products, collections, workshops, inventory, orders, users, notifications, and support settings now use the existing admin text helper for user-facing labels/messages where touched. |
+| Local hostname consistency | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Browser-facing local defaults use `127.0.0.1:3000` for frontend and `127.0.0.1:8080` for backend; Docker database service networking is preserved. |
+| E2E fixture enum cleanup | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Inventory mock status was aligned to backend inventory status values. |
+| Playwright reporting clarity | DOCUMENTED | INDEPENDENT RETEST PENDING | Browser suite should be described as mock-backed UI contract coverage, not full-stack Spring/PostgreSQL E2E. |
+| Typecheck reporting clarity | DOCUMENTED | INDEPENDENT RETEST PENDING | `tsc --noEmit` command exists, but JS semantic checking remains limited while `checkJs=false`. |
 
-## 4. Backend Verification
+## 4. Backend Retest Needed
 
 Not executed in this remediation pass.
 
@@ -47,7 +49,7 @@ Required independent checks:
 - Admin catalog/order/inventory query regression.
 - Security and concurrency regression.
 
-## 5. Frontend Verification
+## 5. Frontend Retest Needed
 
 Not executed in this remediation pass.
 
@@ -76,13 +78,13 @@ Frontend `tsconfig.json` keeps:
 }
 ```
 
-Therefore `tsc --noEmit` is available as a command, but JavaScript semantic checking is intentionally limited unless `checkJs` is enabled later in a separately verified change.
+Therefore `tsc --noEmit` is available as a command, but JavaScript semantic checking is intentionally limited unless `checkJs` is enabled later in a separately retested change.
 
 ## 8. Known Limitations
 
-- Real payOS sandbox/provider verification remains external.
-- AWS deployment and S3 production smoke verification remain external.
-- This pass did not execute automated or runtime verification by instruction.
+- Real payOS sandbox/provider contract check remains external.
+- AWS deployment and S3 production smoke check remain external.
+- This pass did not execute automated or runtime commands by instruction.
 
 ## 9. Retest Checklist
 
@@ -95,5 +97,5 @@ Therefore `tsc --noEmit` is available as a command, but JavaScript semantic chec
 | Frontend build | YES |
 | Playwright | YES |
 | Docker local startup | YES |
-| payOS sandbox verification | YES, external |
+| payOS sandbox/provider contract check | YES, external |
 | AWS deployment smoke | YES, external |
