@@ -13,6 +13,7 @@ public class PaymentWorkflowService {
     public PaymentWorkflowService(PaymentJpaRepository p) { payments=p; }
     @Transactional public Payment lock(Long id) { return payments.findByIdForUpdate(id).orElseThrow(this::missing); }
     @Transactional(readOnly=true) public Payment required(Long id) { return payments.findById(id).orElseThrow(this::missing); }
+    @Transactional(readOnly=true) public boolean externalReferenceUsedByAnotherPayment(String reference,Long currentPaymentId){return payments.findByExternalTransactionIdentifier(reference).filter(p->!p.getId().equals(currentPaymentId)).isPresent();}
     @Transactional public Payment lockForOrder(Long orderId) { return payments.findByOrderIdForUpdate(orderId).orElseThrow(this::missing); }
     @Transactional(readOnly=true) public Payment forOrder(Long orderId) { return payments.findByOrderId(orderId).orElseThrow(this::missing); }
     @Transactional public void captureProvider(Long id,String link,String url,String qr,Instant now){lock(id).captureProvider(link,url,qr,now);}

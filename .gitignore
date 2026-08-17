@@ -6,3 +6,7 @@ target/
 FE/legacy/server/data/users.json
 npm-debug.log*
 .vscode/
+# Playwright generated artifacts
+FE/test-results/
+FE/playwright-report/
+FE/blob-report/

@@ -111,4 +111,57 @@ class BautrucEcommerceApplicationTest {
         );
         assertThat(idDefault).contains("app_global_id_seq");
     }
+
+    @Test
+    void cleanFlywaySchemaContainsRemediationCriticalConstraints() {
+        assertConstraintExists("carts", "uk_carts_user");
+        assertConstraintExists("inventories", "uk_inventories_product");
+        assertConstraintExists("payments", "uk_payments_order");
+        assertConstraintExists("checkout_operations", "uk_checkout_user_key");
+        assertConstraintExists("notification_recipients", "uk_notification_recipient");
+        assertConstraintExists("support_settings", "chk_support_settings_singleton");
+        assertConstraintExists("workshop_bookings", "chk_workshop_bookings_participants");
+        assertConstraintExists("workshop_bookings", "chk_workshop_bookings_status");
+        assertConstraintExists("workshop_offerings", "chk_workshop_offerings_status");
+
+        Long thumbnailIndexCount = jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from pg_indexes
+                where schemaname = 'public'
+                  and tablename = 'product_images'
+                  and indexname = 'uk_product_images_thumbnail'
+                """,
+                Long.class
+        );
+        assertThat(thumbnailIndexCount).isEqualTo(1);
+
+        Long inventoryBusinessKeyIndexCount = jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from pg_indexes
+                where schemaname = 'public'
+                  and tablename = 'inventory_transactions'
+                  and indexname = 'uk_inv_tx_business_key'
+                """,
+                Long.class
+        );
+        assertThat(inventoryBusinessKeyIndexCount).isEqualTo(1);
+    }
+
+    private void assertConstraintExists(String tableName, String constraintName) {
+        Long count = jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.table_constraints
+                where table_schema = 'public'
+                  and table_name = ?
+                  and constraint_name = ?
+                """,
+                Long.class,
+                tableName,
+                constraintName
+        );
+        assertThat(count).isEqualTo(1);
+    }
 }

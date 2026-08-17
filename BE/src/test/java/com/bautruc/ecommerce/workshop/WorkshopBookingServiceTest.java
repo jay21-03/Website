@@ -125,4 +125,77 @@ class WorkshopBookingServiceTest {
         ))).isInstanceOf(BusinessException.class)
                 .hasMessageContaining("future");
     }
+
+    @Test
+    void rejectsBookingForInactiveWorkshopOffering() {
+        var offering = offeringService.create(new WorkshopOfferingRequest(
+                "Lop gom tam dung",
+                "Chua nhan lich dat cho khach.",
+                120000,
+                90,
+                8,
+                null,
+                WorkshopOfferingStatus.INACTIVE
+        ));
+
+        assertThatThrownBy(() -> service.create(new WorkshopBookingRequest(
+                offering.getId(),
+                "Nguyen Van C",
+                "c@example.com",
+                "0909000002",
+                OffsetDateTime.now().plusDays(3),
+                2,
+                null
+        ))).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("available");
+    }
+
+    @Test
+    void rejectsBookingWhenParticipantsExceedWorkshopCapacity() {
+        var offering = offeringService.create(new WorkshopOfferingRequest(
+                "Lam gom gia dinh",
+                "Trai nghiem theo nhom nho.",
+                250000,
+                120,
+                3,
+                null,
+                WorkshopOfferingStatus.ACTIVE
+        ));
+
+        assertThatThrownBy(() -> service.create(new WorkshopBookingRequest(
+                offering.getId(),
+                "Nguyen Van D",
+                "d@example.com",
+                "0909000003",
+                OffsetDateTime.now().plusDays(4),
+                4,
+                null
+        ))).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("capacity");
+    }
+
+    @Test
+    void publicOfferingsExcludeInactiveWorkshopOfferings() {
+        var active = offeringService.create(new WorkshopOfferingRequest(
+                "Workshop dang mo",
+                "Khach co the dat lich.",
+                180000,
+                120,
+                10,
+                null,
+                WorkshopOfferingStatus.ACTIVE
+        ));
+        var inactive = offeringService.create(new WorkshopOfferingRequest(
+                "Workshop an",
+                "Admin chua cong khai.",
+                180000,
+                120,
+                10,
+                null,
+                WorkshopOfferingStatus.INACTIVE
+        ));
+
+        assertThat(offeringService.publicOfferings()).extracting("id").contains(active.getId()).doesNotContain(inactive.getId());
+        assertThat(offeringService.adminOfferings()).extracting("id").contains(active.getId(), inactive.getId());
+    }
 }

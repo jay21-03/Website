@@ -1,9 +1,11 @@
 package com.bautruc.ecommerce.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bautruc.ecommerce.support.api.request.SupportSettingsRequest;
 import com.bautruc.ecommerce.support.application.SupportSettingsService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +55,24 @@ class SupportSettingsServiceTest {
         assertThat(updated.getZaloPhone()).isEqualTo("0909000000");
         assertThat(updated.getSecondaryPhone()).isEqualTo("0909000001");
         Long rowCount = jdbcTemplate.queryForObject("select count(*) from support_settings where id = 1", Long.class);
+        assertThat(rowCount).isEqualTo(1);
+    }
+
+    @Test
+    void databasePreventsAdditionalSupportSettingsRows() {
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                """
+                insert into support_settings (
+                    id,
+                    email,
+                    zalo_phone,
+                    address,
+                    updated_at
+                ) values (2, 'other@example.com', '0909000002', 'Bau Truc', now())
+                """
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        Long rowCount = jdbcTemplate.queryForObject("select count(*) from support_settings", Long.class);
         assertThat(rowCount).isEqualTo(1);
     }
 }

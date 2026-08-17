@@ -1,14 +1,29 @@
-import { describe, expect, it, vi } from 'vitest'
-import { checkoutOrder, getMyOrder, getMyOrders } from './orderService'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { CHECKOUT_IDEMPOTENCY_KEY } from './checkoutIdempotency'
+import { checkoutOrder, completeCheckoutAttempt, getMyOrder, getMyOrders } from './orderService'
 
 vi.mock('../api', () => ({ request: vi.fn().mockResolvedValue({ orderId: 42 }) }))
 import { request } from '../api'
 
 describe('order service contracts', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'stable-checkout-key') })
+    request.mockClear()
+  })
+
   it('sends the exact checkout payload and idempotency key', async () => {
     const payload = { receiverName: 'An', phone: '0901234567', email: '', address: 'Bàu Trúc', note: '' }
     await checkoutOrder(payload)
-    expect(request).toHaveBeenCalledWith('/checkout', expect.objectContaining({ method: 'POST', body: JSON.stringify(payload), headers: { 'Idempotency-Key': expect.any(String) } }))
+    await checkoutOrder(payload)
+    expect(request).toHaveBeenCalledWith('/checkout', expect.objectContaining({ method: 'POST', body: JSON.stringify(payload), headers: { 'Idempotency-Key': 'stable-checkout-key' } }))
+    expect(crypto.randomUUID).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears the logical checkout key after finalization', () => {
+    sessionStorage.setItem(CHECKOUT_IDEMPOTENCY_KEY, 'done-key')
+    completeCheckoutAttempt()
+    expect(sessionStorage.getItem(CHECKOUT_IDEMPOTENCY_KEY)).toBeNull()
   })
 
   it('uses backend pagination and owned-order detail routes', async () => {

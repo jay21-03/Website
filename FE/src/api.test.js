@@ -22,6 +22,13 @@ describe('API client security', () => {
     expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/checkout', expect.objectContaining({ credentials: 'include', headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'memory-token' }) }))
   })
 
+  it('builds authoritative product query parameters for backend filtering', async () => {
+    fetch.mockResolvedValueOnce(response({ success: true, data: { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, first: true, last: true } }))
+    const { api } = await import('./api')
+    await api.products({ keyword: 'binh', collectionId: 7, minPrice: 1000, maxPrice: 2000, page: 1, size: 20, sort: 'sellingPrice,asc' })
+    expect(fetch).toHaveBeenCalledWith('/api/v1/products?page=1&size=20&keyword=binh&collectionId=7&minPrice=1000&maxPrice=2000&sort=sellingPrice%2Casc', expect.objectContaining({ credentials: 'include' }))
+  })
+
   it('sends multipart uploads with CSRF header without forcing JSON content type', async () => {
     const body = new FormData()
     body.append('file', new Blob(['image']), 'image.png')
