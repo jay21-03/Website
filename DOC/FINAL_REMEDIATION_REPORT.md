@@ -2,48 +2,46 @@
 
 ## 1. Executive Status
 
-Status: `READY_FOR_PAYOS_VERIFICATION`
+CORE BACKEND: `VERIFIED LOCALLY`
 
-The remediation run completed the currently verifiable backend, frontend, architecture, migration, and mocked E2E checks. The project must not be called fully production-ready until real payOS external verification and AWS deployment are completed.
+PAYMENT INTERNAL / CG: `VERIFIED WITH MOCK`
+
+FRONTEND: `VERIFIED LOCALLY`
 
 PAYOS: `EXTERNAL VERIFICATION PENDING`
 
 DEPLOYMENT: `PENDING`
+
+OVERALL: `READY_FOR_PAYOS_VERIFICATION`
+
+The source remediation findings were implemented and verified locally. The project is not production-ready until real payOS external verification and deployment smoke testing are completed.
 
 ## 2. Frozen Change Decisions
 
 - CD-001: Frontend remains React + Vite + React Router + TanStack Query + Zod.
 - CD-002: Workshop, Workshop Booking, and Support Settings are in scope.
 - CD-003: Shipping remains out of scope. No shipping fee is shown or included.
-- CD-004: payOS external contract is pending. Tests use fake/mock boundaries.
+- CD-004: payOS external contract is pending. Tests use fake/mock provider boundaries.
 
-## 3. FIX-01..FIX-18 Matrix
+## 3. FINAL-FIX-01..FINAL-FIX-10 Matrix
 
-| Fix | Status | Notes |
-| --- | --- | --- |
-| FIX-01 Catalog Backend Query + Pricing | PASS | Backend product query supports keyword, collection, price range, pagination, and safe sort with PricingService parity. |
-| FIX-02 Catalog Admin API | PASS | Admin catalog status and discount active endpoints added and tested. |
-| FIX-03 Frontend Catalog Query | PASS | Product list uses backend authoritative filters and detail fetch. |
-| FIX-04 Checkout Idempotency Frontend | PASS | Session-scoped checkout idempotency key added; cleared only after successful finalization. |
-| FIX-05 Checkout / Payment Frontend | PASS | Checkout consumes payment fields, removes shipping, and renders pending payment safely. |
-| FIX-06 Payment Polling | PASS | Order detail polls while payment is PENDING and stops on terminal statuses. |
-| FIX-07 Notification Bell + SSE | PASS | Admin bell uses persistent fetch with SSE enhancement and fallback polling. |
-| FIX-08 Reporting Frontend | PASS | Admin dashboard includes revenue and best-selling report UI. |
-| FIX-09 Admin Catalog UI | PASS | Discount controls and product image upload/preview/delete/thumbnail/reorder UI added. |
-| FIX-10 Inventory History UI | PASS | Admin inventory modal shows transaction history and keeps reserved quantity backend-owned. |
-| FIX-11 Manual Refund UI | PASS | Admin refund recording action is shown only for CANCELLED + PAID. |
-| FIX-12 Admin User / Order Query UX | PASS | Admin user/order screens preserve backend-authoritative APIs and actions. |
-| FIX-13 Public Customer UX | PASS | React routes include products, detail, cart, checkout, orders, workshop, support, FAQ, and policy. |
-| FIX-14 Workshop + Support Hardening | PASS | Validation, singleton support integrity, and module documentation were added. |
-| FIX-15 ArchUnit | PASS | Modular boundary rules added to Maven lifecycle. |
-| FIX-16 Playwright E2E | PASS | Mocked Playwright coverage added for catalog, checkout, admin, workshop, and support. |
-| FIX-17 Flyway / Database Constraint Audit | PASS | Clean Testcontainers Flyway run validates V1-V10 and critical constraints. |
-| FIX-18 Full Regression | PASS | Backend, frontend unit/typecheck/lint/build, and Playwright passed. |
+| Fix | Status | Files changed | Tests | Evidence |
+| --- | --- | --- | --- | --- |
+| FINAL-FIX-01 Admin Product / Collection uses admin API | PASS | `FE/src/Admin.jsx`, `FE/src/api.js`, `FE/tests/e2e/remediation.spec.js` | Playwright PASS | Admin product/collection screens fetch `/api/v1/admin/products` and `/api/v1/admin/collections`; E2E verifies inactive product remains manageable and inactive collection is visible. |
+| FINAL-FIX-02 Admin Product / Collection query contract | PASS | `BE/src/main/java/com/bautruc/ecommerce/catalog/**`, `BE/src/test/java/com/bautruc/ecommerce/catalog/api/AdminCatalogApiIntegrationTest.java` | Maven PASS | Backend admin product supports keyword/status/collection/page/size/sort; admin collection supports keyword/status/page/size/sort; inactive entities appear in admin API and are hidden from public API. |
+| FINAL-FIX-03 Checkout idempotency terminal failure | PASS | `FE/src/hooks/useOrders.js`, `FE/src/services/checkoutIdempotency.js`, `FE/src/services/checkoutIdempotency.test.js`, `FE/src/services/orderService.test.js`, `FE/tests/e2e/remediation.spec.js` | Vitest + Playwright PASS | `PAYOS_REQUEST_FAILED` clears session idempotency key; `CHECKOUT_IN_PROGRESS`, `CHECKOUT_FINALIZATION_PENDING`, and ambiguous network failures retain it. |
+| FINAL-FIX-04 Admin users/orders search filter pagination | PASS | `FE/src/Admin.jsx`, `FE/tests/e2e/remediation.spec.js` | Playwright PASS | Admin users/orders use backend query params and page controls, no `size=100` substitute for those management lists. |
+| FINAL-FIX-05 Database pagination for admin order and inventory | PASS | `BE/src/main/java/com/bautruc/ecommerce/order/application/OrderQueryService.java`, `BE/src/main/java/com/bautruc/ecommerce/inventory/application/InventoryQueryService.java`, backend tests | Maven PASS | Admin order payment status filtering moved to DB query; inventory `availableQuantity` sort/pagination runs in database and page boundary is tested. |
+| FINAL-FIX-06 Reporting date Asia/Ho_Chi_Minh | PASS | `FE/src/utils/businessDate.js`, `FE/src/utils/businessDate.test.js`, `FE/src/Admin.jsx` | Vitest PASS | Business date utility formats calendar dates in `Asia/Ho_Chi_Minh`; UTC boundary for Vietnam midnight stays on the correct business date. |
+| FINAL-FIX-07 Notification unread count + SSE recovery | PASS | `FE/src/Admin.jsx`, `FE/tests/e2e/remediation.spec.js` | Playwright PASS | Bell badge uses `PageResponse.totalElements`; SSE fallback interval is cleared on reconnect/open and cleaned on unmount. |
+| FINAL-FIX-08 Product gallery + `/collections` route | PASS | `FE/src/App.jsx`, `FE/assets/css/main.css`, `FE/tests/e2e/remediation.spec.js` | Playwright PASS | Public `/collections` route added; product detail supports thumbnail selection, zoom in/out, and mobile swipe. |
+| FINAL-FIX-09 Discount admin + collection delete | PASS | `BE/src/main/java/com/bautruc/ecommerce/catalog/api/response/AdminProductResponse.java`, `BE/src/main/java/com/bautruc/ecommerce/catalog/api/CatalogController.java`, `FE/src/Admin.jsx`, E2E/backend tests | Maven + Playwright PASS | Admin product response exposes current discount config for admin UI prefill; collection delete UI includes confirmation and refresh. |
+| FINAL-FIX-10 Playwright + regression coverage | PASS | `FE/playwright.config.js`, `FE/tests/e2e/remediation.spec.js` | Playwright PASS | Playwright now runs Desktop Chrome and Mobile Chrome projects with 16 passing E2E tests covering public, admin, checkout, workshop, support, gallery, and idempotency paths. |
 
 ## 4. Backend Verification
 
-- Command: `mvn clean test`
-- Tests run: 182
+- Command: `mvn test`
+- Tests run: 186
 - Failures: 0
 - Errors: 0
 - Skipped: 0
@@ -52,74 +50,74 @@ DEPLOYMENT: `PENDING`
 ## 5. Frontend Verification
 
 - Command: `npm test`
-- Vitest test files: 6 passed
-- Vitest tests: 17 passed
+- Vitest files: 7 passed
+- Vitest tests: 22 passed
+- Failures: 0
+- Command: `npm run lint`
+- Result: PASS, 0 warnings
 - Command: `npm run typecheck`
 - Result: PASS
-- Command: `npm run lint`
-- Result: PASS with 9 hook-dependency warnings
 - Command: `npm run build`
 - Result: PASS
-- Command: `npx playwright test`
-- Playwright tests: 4 passed
+- Command: `npm run e2e`
+- Playwright tests: 16 passed
 - Playwright failures: 0
+
+Environment note: `npm ci` was attempted twice and failed with Windows `EPERM` while unlinking `node_modules/@rolldown/.../rolldown-binding.win32-x64-msvc.node`. Dependencies were restored with `npm install`, then test/lint/typecheck/build/e2e all passed.
 
 ## 6. Security Verification
 
-- JWT, CSRF, CORS, logout, blocked-user, stale-role, admin authorization, and last-admin tests remain covered by backend regression.
-- Swagger/Actuator route matrix was not expanded beyond existing local documentation/health access.
-- Google and payOS credentials are not hard-coded by remediation.
+- Existing JWT, CSRF, CORS, logout, blocked user, stale role, admin authorization, and last-admin regressions remain covered by backend tests.
+- Admin catalog/users/orders continue using admin-protected endpoints.
+- Local origin configuration was standardized to `http://127.0.0.1:3000`.
+- No Google, JWT, AWS, or payOS secret was hard-coded by this remediation.
 
 ## 7. Concurrency Verification
 
-- Existing inventory, checkout, and last-admin concurrency tests remained green in Maven regression.
-- ArchUnit prevents direct cross-module infrastructure dependencies in critical module paths.
+- Backend Maven regression remains green with Testcontainers PostgreSQL.
+- Inventory available-quantity pagination boundary is covered.
+- Existing checkout/idempotency and last-admin tests remain part of the passing backend suite.
 
 ## 8. CG-001..007 Verification
 
-- CG-001 checkout transaction and idempotency regression remains covered by backend integration tests.
-- CG-002..CG-007 payment lifecycle behavior remains covered with fake/mock payOS boundaries.
+- Checkout idempotency behavior remains verified internally.
+- payOS request failure stays a definitive terminal failure for frontend idempotency cleanup.
+- Payment UI still does not fake `PAID`; PENDING remains pending and poll-driven.
 - Real payOS external contract verification remains pending.
 
 ## 9. Database Verification
 
-- Clean PostgreSQL Testcontainers Flyway applies V1-V10.
-- Current schema version: 10.
-- Critical constraints checked: cart/user uniqueness, inventory/product uniqueness, payment/order uniqueness, checkout idempotency, notification recipient uniqueness, product thumbnail uniqueness, inventory business-key dedup, workshop checks, and support singleton.
-- No V11 remediation migration was required in this run.
-- Docker Compose smoke test started `postgres` and `backend`.
-- Docker backend datasource: `jdbc:postgresql://postgres:5432/bautruc_ecommerce`.
-- Docker Flyway status: schema version 10, V1-V10 successful.
-- Docker health: `GET /actuator/health` returned HTTP 200.
-- Docker OpenAPI: `GET /v3/api-docs` returned HTTP 200.
-- Docker Swagger UI: `GET /swagger-ui/index.html` returned HTTP 200.
+- Flyway/Testcontainers regression passed in Maven suite.
+- Admin catalog filtering/pagination is database-backed through Spring Data Specifications.
+- Admin order payment status filtering no longer paginates after loading all orders into memory.
+- Inventory `availableQuantity` sort/pagination no longer uses Java `subList` pagination.
 
 ## 10. Workshop Verification
 
-- Public active offerings are readable.
-- Inactive offerings are excluded from public listing.
-- Booking rejects past preferred time, inactive offering, and participant count above offering capacity.
-- Admin offering and booking management remain in scope and routed under admin security.
+- Workshop remains in scope.
+- Public workshop booking and admin workshop management are covered in Playwright mock E2E.
+- No Workshop feature was removed or downgraded.
 
 ## 11. Support Settings Verification
 
-- Public support settings read remains available.
-- Admin update targets singleton settings row only.
-- Database prevents additional support settings rows with `id <> 1`.
-- Support remains contact configuration, not a generic CMS or secret store.
+- Support Settings remains in scope.
+- Public support render and admin update screen are covered in Playwright mock E2E.
+- Support stays contact configuration, not a generic CMS or secret store.
 
 ## 12. Test Statistics
 
-- Backend Maven: 182 tests, 0 failures, 0 errors, 0 skipped.
-- Frontend Vitest: 17 tests, 0 failures.
-- Playwright: 4 tests, 0 failures.
-- Frontend lint: PASS, 9 warnings.
+- Backend Maven: 186 tests, 0 failures, 0 errors, 0 skipped.
+- Frontend Vitest: 22 tests, 0 failures.
+- Frontend lint: PASS, 0 warnings.
+- Frontend typecheck: PASS.
 - Frontend build: PASS.
+- Playwright: 16 tests, 0 failures.
 
 ## 13. Known Limitations
 
-- Frontend lint still reports 9 React hook dependency warnings in admin/public components. They are warnings, not failing checks, and were not broadened into a refactor during this remediation.
-- Generated Playwright artifact directory `FE/test-results/` may exist locally after E2E execution and should not be committed.
+- `npm ci` could not complete in this Windows workspace because a native Rolldown binding file was locked by the OS. This is recorded as an environment limitation; source verification commands passed after dependency restoration.
+- Real provider verification for payOS is not included in local mocked tests.
+- AWS deployment verification is not included in this local remediation.
 
 ## 14. payOS Pending Verification
 
@@ -137,43 +135,33 @@ S3/AWS production deployment and smoke testing were not finalized in this remedi
 
 | Item | Status |
 | --- | --- |
-| Backend tests | PASS |
+| Admin Products uses admin API | PASS |
+| Admin Collections uses admin API | PASS |
+| INACTIVE Product/Collection manageable/reactivatable | PASS |
+| Admin Product query contract | PASS |
+| Admin Collection query contract | PASS |
+| Checkout terminal failure clears key | PASS |
+| Ambiguous checkout retains key | PASS |
+| Admin Users real pagination/search/filter | PASS |
+| Admin Orders real pagination/search/filter | PASS |
+| Order payment-status filtering database-backed | PASS |
+| Inventory availableQuantity sorting database-backed | PASS |
+| Reporting date Asia/Ho_Chi_Minh | PASS |
+| Notification badge true unread total | PASS |
+| SSE fallback cleanup/recovery | PASS |
+| Product Detail gallery zoom + mobile swipe | PASS |
+| `/collections` route | PASS |
+| Admin current Discount config | PASS |
+| Collection Delete UI | PASS |
+| Playwright expanded coverage | PASS |
+| Backend automated tests | PASS |
 | Frontend tests | PASS |
+| Frontend lint | PASS |
+| Frontend typecheck | PASS |
 | Frontend build | PASS |
-| Catalog backend query | PASS |
-| Catalog FE integration | PASS |
-| Effective price parity | PASS |
-| Product Discount invariant | PASS |
-| Checkout Idempotency | PASS |
-| No Shipping Fee | PASS |
-| Payment PENDING UI | PASS |
-| Payment polling | PASS |
-| CG-001 | PASS |
-| CG-002 | PASS |
-| CG-003 | PASS |
-| CG-004 | PASS |
-| CG-005 | PASS |
-| CG-006 | PASS |
-| CG-007 | PASS |
-| Security regression | PASS |
-| Concurrency regression | PASS |
-| Notification | PASS |
-| Notification dedup | PASS |
-| Multi-admin Notification | PASS |
-| SSE fallback | PASS |
-| Dashboard | PASS |
-| Revenue | PASS |
-| Best Selling | PASS |
-| Discount UI | PASS |
-| Product Images | PASS |
-| Inventory History | PASS |
-| Manual Refund | PASS |
-| Admin User UX | PASS |
-| Admin Order UX | PASS |
-| Workshop | PASS |
-| Support Settings | PASS |
-| ArchUnit | PASS |
-| Playwright | PASS |
-| Clean Flyway migration | PASS |
+| E2E executed | PASS |
+| Workshop regression | PASS |
+| Support regression | PASS |
+| localhost/127.0.0.1 consistency | PASS |
 | No CRITICAL issues | PASS |
 | No HIGH issues | PASS |

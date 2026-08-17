@@ -176,6 +176,39 @@ class OrderPaymentApiIntegrationTest {
                 .andExpect(jsonPath("$.data.orderStatus").value("COMPLETED"));
     }
 
+    @Test
+    void adminOrderListFiltersPaymentStatusWithDatabasePagination() throws Exception {
+        User admin = save("admin-order-list", UserRole.ADMIN);
+        User owner = save("order-list-owner", UserRole.USER);
+        long paidOrder = directOrder(owner.getId(), "BT-PAID-001", "PAID", 1000);
+        directOrder(owner.getId(), "BT-PENDING-001", "PENDING", 2000);
+        long paidOrderSecond = directOrder(owner.getId(), "BT-PAID-002", "PAID", 3000);
+
+        mvc.perform(get("/api/v1/admin/orders")
+                        .param("paymentStatus", "PAID")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .param("sort", "totalAmount,asc")
+                        .cookie(access(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.content[0].id").value(paidOrder))
+                .andExpect(jsonPath("$.data.content[0].paymentStatus").value("PAID"))
+                .andExpect(jsonPath("$.data.last").value(false));
+
+        mvc.perform(get("/api/v1/admin/orders")
+                        .param("paymentStatus", "PAID")
+                        .param("page", "1")
+                        .param("size", "1")
+                        .param("sort", "totalAmount,asc")
+                        .cookie(access(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.content[0].id").value(paidOrderSecond))
+                .andExpect(jsonPath("$.data.content[0].paymentStatus").value("PAID"))
+                .andExpect(jsonPath("$.data.last").value(true));
+    }
+
     private void addToCart(Cookie access, long productId, int quantity) throws Exception {
         mvc.perform(post("/api/v1/cart/items").cookie(access).with(csrf().asHeader())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -195,6 +228,19 @@ class OrderPaymentApiIntegrationTest {
         Long productId = jdbc.queryForObject("insert into products(name_vi,name_en,base_price,status,collection_id,created_at,updated_at) values('Bình gốm','Ceramic vase',?,'ACTIVE',?,now(),now()) returning id", Long.class, price, collectionId);
         jdbc.update("insert into inventories(product_id,quantity,reserved_quantity,low_stock_threshold,updated_at) values(?,?,0,5,now())", productId, quantity);
         return productId;
+    }
+
+    private long directOrder(long userId, String code, String paymentStatus, long amount) {
+        Long orderId = jdbc.queryForObject("select nextval('app_global_id_seq')", Long.class);
+        jdbc.update("""
+                insert into orders(id,order_code,user_id,receiver_name,phone,email,address,total_amount,status,created_at,updated_at)
+                values(?,?,?,?,?,?,?,?,?,now(),now())
+                """, orderId, code, userId, "Nguyen Van A", "0909000000", code.toLowerCase() + "@example.com", "Bau Truc", amount, "NEW");
+        jdbc.update("""
+                insert into payments(order_id,provider,status,amount,created_at,expires_at,updated_at)
+                values(?,'PAYOS',?,?,now(),now() + interval '15 minutes',now())
+                """, orderId, paymentStatus, amount);
+        return orderId;
     }
 
     private String checkoutRequest(String address) throws Exception {

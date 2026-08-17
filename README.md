@@ -14,7 +14,7 @@ Copy-Item .env.example .env
 docker compose up -d --build
 ```
 
-Backend chạy tại `http://localhost:8080`.
+Backend chạy tại `http://127.0.0.1:8080`.
 
 ## Chạy frontend
 
@@ -27,4 +27,4 @@ npm install
 npm run dev
 ```
 
-Frontend chạy tại `http://localhost:3000` và proxy API tới backend.
+Frontend chạy tại `http://127.0.0.1:3000` và proxy API tới backend.

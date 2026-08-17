@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from './api'
+import { localBusinessDate, monthStartBusinessDate } from './utils/businessDate'
 import '../assets/css/admin.css'
 
 const cash = value => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value || 0)
@@ -21,7 +22,7 @@ const adminSections = [
 ]
 const adminSectionIds = new Set(adminSections.map(([id]) => id))
 
-export default function Admin({ user, products, collections, notify, onLogout }) {
+export default function Admin({ user, notify, onLogout }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const requestedSection = searchParams.get('section') || 'dashboard'
@@ -31,7 +32,7 @@ export default function Admin({ user, products, collections, notify, onLogout })
   }, [requestedSection, section, setSearchParams])
   if (!user) return <Navigate to="/" replace />
   if (user.role !== 'ADMIN') return <Navigate to="/" replace />
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, label]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams({ section: id })} key={id}>{label}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>Đăng xuất</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>QUẢN TRỊ CỬA HÀNG</span><h1>{adminSections.find(item => item[0] === section)?.[1]}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} /><button type="button" onClick={() => navigate(-1)}>Lùi</button><Link to="/">Xem cửa hàng</Link></div></header>{section === 'dashboard' && <Dashboard />}{section === 'products' && <Products products={products} collections={collections} notify={notify} />}{section === 'collections' && <Collections collections={collections} notify={notify} />}{section === 'workshop' && <WorkshopBookings notify={notify} />}{section === 'inventory' && <Inventory notify={notify} />}{section === 'orders' && <Orders notify={notify} />}{section === 'users' && <Users notify={notify} currentId={user.id} />}{section === 'notifications' && <Notifications notify={notify} />}{section === 'settings' && <SupportSettings notify={notify} />}</main></div>
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, label]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams({ section: id })} key={id}>{label}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>Đăng xuất</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>QUẢN TRỊ CỬA HÀNG</span><h1>{adminSections.find(item => item[0] === section)?.[1]}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} /><button type="button" onClick={() => navigate(-1)}>Lùi</button><Link to="/">Xem cửa hàng</Link></div></header>{section === 'dashboard' && <Dashboard />}{section === 'products' && <Products notify={notify} />}{section === 'collections' && <Collections notify={notify} />}{section === 'workshop' && <WorkshopBookings notify={notify} />}{section === 'inventory' && <Inventory notify={notify} />}{section === 'orders' && <Orders notify={notify} />}{section === 'users' && <Users notify={notify} currentId={user.id} />}{section === 'notifications' && <Notifications notify={notify} />}{section === 'settings' && <SupportSettings notify={notify} />}</main></div>
 }
 
 function LoadState({ loading, error, empty, children }) {
@@ -41,8 +42,14 @@ function LoadState({ loading, error, empty, children }) {
   return children
 }
 
-function todayIso() { return new Date().toISOString().slice(0, 10) }
-function monthStartIso() { const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10) }
+function todayIso() { return localBusinessDate() }
+function monthStartIso() { return monthStartBusinessDate() }
+function toDateTimeLocal(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
 
 function Dashboard() {
   const [data, setData] = useState(null), [error, setError] = useState('')
@@ -56,39 +63,58 @@ function SimpleTable({ heads, rows, actions }) { return <div className="table-wr
 function Reports() {
   const [filters, setFilters] = useState({ fromDate: monthStartIso(), toDate: todayIso(), groupBy: 'DAY', limit: 10 })
   const [revenue, setRevenue] = useState(null), [bestSelling, setBestSelling] = useState(null), [error, setError] = useState('')
-  const params = () => new URLSearchParams(filters).toString()
-  const load = () => { setError(''); Promise.all([api.revenueReport(params()), api.bestSellingReport(new URLSearchParams({ fromDate: filters.fromDate, toDate: filters.toDate, limit: filters.limit }).toString())]).then(([r, b]) => { setRevenue(r); setBestSelling(b) }).catch(e => setError(e.message)) }
-  useEffect(() => { load() }, [])
+  const load = useCallback(() => { setError(''); Promise.all([api.revenueReport(new URLSearchParams(filters).toString()), api.bestSellingReport(new URLSearchParams({ fromDate: filters.fromDate, toDate: filters.toDate, limit: filters.limit }).toString())]).then(([r, b]) => { setRevenue(r); setBestSelling(b) }).catch(e => setError(e.message)) }, [filters])
+  useEffect(() => { load() }, [load])
   function submit(event) { event.preventDefault(); if (filters.fromDate > filters.toDate) return setError('Ngày bắt đầu không được sau ngày kết thúc.'); load() }
   return <Panel title="Báo cáo"><form className="admin-search report-filters" onSubmit={submit}><input type="date" value={filters.fromDate} onChange={e => setFilters({ ...filters, fromDate: e.target.value })} /><input type="date" value={filters.toDate} onChange={e => setFilters({ ...filters, toDate: e.target.value })} /><select value={filters.groupBy} onChange={e => setFilters({ ...filters, groupBy: e.target.value })}><option>DAY</option><option>WEEK</option><option>MONTH</option></select><input type="number" min="1" max="50" value={filters.limit} onChange={e => setFilters({ ...filters, limit: e.target.value })} /><button>Tải báo cáo</button></form>{error && <div className="admin-state error">{error}</div>}<div className="admin-grid"><section><h3>Doanh thu</h3><p className="report-total">{cash(revenue?.totalRevenue)}</p><SimpleTable heads={['Kỳ', 'Doanh thu']} rows={(revenue?.points || []).map(x => [x.periodStart, cash(x.revenue)])} /></section><section><h3>Bán chạy</h3><SimpleTable heads={['Sản phẩm', 'Số lượng']} rows={(bestSelling || []).map(x => [x.productNameVi, x.soldQuantity])} /></section></div></Panel>
 }
 
 function NotificationBell({ notify, onOpenList }) {
   const [open, setOpen] = useState(false), [page, setPage] = useState(null), [sseDown, setSseDown] = useState(false)
-  const load = () => api.adminNotifications('isRead=false&size=10&sort=createdAt,desc').then(setPage).catch(e => notify(e.message))
+  const load = useCallback(() => api.adminNotifications('isRead=false&size=10&sort=createdAt,desc').then(setPage).catch(e => notify(e.message)), [notify])
   useEffect(() => {
     load()
     let fallback
     let source
+    const clearFallback = () => {
+      if (fallback) {
+        window.clearInterval(fallback)
+        fallback = undefined
+      }
+    }
     try {
       source = new EventSource(api.adminNotificationStreamUrl(), { withCredentials: true })
+      source.onopen = () => { setSseDown(false); clearFallback() }
       source.onmessage = () => load()
       source.addEventListener('notification', () => load())
       source.onerror = () => { setSseDown(true); fallback = fallback || window.setInterval(load, 30000) }
     } catch {
       setSseDown(true); fallback = window.setInterval(load, 30000)
     }
-    return () => { source?.close(); if (fallback) window.clearInterval(fallback) }
-  }, [])
+    return () => { source?.close(); clearFallback() }
+  }, [load])
   const rows = pageContent(page)
   async function read(item) { try { await api.adminReadNotification(item.id); load(); notify('Đã đánh dấu thông báo đã đọc.') } catch (e) { notify(e.message) } }
-  return <div className="notification-bell"><button type="button" onClick={() => setOpen(value => !value)} aria-label="Thông báo"><span className="bell-mark" aria-hidden="true" />{rows.length > 0 && <span>{rows.length}</span>}</button>{open && <div className="notification-popover"><header><b>Thông báo mới</b>{sseDown && <small>SSE gián đoạn, đang tự làm mới định kỳ.</small>}</header>{rows.length ? rows.map(item => <article key={item.id}><b>{item.title}</b><p>{item.message}</p><small>{when(item.createdAt)}</small><button onClick={() => read(item)}>Đã đọc</button></article>) : <p className="empty-copy">Không có thông báo chưa đọc.</p>}<button className="text-action" onClick={onOpenList}>Xem tất cả</button></div>}</div>
+  const unreadTotal = page?.totalElements || 0
+  return <div className="notification-bell"><button type="button" onClick={() => setOpen(value => !value)} aria-label="Thông báo"><span className="bell-mark" aria-hidden="true" />{unreadTotal > 0 && <span>{unreadTotal}</span>}</button>{open && <div className="notification-popover"><header><b>Thông báo mới</b>{sseDown && <small>SSE gián đoạn, đang tự làm mới định kỳ.</small>}</header>{rows.length ? rows.map(item => <article key={item.id}><b>{item.title}</b><p>{item.message}</p><small>{when(item.createdAt)}</small><button onClick={() => read(item)}>Đã đọc</button></article>) : <p className="empty-copy">Không có thông báo chưa đọc.</p>}<button className="text-action" onClick={onOpenList}>Xem tất cả</button></div>}</div>
 }
 
-function Products({ products, collections, notify }) {
-  const [editing, setEditing] = useState(null), [open, setOpen] = useState(false)
+function Products({ notify }) {
+  const [page, setPage] = useState(null), [collections, setCollections] = useState([])
+  const [filters, setFilters] = useState({ keyword: '', status: '', collectionId: '', page: 0, size: 20, sort: 'createdAt,desc' })
+  const [editing, setEditing] = useState(null), [open, setOpen] = useState(false), [error, setError] = useState('')
   const [selectedFiles, setSelectedFiles] = useState([])
   const previews = useImagePreviews(selectedFiles)
+  const products = pageContent(page)
+  const params = value => new URLSearchParams(Object.fromEntries(Object.entries(value).filter(([, v]) => v !== ''))).toString()
+  const load = useCallback(() => {
+    setError('')
+    Promise.all([api.adminProducts(params(filters)), api.adminCollections('size=100&sort=nameVi,asc')])
+      .then(([productPage, collectionPage]) => { setPage(productPage); setCollections(pageContent(collectionPage)) })
+      .catch(e => setError(e.message))
+  }, [filters])
+  useEffect(() => { load() }, [load])
+  const updateFilter = changes => setFilters(value => ({ ...value, ...changes, page: changes.page ?? 0 }))
   function openForm(product = null) {
     setEditing(product)
     setSelectedFiles([])
@@ -115,29 +141,36 @@ function Products({ products, collections, notify }) {
       for (const file of files) uploaded.push(await api.uploadProductImage(product.id, file))
       if (uploaded.length && !product.images?.some(image => image.thumbnail)) await api.setProductThumbnail(product.id, uploaded[0].id)
       notify(files.length ? `Đã lưu sản phẩm và tải lên ${files.length} hình ảnh.` : 'Đã lưu sản phẩm.')
-      closeForm(); window.location.reload()
+      closeForm(); load()
     } catch (x) { notify(x.message) }
   }
-  async function imageAction(action) { try { await action(); notify('Đã cập nhật hình ảnh.'); window.location.reload() } catch (x) { notify(x.message) } }
-  async function discountAction(action) { try { await action(); notify('Đã cập nhật giảm giá.') } catch (x) { notify(x.message) } }
-  async function remove(item) { if (!confirm(`Xóa sản phẩm “${item.nameVi}”?`)) return; try { await api.deleteProduct(item.id); notify('Đã xóa sản phẩm.'); window.location.reload() } catch (x) { notify(x.message) } }
-  return <Panel title="Danh sách sản phẩm" action={<button className="admin-primary" onClick={() => openForm()}>+ Thêm sản phẩm</button>}><SimpleTable heads={['Hình', 'Tên sản phẩm', 'Giá bán', 'Trạng thái']} rows={products.map(x => [<img className="admin-product-thumb" src={x.thumbnailUrl || '/assets/images/vase.jpg'} alt="" />, <><b>{x.nameVi}</b><small>{x.nameEn}</small></>, cash(x.sellingPrice), <Status value={x.status} />])} actions={i => <><button onClick={() => openForm(products[i])}>Sửa</button><button className="danger" onClick={() => remove(products[i])}>Xóa</button></>} />{open && <Modal title={editing ? 'Cập nhật sản phẩm' : 'Thêm sản phẩm'} close={closeForm}><form className="admin-form" onSubmit={save}><label>Tên tiếng Việt<input name="nameVi" defaultValue={editing?.nameVi} required /></label><label>Tên tiếng Anh<input name="nameEn" defaultValue={editing?.nameEn} required /></label><label>Mô tả VI<textarea name="descriptionVi" defaultValue={editing?.descriptionVi} /></label><label>Mô tả EN<textarea name="descriptionEn" defaultValue={editing?.descriptionEn} /></label><label>Giá gốc<input name="basePrice" type="number" min="1" defaultValue={editing?.basePrice} required /></label><label>Bộ sưu tập<select name="collectionId" defaultValue={editing?.collectionId || ''} required disabled={!collections.length}>{collections.length ? collections.map(x => <option value={x.id} key={x.id}>{x.nameVi}</option>) : <option value="">Chưa có bộ sưu tập</option>}</select>{!collections.length && <small className="admin-help error">Vui lòng tạo bộ sưu tập trước khi thêm sản phẩm.</small>}</label><label>Trạng thái<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><fieldset className="admin-fieldset"><legend>Giảm giá</legend><label>Loại<select name="discountType" defaultValue=""><option value="">Không thay đổi</option><option>PERCENTAGE</option><option>FIXED_PRICE</option></select></label><label>Giá trị<input name="discountValue" type="number" min="1" step="0.01" /></label><label>Bắt đầu<input name="startAt" type="datetime-local" /></label><label>Kết thúc<input name="endAt" type="datetime-local" /></label><label className="check-row"><input name="isActive" type="checkbox" defaultChecked /> Đang bật</label>{editing && <div className="row-actions wide"><button type="button" onClick={() => discountAction(() => api.toggleDiscount(editing.id, false))}>Tắt discount</button><button type="button" onClick={() => discountAction(() => api.toggleDiscount(editing.id, true))}>Bật discount</button><button type="button" className="danger" onClick={() => discountAction(() => api.deleteDiscount(editing.id))}>Xóa discount</button></div>}</fieldset><label className="image-picker">Hình ảnh sản phẩm<input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => setSelectedFiles(Array.from(e.target.files || []))} /><small>JPEG, PNG hoặc WebP · tối đa 10 hình · ảnh đầu tiên làm ảnh đại diện</small></label>{previews.length > 0 && <div className="image-preview-block"><b>Ảnh sắp tải lên</b><div className="image-preview-grid">{previews.map(item => <figure key={item.url}><img src={item.url} alt={item.name} /><figcaption>{item.name}</figcaption></figure>)}</div></div>}{editing?.images?.length > 0 && <div className="existing-images"><b>Ảnh hiện có</b>{editing.images.map((image, index) => <figure key={image.id}><img src={image.url} alt="" /><figcaption>{image.thumbnail ? 'Ảnh đại diện' : `Ảnh ${index + 1}`}</figcaption><div className="row-actions"><button type="button" onClick={() => imageAction(() => api.setProductThumbnail(editing.id, image.id))}>Đại diện</button><button type="button" disabled={index === 0} onClick={() => { const ids = editing.images.map(x => x.id); [ids[index - 1], ids[index]] = [ids[index], ids[index - 1]]; imageAction(() => api.reorderProductImages(editing.id, ids)) }}>Lên</button><button type="button" disabled={index === editing.images.length - 1} onClick={() => { const ids = editing.images.map(x => x.id); [ids[index + 1], ids[index]] = [ids[index], ids[index + 1]]; imageAction(() => api.reorderProductImages(editing.id, ids)) }}>Xuống</button><button type="button" className="danger" onClick={() => imageAction(() => api.deleteProductImage(editing.id, image.id))}>Xóa</button></div></figure>)}</div>}<button className="admin-primary" disabled={!collections.length}>Lưu sản phẩm</button></form></Modal>}</Panel>
+  async function imageAction(action) { try { await action(); notify('Đã cập nhật hình ảnh.'); load() } catch (x) { notify(x.message) } }
+  async function discountAction(action) { try { await action(); notify('Đã cập nhật giảm giá.'); load() } catch (x) { notify(x.message) } }
+  async function remove(item) { if (!confirm(`Xóa sản phẩm “${item.nameVi}”?`)) return; try { await api.deleteProduct(item.id); notify('Đã xóa sản phẩm.'); load() } catch (x) { notify(x.message) } }
+  const discount = editing?.discount
+  return <Panel title="Danh sách sản phẩm" action={<button className="admin-primary" onClick={() => openForm()}>+ Thêm sản phẩm</button>}><form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><input value={filters.keyword} onChange={e => updateFilter({ keyword: e.target.value })} placeholder="Tìm sản phẩm" /><select value={filters.status} onChange={e => updateFilter({ status: e.target.value })}><option value="">Mọi trạng thái</option><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select><select value={filters.collectionId} onChange={e => updateFilter({ collectionId: e.target.value })}><option value="">Mọi bộ sưu tập</option>{collections.map(x => <option key={x.id} value={x.id}>{x.nameVi}</option>)}</select><select value={filters.sort} onChange={e => updateFilter({ sort: e.target.value })}><option value="createdAt,desc">Mới nhất</option><option value="nameVi,asc">Tên A-Z</option><option value="basePrice,asc">Giá thấp</option><option value="basePrice,desc">Giá cao</option></select><button>Tải</button></form><LoadState loading={!page && !error} error={error} empty={page && !products.length}><SimpleTable heads={['Hình', 'Tên sản phẩm', 'Giá bán', 'Trạng thái']} rows={products.map(x => [<img className="admin-product-thumb" src={x.thumbnailUrl || '/assets/images/vase.jpg'} alt="" />, <><b>{x.nameVi}</b><small>{x.nameEn}</small></>, cash(x.sellingPrice), <Status value={x.status} />])} actions={i => <><button onClick={() => openForm(products[i])}>Sửa</button><button className="danger" onClick={() => remove(products[i])}>Xóa</button></>} />{page && <nav className="pagination"><button disabled={page.first} onClick={() => updateFilter({ page: page.page - 1 })}>Trước</button><span>Trang {page.page + 1}/{Math.max(page.totalPages, 1)} · {page.totalElements} sản phẩm</span><button disabled={page.last} onClick={() => updateFilter({ page: page.page + 1 })}>Sau</button></nav>}</LoadState>{open && <Modal title={editing ? 'Cập nhật sản phẩm' : 'Thêm sản phẩm'} close={closeForm}><form className="admin-form" onSubmit={save}><label>Tên tiếng Việt<input name="nameVi" defaultValue={editing?.nameVi} required /></label><label>Tên tiếng Anh<input name="nameEn" defaultValue={editing?.nameEn} required /></label><label>Mô tả VI<textarea name="descriptionVi" defaultValue={editing?.descriptionVi} /></label><label>Mô tả EN<textarea name="descriptionEn" defaultValue={editing?.descriptionEn} /></label><label>Giá gốc<input name="basePrice" type="number" min="1" defaultValue={editing?.basePrice} required /></label><label>Bộ sưu tập<select name="collectionId" defaultValue={editing?.collectionId || ''} required disabled={!collections.length}>{collections.length ? collections.map(x => <option value={x.id} key={x.id}>{x.nameVi}</option>) : <option value="">Chưa có bộ sưu tập</option>}</select>{!collections.length && <small className="admin-help error">Vui lòng tạo bộ sưu tập trước khi thêm sản phẩm.</small>}</label><label>Trạng thái<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><fieldset className="admin-fieldset"><legend>Giảm giá</legend>{discount && <p className="admin-help">Hiện tại: {discount.discountType} · {discount.discountValue} · {discount.isActive ? 'đang bật' : 'đang tắt'}</p>}<label>Loại<select name="discountType" defaultValue={discount?.discountType || ''}><option value="">Không thay đổi</option><option>PERCENTAGE</option><option>FIXED_PRICE</option></select></label><label>Giá trị<input name="discountValue" type="number" min="1" step="0.01" defaultValue={discount?.discountValue || ''} /></label><label>Bắt đầu<input name="startAt" type="datetime-local" defaultValue={toDateTimeLocal(discount?.startAt)} /></label><label>Kết thúc<input name="endAt" type="datetime-local" defaultValue={toDateTimeLocal(discount?.endAt)} /></label><label className="check-row"><input name="isActive" type="checkbox" defaultChecked={discount?.isActive ?? true} /> Đang bật</label>{editing && <div className="row-actions wide"><button type="button" onClick={() => discountAction(() => api.toggleDiscount(editing.id, false))}>Tắt discount</button><button type="button" onClick={() => discountAction(() => api.toggleDiscount(editing.id, true))}>Bật discount</button><button type="button" className="danger" onClick={() => discountAction(() => api.deleteDiscount(editing.id))}>Xóa discount</button></div>}</fieldset><label className="image-picker">Hình ảnh sản phẩm<input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => setSelectedFiles(Array.from(e.target.files || []))} /><small>JPEG, PNG hoặc WebP · tối đa 10 hình · ảnh đầu tiên làm ảnh đại diện</small></label>{previews.length > 0 && <div className="image-preview-block"><b>Ảnh sắp tải lên</b><div className="image-preview-grid">{previews.map(item => <figure key={item.url}><img src={item.url} alt={item.name} /><figcaption>{item.name}</figcaption></figure>)}</div></div>}{editing?.images?.length > 0 && <div className="existing-images"><b>Ảnh hiện có</b>{editing.images.map((image, index) => <figure key={image.id}><img src={image.url} alt="" /><figcaption>{image.thumbnail ? 'Ảnh đại diện' : `Ảnh ${index + 1}`}</figcaption><div className="row-actions"><button type="button" onClick={() => imageAction(() => api.setProductThumbnail(editing.id, image.id))}>Đại diện</button><button type="button" disabled={index === 0} onClick={() => { const ids = editing.images.map(x => x.id); [ids[index - 1], ids[index]] = [ids[index], ids[index - 1]]; imageAction(() => api.reorderProductImages(editing.id, ids)) }}>Lên</button><button type="button" disabled={index === editing.images.length - 1} onClick={() => { const ids = editing.images.map(x => x.id); [ids[index + 1], ids[index]] = [ids[index], ids[index + 1]]; imageAction(() => api.reorderProductImages(editing.id, ids)) }}>Xuống</button><button type="button" className="danger" onClick={() => imageAction(() => api.deleteProductImage(editing.id, image.id))}>Xóa</button></div></figure>)}</div>}<button className="admin-primary" disabled={!collections.length}>Lưu sản phẩm</button></form></Modal>}</Panel>
 }
 
-function Collections({ collections, notify }) {
-  const [editing, setEditing] = useState(null), [open, setOpen] = useState(false)
-  async function save(e) { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); try { editing ? await api.updateCollection(editing.id, v) : await api.createCollection(v); notify('Đã lưu bộ sưu tập.'); window.location.reload() } catch (x) { notify(x.message) } }
-  return <Panel title="Bộ sưu tập" action={<button className="admin-primary" onClick={() => { setEditing(null); setOpen(true) }}>+ Thêm bộ sưu tập</button>}><SimpleTable heads={['Tên VI', 'Tên EN', 'Trạng thái']} rows={collections.map(x => [x.nameVi, x.nameEn, <Status value={x.status} />])} actions={i => <button onClick={() => { setEditing(collections[i]); setOpen(true) }}>Sửa</button>} />{open && <Modal title="Bộ sưu tập" close={() => setOpen(false)}><form className="admin-form" onSubmit={save}><label>Tên tiếng Việt<input name="nameVi" defaultValue={editing?.nameVi} required /></label><label>Tên tiếng Anh<input name="nameEn" defaultValue={editing?.nameEn} required /></label><label>Mô tả VI<textarea name="descriptionVi" defaultValue={editing?.descriptionVi} /></label><label>Mô tả EN<textarea name="descriptionEn" defaultValue={editing?.descriptionEn} /></label><label>Trạng thái<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><button className="admin-primary">Lưu</button></form></Modal>}</Panel>
+function Collections({ notify }) {
+  const [page, setPage] = useState(null), [filters, setFilters] = useState({ keyword: '', status: '', page: 0, size: 20, sort: 'createdAt,desc' })
+  const [editing, setEditing] = useState(null), [open, setOpen] = useState(false), [error, setError] = useState('')
+  const rows = pageContent(page)
+  const params = value => new URLSearchParams(Object.fromEntries(Object.entries(value).filter(([, v]) => v !== ''))).toString()
+  const load = useCallback(() => api.adminCollections(params(filters)).then(setPage).catch(e => setError(e.message)), [filters])
+  useEffect(() => { load() }, [load])
+  const updateFilter = changes => setFilters(value => ({ ...value, ...changes, page: changes.page ?? 0 }))
+  async function save(e) { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); try { editing ? await api.updateCollection(editing.id, v) : await api.createCollection(v); notify('Đã lưu bộ sưu tập.'); setOpen(false); load() } catch (x) { notify(x.message) } }
+  async function remove(item) { if (!confirm(`Xóa bộ sưu tập “${item.nameVi}”?`)) return; try { await api.deleteCollection(item.id); notify('Đã xóa bộ sưu tập.'); load() } catch (x) { notify(x.message) } }
+  return <Panel title="Bộ sưu tập" action={<button className="admin-primary" onClick={() => { setEditing(null); setOpen(true) }}>+ Thêm bộ sưu tập</button>}><form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><input value={filters.keyword} onChange={e => updateFilter({ keyword: e.target.value })} placeholder="Tìm bộ sưu tập" /><select value={filters.status} onChange={e => updateFilter({ status: e.target.value })}><option value="">Mọi trạng thái</option><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select><select value={filters.sort} onChange={e => updateFilter({ sort: e.target.value })}><option value="createdAt,desc">Mới nhất</option><option value="nameVi,asc">Tên A-Z</option><option value="status,asc">Trạng thái</option></select><button>Tải</button></form><LoadState loading={!page && !error} error={error} empty={page && !rows.length}><SimpleTable heads={['Tên VI', 'Tên EN', 'Trạng thái']} rows={rows.map(x => [x.nameVi, x.nameEn, <Status value={x.status} />])} actions={i => <><button onClick={() => { setEditing(rows[i]); setOpen(true) }}>Sửa</button><button className="danger" onClick={() => remove(rows[i])}>Xóa</button></>} />{page && <nav className="pagination"><button disabled={page.first} onClick={() => updateFilter({ page: page.page - 1 })}>Trước</button><span>Trang {page.page + 1}/{Math.max(page.totalPages, 1)} · {page.totalElements} bộ sưu tập</span><button disabled={page.last} onClick={() => updateFilter({ page: page.page + 1 })}>Sau</button></nav>}</LoadState>{open && <Modal title="Bộ sưu tập" close={() => setOpen(false)}><form className="admin-form" onSubmit={save}><label>Tên tiếng Việt<input name="nameVi" defaultValue={editing?.nameVi} required /></label><label>Tên tiếng Anh<input name="nameEn" defaultValue={editing?.nameEn} required /></label><label>Mô tả VI<textarea name="descriptionVi" defaultValue={editing?.descriptionVi} /></label><label>Mô tả EN<textarea name="descriptionEn" defaultValue={editing?.descriptionEn} /></label><label>Trạng thái<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><button className="admin-primary">Lưu</button></form></Modal>}</Panel>
 }
 
 function WorkshopBookings({ notify }) {
   const [offerings, setOfferings] = useState([]), [editing, setEditing] = useState(null), [open, setOpen] = useState(false)
   const [imagePreview, setImagePreview] = useState('')
   const [data, setData] = useState(null), [status, setStatus] = useState('')
-  const params = () => new URLSearchParams({ size: 100, sort: 'createdAt,desc', ...(status ? { status } : {}) }).toString()
-  const load = () => api.adminWorkshopBookings(params()).then(setData).catch(e => notify(e.message))
-  const loadOfferings = () => api.adminWorkshops().then(setOfferings).catch(e => notify(e.message))
-  useEffect(() => { load(); loadOfferings() }, [])
+  const load = useCallback(() => api.adminWorkshopBookings(new URLSearchParams({ size: 100, sort: 'createdAt,desc', ...(status ? { status } : {}) }).toString()).then(setData).catch(e => notify(e.message)), [notify, status])
+  const loadOfferings = useCallback(() => api.adminWorkshops().then(setOfferings).catch(e => notify(e.message)), [notify])
+  useEffect(() => { load(); loadOfferings() }, [load, loadOfferings])
   const rows = pageContent(data)
   function openOfferingForm(item = null) {
     setEditing(item)
@@ -172,8 +205,8 @@ function WorkshopBookings({ notify }) {
 
 function Inventory({ notify }) {
   const [data, setData] = useState(null), [selected, setSelected] = useState(null), [history, setHistory] = useState(null), [query, setQuery] = useState('')
-  const load = () => api.adminInventory(new URLSearchParams({ keyword: query, size: 100 })).then(setData).catch(e => notify(e.message))
-  useEffect(() => { load() }, [])
+  const load = useCallback(() => api.adminInventory(new URLSearchParams({ keyword: query, size: 100 })).then(setData).catch(e => notify(e.message)), [notify, query])
+  useEffect(() => { load() }, [load])
   function openAdjust(item) { setSelected(item); api.adminInventoryHistory(item.productId, 'size=20').then(setHistory).catch(e => notify(e.message)) }
   async function adjust(e) { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); v.quantityChange = Number(v.quantityChange); try { await api.adminAdjustInventory(selected.productId, v); setSelected(null); load(); notify('Đã cập nhật tồn kho.') } catch (x) { notify(x.message) } }
   const rows = pageContent(data)
@@ -182,29 +215,38 @@ function Inventory({ notify }) {
 
 function Orders({ notify }) {
   const [data, setData] = useState(null), [detail, setDetail] = useState(null)
-  const load = () => api.adminOrders('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(() => { load() }, [])
+  const [filters, setFilters] = useState({ keyword: '', orderStatus: '', paymentStatus: '', fromDate: '', toDate: '', page: 0, size: 20, sort: 'createdAt,desc' })
+  const params = value => new URLSearchParams(Object.fromEntries(Object.entries(value).filter(([, v]) => v !== ''))).toString()
+  const load = useCallback(() => api.adminOrders(params(filters)).then(setData).catch(e => notify(e.message)), [filters, notify])
+  useEffect(() => { load() }, [load])
+  const updateFilter = changes => setFilters(value => ({ ...value, ...changes, page: changes.page ?? 0 }))
   const rows = pageContent(data)
   async function transition(status) { try { setDetail(await api.adminOrderStatus(detail.id, status)); load(); notify('Đã cập nhật đơn hàng.') } catch (x) { notify(x.message) } }
   async function refund() { if (!confirm('Chức năng này chỉ ghi nhận refund đã được thực hiện bên ngoài hệ thống. Ứng dụng không gửi refund tới payOS.')) return; const note = prompt('Ghi chú refund') || ''; try { const payment = await api.adminManualRefund(detail.paymentId, note); setDetail({ ...detail, paymentStatus: payment.status }); load(); notify('Đã ghi nhận hoàn tiền thủ công.') } catch (x) { notify(x.message) } }
-  return <Panel title="Đơn hàng"><SimpleTable heads={['Mã đơn', 'Ngày tạo', 'Đơn hàng', 'Thanh toán', 'Tổng tiền']} rows={rows.map(x => [x.orderCode, when(x.createdAt), <Status value={x.orderStatus} />, <Status value={x.paymentStatus} />, cash(x.totalAmount)])} actions={i => <button onClick={() => api.adminOrder(rows[i].id).then(setDetail).catch(e => notify(e.message))}>Chi tiết</button>} />{detail && <Modal title={`Đơn hàng ${detail.orderCode}`} close={() => setDetail(null)}><div className="order-admin-detail"><p><b>Người nhận:</b> {detail.receiverName} · {detail.phone}</p><p><b>Địa chỉ:</b> {detail.address}</p><p><b>Đơn hàng:</b> <Status value={detail.orderStatus} /> <b>Thanh toán:</b> <Status value={detail.paymentStatus} /></p>{detail.items.map(x => <p key={x.productId}>{x.productNameVi} × {x.quantity} <b>{cash(x.totalPrice)}</b></p>)}<h3>Tổng cộng: {cash(detail.totalAmount)}</h3><div className="admin-actions"><button onClick={() => transition('CONFIRMED')}>Xác nhận</button><button onClick={() => transition('COMPLETED')}>Hoàn thành</button><button className="danger" onClick={() => api.adminCancelOrder(detail.id).then(setDetail).then(load).catch(e => notify(e.message))}>Hủy đơn</button>{detail.orderStatus === 'CANCELLED' && detail.paymentStatus === 'PAID' && <button className="danger" onClick={refund}>Ghi nhận refund</button>}</div></div></Modal>}</Panel>
+  return <Panel title="Đơn hàng"><form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><input value={filters.keyword} onChange={e => updateFilter({ keyword: e.target.value })} placeholder="Tìm mã đơn, tên, SĐT" /><select value={filters.orderStatus} onChange={e => updateFilter({ orderStatus: e.target.value })}><option value="">Mọi trạng thái đơn</option><option>NEW</option><option>CONFIRMED</option><option>COMPLETED</option><option>CANCELLED</option></select><select value={filters.paymentStatus} onChange={e => updateFilter({ paymentStatus: e.target.value })}><option value="">Mọi thanh toán</option><option>PENDING</option><option>PAID</option><option>FAILED</option><option>CANCELLED</option><option>EXPIRED</option><option>REFUNDED</option></select><input type="date" value={filters.fromDate} onChange={e => updateFilter({ fromDate: e.target.value })} /><input type="date" value={filters.toDate} onChange={e => updateFilter({ toDate: e.target.value })} /><select value={filters.sort} onChange={e => updateFilter({ sort: e.target.value })}><option value="createdAt,desc">Mới nhất</option><option value="createdAt,asc">Cũ nhất</option><option value="totalAmount,desc">Giá trị cao</option><option value="totalAmount,asc">Giá trị thấp</option></select><button>Tải</button></form><SimpleTable heads={['Mã đơn', 'Ngày tạo', 'Đơn hàng', 'Thanh toán', 'Tổng tiền']} rows={rows.map(x => [x.orderCode, when(x.createdAt), <Status value={x.orderStatus} />, <Status value={x.paymentStatus} />, cash(x.totalAmount)])} actions={i => <button onClick={() => api.adminOrder(rows[i].id).then(setDetail).catch(e => notify(e.message))}>Chi tiết</button>} />{data && <nav className="pagination"><button disabled={data.first} onClick={() => updateFilter({ page: data.page - 1 })}>Trước</button><span>Trang {data.page + 1}/{Math.max(data.totalPages, 1)} · {data.totalElements} đơn hàng</span><button disabled={data.last} onClick={() => updateFilter({ page: data.page + 1 })}>Sau</button></nav>}{detail && <Modal title={`Đơn hàng ${detail.orderCode}`} close={() => setDetail(null)}><div className="order-admin-detail"><p><b>Người nhận:</b> {detail.receiverName} · {detail.phone}</p><p><b>Địa chỉ:</b> {detail.address}</p><p><b>Đơn hàng:</b> <Status value={detail.orderStatus} /> <b>Thanh toán:</b> <Status value={detail.paymentStatus} /></p>{detail.items.map(x => <p key={x.productId}>{x.productNameVi} × {x.quantity} <b>{cash(x.totalPrice)}</b></p>)}<h3>Tổng cộng: {cash(detail.totalAmount)}</h3><div className="admin-actions"><button onClick={() => transition('CONFIRMED')}>Xác nhận</button><button onClick={() => transition('COMPLETED')}>Hoàn thành</button><button className="danger" onClick={() => api.adminCancelOrder(detail.id).then(setDetail).then(load).catch(e => notify(e.message))}>Hủy đơn</button>{detail.orderStatus === 'CANCELLED' && detail.paymentStatus === 'PAID' && <button className="danger" onClick={refund}>Ghi nhận refund</button>}</div></div></Modal>}</Panel>
 }
 
 function Users({ notify, currentId }) {
-  const [data, setData] = useState(null); const load = () => api.adminUsers('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(() => { load() }, [])
+  const [data, setData] = useState(null)
+  const [filters, setFilters] = useState({ keyword: '', role: '', status: '', page: 0, size: 20, sort: 'createdAt,desc' })
+  const params = value => new URLSearchParams(Object.fromEntries(Object.entries(value).filter(([, v]) => v !== ''))).toString()
+  const load = useCallback(() => api.adminUsers(params(filters)).then(setData).catch(e => notify(e.message)), [filters, notify])
+  useEffect(() => { load() }, [load])
+  const updateFilter = changes => setFilters(value => ({ ...value, ...changes, page: changes.page ?? 0 }))
   const rows = pageContent(data)
   async function action(item, name) { if (item.id === currentId && ['demote', 'block'].includes(name) && !confirm('Thao tác trên chính tài khoản hiện tại. Tiếp tục?')) return; try { await api.adminUserAction(item.id, name); load(); notify('Đã cập nhật người dùng.') } catch (x) { notify(x.message) } }
-  return <Panel title="Người dùng"><SimpleTable heads={['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Ngày tạo']} rows={rows.map(x => [x.fullName, x.email, x.role, <Status value={x.status} />, when(x.createdAt)])} actions={i => { const x = rows[i]; return <div className="row-actions">{x.role === 'USER' ? <button onClick={() => action(x, 'promote')}>Cấp Admin</button> : <button onClick={() => action(x, 'demote')}>Hạ quyền</button>}{x.status === 'ACTIVE' ? <button className="danger" onClick={() => action(x, 'block')}>Chặn</button> : <button onClick={() => action(x, 'unblock')}>Bỏ chặn</button>}</div> }} /></Panel>
+  return <Panel title="Người dùng"><form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><input value={filters.keyword} onChange={e => updateFilter({ keyword: e.target.value })} placeholder="Tìm email hoặc tên" /><select value={filters.role} onChange={e => updateFilter({ role: e.target.value })}><option value="">Mọi vai trò</option><option>USER</option><option>ADMIN</option></select><select value={filters.status} onChange={e => updateFilter({ status: e.target.value })}><option value="">Mọi trạng thái</option><option>ACTIVE</option><option>BLOCKED</option></select><select value={filters.sort} onChange={e => updateFilter({ sort: e.target.value })}><option value="createdAt,desc">Mới nhất</option><option value="email,asc">Email A-Z</option><option value="email,desc">Email Z-A</option></select><button>Tải</button></form><SimpleTable heads={['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Ngày tạo']} rows={rows.map(x => [x.fullName, x.email, x.role, <Status value={x.status} />, when(x.createdAt)])} actions={i => { const x = rows[i]; return <div className="row-actions">{x.role === 'USER' ? <button onClick={() => action(x, 'promote')}>Cấp Admin</button> : <button onClick={() => action(x, 'demote')}>Hạ quyền</button>}{x.status === 'ACTIVE' ? <button className="danger" onClick={() => action(x, 'block')}>Chặn</button> : <button onClick={() => action(x, 'unblock')}>Bỏ chặn</button>}</div> }} />{data && <nav className="pagination"><button disabled={data.first} onClick={() => updateFilter({ page: data.page - 1 })}>Trước</button><span>Trang {data.page + 1}/{Math.max(data.totalPages, 1)} · {data.totalElements} người dùng</span><button disabled={data.last} onClick={() => updateFilter({ page: data.page + 1 })}>Sau</button></nav>}</Panel>
 }
 
 function Notifications({ notify }) {
-  const [data, setData] = useState(null); const load = () => api.adminNotifications('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)); useEffect(() => { load() }, [])
+  const [data, setData] = useState(null); const load = useCallback(() => api.adminNotifications('size=100&sort=createdAt,desc').then(setData).catch(e => notify(e.message)), [notify]); useEffect(() => { load() }, [load])
   const rows = pageContent(data)
   return <Panel title={`Thông báo (${rows.filter(x => !x.isRead).length} chưa đọc)`}><div className="notification-list">{rows.map(x => <article className={x.isRead ? '' : 'unread'} key={x.id}><div><b>{x.title}</b><p>{x.message}</p><small>{when(x.createdAt)}</small></div>{!x.isRead && <button onClick={() => api.adminReadNotification(x.id).then(load).catch(e => notify(e.message))}>Đánh dấu đã đọc</button>}</article>)}</div></Panel>
 }
 
 function SupportSettings({ notify }) {
   const [settings, setSettings] = useState(null)
-  useEffect(() => { api.adminSupportSettings().then(setSettings).catch(e => notify(e.message)) }, [])
+  useEffect(() => { api.adminSupportSettings().then(setSettings).catch(e => notify(e.message)) }, [notify])
   async function save(e) {
     e.preventDefault()
     const values = Object.fromEntries(new FormData(e.currentTarget))

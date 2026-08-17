@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -152,6 +153,79 @@ class AdminCatalogApiIntegrationTest {
                         .content("{\"isActive\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.isActive").value(false));
+    }
+
+    @Test
+    void adminProductQuerySupportsKeywordStatusCollectionPaginationSortingAndDiscountConfig() throws Exception {
+        Cookie admin = access(saveAdmin());
+        long firstCollection = collection("Binh", "Vase");
+        long secondCollection = collection("Tuong", "Statue");
+        long activeLow = product("Binh nho", "Small vase", 1000, "ACTIVE", firstCollection);
+        long inactiveHigh = product("Binh lon", "Large vase", 3000, "INACTIVE", firstCollection);
+        product("Tuong Cham", "Cham statue", 2000, "ACTIVE", secondCollection);
+        discount(inactiveHigh, "FIXED_PRICE", "2500");
+
+        mvc.perform(get("/api/v1/admin/products")
+                        .param("keyword", "binh")
+                        .param("collectionId", String.valueOf(firstCollection))
+                        .param("sort", "basePrice,desc")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(2))
+                .andExpect(jsonPath("$.data.content[0].id").value(inactiveHigh))
+                .andExpect(jsonPath("$.data.content[0].status").value("INACTIVE"))
+                .andExpect(jsonPath("$.data.content[0].discount.discountType").value("FIXED_PRICE"))
+                .andExpect(jsonPath("$.data.last").value(false));
+
+        mvc.perform(get("/api/v1/admin/products")
+                        .param("status", "ACTIVE")
+                        .param("collectionId", String.valueOf(firstCollection))
+                        .cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(activeLow));
+
+        mvc.perform(get("/api/v1/products")
+                        .param("keyword", "binh")
+                        .cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(activeLow));
+    }
+
+    @Test
+    void adminCollectionQuerySupportsKeywordStatusPaginationSortingAndDelete() throws Exception {
+        Cookie admin = access(saveAdmin());
+        long inactive = collection("Bo suu tap an", "Hidden collection");
+        long active = collection("Bo suu tap mo", "Open collection");
+        jdbc.update("UPDATE collections SET status = 'INACTIVE' WHERE id = ?", inactive);
+
+        mvc.perform(get("/api/v1/admin/collections")
+                        .param("keyword", "bo suu tap")
+                        .param("status", "INACTIVE")
+                        .param("sort", "nameVi,asc")
+                        .param("page", "0")
+                        .param("size", "1")
+                        .cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(inactive))
+                .andExpect(jsonPath("$.data.content[0].status").value("INACTIVE"));
+
+        mvc.perform(get("/api/v1/collections").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(active));
+
+        mvc.perform(delete("/api/v1/admin/collections/{id}", inactive)
+                        .cookie(admin)
+                        .with(csrf().asHeader()))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/admin/collections/{id}", inactive).cookie(admin))
+                .andExpect(status().isNotFound());
     }
 
     private long collection(String nameVi, String nameEn) {

@@ -51,8 +51,8 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
 
       # Frontend / CORS
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://127.0.0.1:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://127.0.0.1:3000}
 
       # payOS
       PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}

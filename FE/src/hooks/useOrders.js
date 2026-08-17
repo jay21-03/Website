@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cartKeys, orderKeys } from '../lib/queryClient'
 import { checkoutOrder, completeCheckoutAttempt, getMyOrder, getMyOrders } from '../services/orderService'
+import { clearCheckoutIdempotencyKey, shouldClearCheckoutIdempotencyKey } from '../services/checkoutIdempotency'
 
 export function useCheckout() {
   const client = useQueryClient()
@@ -13,6 +14,9 @@ export function useCheckout() {
         client.invalidateQueries({ queryKey: orderKeys.lists() }),
         client.setQueryData(orderKeys.detail(result.orderId), undefined)
       ])
+    },
+    onError: error => {
+      if (shouldClearCheckoutIdempotencyKey(error)) clearCheckoutIdempotencyKey()
     }
   })
 }

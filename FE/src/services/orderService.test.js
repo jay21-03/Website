@@ -26,6 +26,15 @@ describe('order service contracts', () => {
     expect(sessionStorage.getItem(CHECKOUT_IDEMPOTENCY_KEY)).toBeNull()
   })
 
+  it('creates a new checkout key after terminal failure cleanup', async () => {
+    crypto.randomUUID.mockReturnValueOnce('failed-key').mockReturnValueOnce('new-key')
+    await checkoutOrder({ receiverName: 'An' })
+    completeCheckoutAttempt()
+    await checkoutOrder({ receiverName: 'An' })
+    expect(request).toHaveBeenNthCalledWith(1, '/checkout', expect.objectContaining({ headers: { 'Idempotency-Key': 'failed-key' } }))
+    expect(request).toHaveBeenNthCalledWith(2, '/checkout', expect.objectContaining({ headers: { 'Idempotency-Key': 'new-key' } }))
+  })
+
   it('uses backend pagination and owned-order detail routes', async () => {
     await getMyOrders(2, 20); await getMyOrder(9)
     expect(request).toHaveBeenCalledWith('/me/orders?page=2&size=20')

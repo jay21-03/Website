@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CHECKOUT_IDEMPOTENCY_KEY, clearCheckoutIdempotencyKey, getCheckoutIdempotencyKey } from './checkoutIdempotency'
+import { CHECKOUT_IDEMPOTENCY_KEY, clearCheckoutIdempotencyKey, getCheckoutIdempotencyKey, shouldClearCheckoutIdempotencyKey } from './checkoutIdempotency'
 
 describe('checkout idempotency key', () => {
   beforeEach(() => {
@@ -17,5 +17,15 @@ describe('checkout idempotency key', () => {
     getCheckoutIdempotencyKey()
     clearCheckoutIdempotencyKey()
     expect(sessionStorage.getItem(CHECKOUT_IDEMPOTENCY_KEY)).toBeNull()
+  })
+
+  it('clears key for definitive payOS request failure', () => {
+    expect(shouldClearCheckoutIdempotencyKey({ code: 'PAYOS_REQUEST_FAILED' })).toBe(true)
+  })
+
+  it('retains key for resumable checkout states and ambiguous network failures', () => {
+    expect(shouldClearCheckoutIdempotencyKey({ code: 'CHECKOUT_IN_PROGRESS' })).toBe(false)
+    expect(shouldClearCheckoutIdempotencyKey({ code: 'CHECKOUT_FINALIZATION_PENDING' })).toBe(false)
+    expect(shouldClearCheckoutIdempotencyKey(new TypeError('Failed to fetch'))).toBe(false)
   })
 })
