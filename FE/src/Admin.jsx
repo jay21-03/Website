@@ -178,8 +178,34 @@ function Collections({ notify, lang = 'vi' }) {
 function WorkshopBookings({ notify, lang = 'vi' }) {
   const [offerings, setOfferings] = useState([]), [editing, setEditing] = useState(null), [open, setOpen] = useState(false)
   const [imagePreview, setImagePreview] = useState('')
-  const [data, setData] = useState(null), [status, setStatus] = useState('')
-  const load = useCallback(() => api.adminWorkshopBookings(new URLSearchParams({ size: 100, sort: 'createdAt,desc', ...(status ? { status } : {}) }).toString()).then(setData).catch(e => notify(e.message)), [notify, status])
+  const [data, setData] = useState(null)
+
+  const [filters, setFilters] = useState({
+    status: '',
+    page: 0,
+    size: 20
+  })
+  const load = useCallback(() => {
+  const query = new URLSearchParams(
+    Object.fromEntries(
+      Object.entries(filters)
+        .filter(([, value]) => value !== '')
+    )
+  ).toString()
+
+  api.adminWorkshopBookings(query)
+    .then(setData)
+    .catch(e => notify(e.message))
+}, [filters, notify])
+
+  const updateFilter = changes => {
+  setFilters(value => ({
+    ...value,
+    ...changes,
+    page: changes.page ?? 0
+  }))
+}
+
   const loadOfferings = useCallback(() => api.adminWorkshops().then(setOfferings).catch(e => notify(e.message)), [notify])
   useEffect(() => { load(); loadOfferings() }, [load, loadOfferings])
   const rows = pageContent(data)
@@ -206,12 +232,19 @@ function WorkshopBookings({ notify, lang = 'vi' }) {
   async function change(item, nextStatus) {
     try {
       await api.adminWorkshopStatus(item.id, nextStatus)
-      load()
+      updateFilter({ page: 0 })
       notify(adminText(lang, 'Đã cập nhật lịch workshop.', 'Workshop booking updated.'))
     } catch (x) { notify(x.message) }
   }
   const byId = new Map(offerings.map(x => [x.id, x.title]))
-  return <><Panel title={adminText(lang, 'Gói workshop', 'Workshop offerings')} action={<button className="admin-primary" onClick={() => openOfferingForm()}>+ {adminText(lang, 'Thêm workshop', 'Add workshop')}</button>}><SimpleTable heads={['Workshop', adminText(lang, 'Giá', 'Price'), adminText(lang, 'Thời lượng', 'Duration'), adminText(lang, 'Sức chứa', 'Capacity'), adminText(lang, 'Trạng thái', 'Status')]} rows={offerings.map(x => [<><b>{x.title}</b><small>{x.description}</small></>, cash(x.priceAmount), `${x.durationMinutes} ${adminText(lang, 'phút', 'minutes')}`, `${x.maxParticipants} ${adminText(lang, 'người', 'people')}`, <Status value={x.status} />])} actionLabel={adminText(lang, 'Thao tác', 'Actions')} actions={i => <><button onClick={() => openOfferingForm(offerings[i])}>{adminText(lang, 'Sửa', 'Edit')}</button><button className="danger" onClick={() => removeOffering(offerings[i])}>{adminText(lang, 'Xóa', 'Delete')}</button></>} />{open && <Modal title={editing ? adminText(lang, 'Cập nhật workshop', 'Update workshop') : adminText(lang, 'Thêm workshop', 'Add workshop')} close={closeOfferingForm}><form className="admin-form" onSubmit={saveOffering}><label>{adminText(lang, 'Tên workshop', 'Workshop name')}<input name="title" defaultValue={editing?.title} maxLength="255" required /></label><label>{adminText(lang, 'Giá', 'Price')}<input name="priceAmount" type="number" min="0" defaultValue={editing?.priceAmount ?? 0} required /></label><label className="wide">{adminText(lang, 'Mô tả', 'Description')}<textarea name="description" defaultValue={editing?.description} maxLength="2000" required /></label><label>{adminText(lang, 'Thời lượng phút', 'Duration in minutes')}<input name="durationMinutes" type="number" min="1" max="1440" defaultValue={editing?.durationMinutes ?? 120} required /></label><label>{adminText(lang, 'Sức chứa tối đa', 'Maximum capacity')}<input name="maxParticipants" type="number" min="1" max="100" defaultValue={editing?.maxParticipants ?? 10} required /></label><label className="wide">{adminText(lang, 'URL hình ảnh', 'Image URL')}<input name="imageUrl" defaultValue={editing?.imageUrl} maxLength="1024" placeholder="/assets/images/artisan.jpg" onChange={e => setImagePreview(e.target.value.trim())} /></label>{imagePreview && <div className="image-preview-block"><b>{adminText(lang, 'Ảnh hiển thị trên trang workshop', 'Image shown on workshop page')}</b><div className="single-image-preview"><img src={imagePreview} alt={adminText(lang, 'Xem trước workshop', 'Workshop preview')} /></div></div>}<label>{adminText(lang, 'Trạng thái', 'Status')}<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><button className="admin-primary">{adminText(lang, 'Lưu workshop', 'Save workshop')}</button></form></Modal>}</Panel><Panel title={adminText(lang, 'Lịch hẹn workshop', 'Workshop bookings')} action={<form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><select value={status} onChange={e => setStatus(e.target.value)}><option value="">{adminText(lang, 'Tất cả', 'All')}</option><option value="NEW">{adminText(lang, 'Mới', 'New')}</option><option value="CONFIRMED">{adminText(lang, 'Đã xác nhận', 'Confirmed')}</option><option value="CANCELLED">{adminText(lang, 'Đã hủy', 'Cancelled')}</option><option value="COMPLETED">{adminText(lang, 'Hoàn thành', 'Completed')}</option></select><button>{adminText(lang, 'Lọc', 'Filter')}</button></form>}><SimpleTable heads={[adminText(lang, 'Khách', 'Customer'), 'Workshop', adminText(lang, 'Liên hệ', 'Contact'), adminText(lang, 'Thời gian', 'Time'), adminText(lang, 'Số người', 'Participants'), adminText(lang, 'Trạng thái', 'Status')]} rows={rows.map(x => [<><b>{x.fullName}</b><small>{x.note}</small></>, x.workshopId ? byId.get(x.workshopId) || `#${x.workshopId}` : adminText(lang, 'Tư vấn chung', 'General consultation'), <><span>{x.phone}</span><small>{x.email}</small></>, when(x.preferredAt, lang), x.participants, <Status value={x.status} />])} actionLabel={adminText(lang, 'Thao tác', 'Actions')} actions={i => { const x = rows[i]; return <div className="row-actions"><button disabled={x.status === 'CONFIRMED'} onClick={() => change(x, 'CONFIRMED')}>{adminText(lang, 'Xác nhận', 'Confirm')}</button><button disabled={x.status === 'COMPLETED'} onClick={() => change(x, 'COMPLETED')}>{adminText(lang, 'Hoàn thành', 'Complete')}</button><button className="danger" disabled={x.status === 'CANCELLED'} onClick={() => change(x, 'CANCELLED')}>{adminText(lang, 'Hủy', 'Cancel')}</button></div> }} /></Panel></>
+  return <><Panel title={adminText(lang, 'Gói workshop', 'Workshop offerings')} action={<button className="admin-primary" onClick={() => openOfferingForm()}>+ {adminText(lang, 'Thêm workshop', 'Add workshop')}</button>}><SimpleTable heads={['Workshop', adminText(lang, 'Giá', 'Price'), adminText(lang, 'Thời lượng', 'Duration'), adminText(lang, 'Sức chứa', 'Capacity'), adminText(lang, 'Trạng thái', 'Status')]} rows={offerings.map(x => [<><b>{x.title}</b><small>{x.description}</small></>, cash(x.priceAmount), `${x.durationMinutes} ${adminText(lang, 'phút', 'minutes')}`, `${x.maxParticipants} ${adminText(lang, 'người', 'people')}`, <Status value={x.status} />])} actionLabel={adminText(lang, 'Thao tác', 'Actions')} actions={i => <><button onClick={() => openOfferingForm(offerings[i])}>{adminText(lang, 'Sửa', 'Edit')}</button><button className="danger" onClick={() => removeOffering(offerings[i])}>{adminText(lang, 'Xóa', 'Delete')}</button></>} />{open && <Modal title={editing ? adminText(lang, 'Cập nhật workshop', 'Update workshop') : adminText(lang, 'Thêm workshop', 'Add workshop')} close={closeOfferingForm}><form className="admin-form" onSubmit={saveOffering}><label>{adminText(lang, 'Tên workshop', 'Workshop name')}<input name="title" defaultValue={editing?.title} maxLength="255" required /></label><label>{adminText(lang, 'Giá', 'Price')}<input name="priceAmount" type="number" min="0" defaultValue={editing?.priceAmount ?? 0} required /></label><label className="wide">{adminText(lang, 'Mô tả', 'Description')}<textarea name="description" defaultValue={editing?.description} maxLength="2000" required /></label><label>{adminText(lang, 'Thời lượng phút', 'Duration in minutes')}<input name="durationMinutes" type="number" min="1" max="1440" defaultValue={editing?.durationMinutes ?? 120} required /></label><label>{adminText(lang, 'Sức chứa tối đa', 'Maximum capacity')}<input name="maxParticipants" type="number" min="1" max="100" defaultValue={editing?.maxParticipants ?? 10} required /></label><label className="wide">{adminText(lang, 'URL hình ảnh', 'Image URL')}<input name="imageUrl" defaultValue={editing?.imageUrl} maxLength="1024" placeholder="/assets/images/artisan.jpg" onChange={e => setImagePreview(e.target.value.trim())} /></label>{imagePreview && <div className="image-preview-block"><b>{adminText(lang, 'Ảnh hiển thị trên trang workshop', 'Image shown on workshop page')}</b><div className="single-image-preview"><img src={imagePreview} alt={adminText(lang, 'Xem trước workshop', 'Workshop preview')} /></div></div>}<label>{adminText(lang, 'Trạng thái', 'Status')}<select name="status" defaultValue={editing?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></label><button className="admin-primary">{adminText(lang, 'Lưu workshop', 'Save workshop')}</button></form></Modal>}</Panel><Panel title={adminText(lang, 'Lịch hẹn workshop', 'Workshop bookings')} action={<form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><select
+  value={filters.status}
+  onChange={e =>
+    updateFilter({
+      status: e.target.value
+    })
+  }
+><option value="">{adminText(lang, 'Tất cả', 'All')}</option><option value="NEW">{adminText(lang, 'Mới', 'New')}</option><option value="CONFIRMED">{adminText(lang, 'Đã xác nhận', 'Confirmed')}</option><option value="CANCELLED">{adminText(lang, 'Đã hủy', 'Cancelled')}</option><option value="COMPLETED">{adminText(lang, 'Hoàn thành', 'Completed')}</option></select><button>{adminText(lang, 'Lọc', 'Filter')}</button></form>}><SimpleTable heads={[adminText(lang, 'Khách', 'Customer'), 'Workshop', adminText(lang, 'Liên hệ', 'Contact'), adminText(lang, 'Thời gian', 'Time'), adminText(lang, 'Số người', 'Participants'), adminText(lang, 'Trạng thái', 'Status')]} rows={rows.map(x => [<><b>{x.fullName}</b><small>{x.note}</small></>, x.workshopId ? byId.get(x.workshopId) || `#${x.workshopId}` : adminText(lang, 'Tư vấn chung', 'General consultation'), <><span>{x.phone}</span><small>{x.email}</small></>, when(x.preferredAt, lang), x.participants, <Status value={x.status} />])} actionLabel={adminText(lang, 'Thao tác', 'Actions')} actions={i => { const x = rows[i]; return <div className="row-actions"><button disabled={x.status === 'CONFIRMED'} onClick={() => change(x, 'CONFIRMED')}>{adminText(lang, 'Xác nhận', 'Confirm')}</button><button disabled={x.status === 'COMPLETED'} onClick={() => change(x, 'COMPLETED')}>{adminText(lang, 'Hoàn thành', 'Complete')}</button><button className="danger" disabled={x.status === 'CANCELLED'} onClick={() => change(x, 'CANCELLED')}>{adminText(lang, 'Hủy', 'Cancel')}</button></div> }} />{data && <nav className="pagination"><button disabled={data.first} onClick={() => updateFilter({ page: Math.max(0, data.page - 1) })}>{adminText(lang, 'Trước', 'Previous')}</button><span>{adminText(lang, 'Trang', 'Page')} {data.page + 1}/{Math.max(data.totalPages, 1)} · {data.totalElements} {adminText(lang, 'lịch hẹn', 'bookings')}</span><button disabled={data.last} onClick={() => updateFilter({ page: data.page + 1 })}>{adminText(lang, 'Sau', 'Next')}</button></nav>}</Panel></>
 }
 
 function Inventory({ notify, lang = 'vi' }) {
@@ -377,7 +410,10 @@ function Inventory({ notify, lang = 'vi' }) {
           adminText(lang, 'Trạng thái', 'Status')
         ]}
         rows={rows.map(x => [
-          x.productNameVi,
+          lang === 'vi'
+            ? x.productNameVi
+            : x.productNameEn || x.productNameVi,
+
           x.quantity,
           x.reservedQuantity,
           x.availableQuantity,
@@ -428,7 +464,16 @@ function Inventory({ notify, lang = 'vi' }) {
 
       {selected && (
         <Modal
-          title={`${adminText(lang, 'Điều chỉnh', 'Adjust')}: ${selected.productNameVi}`}
+          title={`${adminText(
+  lang,
+  'Điều chỉnh',
+  'Adjust'
+)}: ${
+  lang === 'vi'
+    ? selected.productNameVi
+    : selected.productNameEn ||
+      selected.productNameVi
+}`}
           close={() => {
             setSelected(null)
             setHistory(null)

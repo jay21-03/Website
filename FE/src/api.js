@@ -1,4 +1,7 @@
-import { apiErrorMessage } from './utils/apiError'
+import {
+  apiErrorMessage,
+  localizedText
+} from './utils/apiError'
 import { getCheckoutIdempotencyKey } from './services/checkoutIdempotency'
 
 const API_ROOT = '/api/v1'
@@ -22,7 +25,16 @@ async function ensureCsrfToken() {
   if (csrfToken) return csrfToken
   const response = await fetch(`${API_ROOT}/auth/csrf`, { credentials: 'include' })
   const payload = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(messageOf(payload, 'Không thể khởi tạo phiên bảo mật.'))
+  if (!response.ok) {
+  throw new Error(
+    messageOf(
+      payload,
+      localizedText(
+        'Không thể khởi tạo phiên bảo mật.',
+        'Unable to initialize the security session.'
+      )
+    )
+  )
   csrfToken = payload.data.token
   return csrfToken
 }
@@ -42,10 +54,19 @@ async function send(path, options, retryOnCsrfInvalid) {
       if (retryOnCsrfInvalid) return send(path, options, false)
     }
     const code = payload?.error?.code
-    throw new ApiError(apiErrorMessage(code, messageOf(payload, 'Không thể xử lý yêu cầu.')), response.status, code, payload?.error?.fieldErrors)
-  }
-  if (path === '/auth/google' || path === '/auth/logout') csrfToken = null
-  return payload?.data
+    throw new ApiError(apiErrorMessage(
+      code,
+      messageOf(
+        payload,
+        localizedText(
+          'Không thể xử lý yêu cầu.',
+          'Unable to process the request.'
+        )
+      )
+    ), response.status, code, payload?.error?.fieldErrors)
+      }
+      if (path === '/auth/google' || path === '/auth/logout') csrfToken = null
+      return payload?.data
 }
 
 export async function request(path, options = {}) {

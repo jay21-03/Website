@@ -37,6 +37,8 @@ This report reflects source edits after the latest remediation pass. No tests, l
 | E2E fixture enum cleanup | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Inventory mock status was aligned to backend inventory status values. |
 | Playwright reporting clarity | DOCUMENTED | INDEPENDENT RETEST PENDING | Browser suite should be described as mock-backed UI contract coverage, not full-stack Spring/PostgreSQL E2E. |
 | Typecheck reporting clarity | DOCUMENTED | INDEPENDENT RETEST PENDING | `tsc --noEmit` command exists, but JS semantic checking remains limited while `checkJs=false`. |
+| FINAL-FIX-17 Complete i18n | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Checkout validation, API error-code map, generic API fallbacks, and admin inventory product names support VI/EN via existing language helpers. |
+| FINAL-FIX-18 Admin Workshop Booking pagination | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Workshop booking admin list uses backend `status`/`page`/`size` pagination with Previous/Next controls; status updates reset to page 0. |
 
 ## 4. Backend Retest Needed
 
@@ -99,3 +101,17 @@ Therefore `tsc --noEmit` is available as a command, but JavaScript semantic chec
 | Docker local startup | YES |
 | payOS sandbox/provider contract check | YES, external |
 | AWS deployment smoke | YES, external |
+
+## 10. Latest Fix Entries
+
+### FINAL-FIX-17 — Complete i18n
+
+Implementation: `SOURCE REMEDIATED`
+
+Verification: `INDEPENDENT RETEST PENDING`
+
+### FINAL-FIX-18 — Admin Workshop Booking pagination
+
+Implementation: `SOURCE REMEDIATED`
+
+Verification: `INDEPENDENT RETEST PENDING`
