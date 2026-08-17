@@ -23,7 +23,7 @@ DB_NAME=bautruc_ecommerce
 DB_USERNAME=bautruc
 DB_PASSWORD=bautruc_local
 SPRING_PROFILES_ACTIVE=local
-ALLOWED_ORIGINS=http://localhost:3000
+ALLOWED_ORIGINS=http://127.0.0.1:3000
 ```
 
 For backend running inside Docker Compose, the backend container uses:
@@ -84,7 +84,7 @@ PostgreSQL becomes healthy
 Backend waits for PostgreSQL health
 Flyway migrations apply/validate
 Hibernate schema validation passes
-Spring Boot starts on http://localhost:8080
+Spring Boot starts on http://127.0.0.1:8080
 ```
 
 ### 3. Local URLs
@@ -92,31 +92,31 @@ Spring Boot starts on http://localhost:8080
 Backend base:
 
 ```text
-http://localhost:8080
+http://127.0.0.1:8080
 ```
 
 Swagger UI:
 
 ```text
-http://localhost:8080/swagger-ui/index.html
+http://127.0.0.1:8080/swagger-ui/index.html
 ```
 
 OpenAPI JSON:
 
 ```text
-http://localhost:8080/v3/api-docs
+http://127.0.0.1:8080/v3/api-docs
 ```
 
 Health:
 
 ```text
-http://localhost:8080/actuator/health
+http://127.0.0.1:8080/actuator/health
 ```
 
 CSRF token endpoint:
 
 ```text
-http://localhost:8080/api/v1/auth/csrf
+http://127.0.0.1:8080/api/v1/auth/csrf
 ```
 
 ### 4. Verify Database

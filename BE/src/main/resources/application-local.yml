@@ -19,7 +19,7 @@ logging:
     level: "%5p [correlationId=%X{correlationId:-}]"
 
 bautruc:
-    frontend-base-url: ${FRONTEND_BASE_URL:http://127.0.0.1:3000}
-    allowed-origins: ${ALLOWED_ORIGINS:http://127.0.0.1:3000}
+  frontend-base-url: ${FRONTEND_BASE_URL:http://127.0.0.1:3000}
+  allowed-origins: ${ALLOWED_ORIGINS:http://127.0.0.1:3000}
   jwt:
     secret-base64: ${JWT_SECRET_BASE64}
