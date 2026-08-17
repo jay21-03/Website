@@ -19,16 +19,26 @@ const contact = {
   address: '35 Bàu Trúc, thôn Vĩnh Thuận, xã Ninh Phước, tỉnh Khánh Hòa',
   map: 'https://www.google.com/maps/search/?api=1&query=35%20B%C3%A0u%20Tr%C3%BAc%2C%20th%C3%B4n%20V%C4%A9nh%20Thu%E1%BA%ADn%2C%20x%C3%A3%20Ninh%20Ph%C6%B0%E1%BB%9Bc%2C%20t%E1%BB%89nh%20Kh%C3%A1nh%20H%C3%B2a'
 }
+const supportToContact = settings => settings ? {
+  email: settings.email,
+  phones: [settings.zaloPhone, settings.secondaryPhone].filter(Boolean),
+  facebook: settings.facebookUrl,
+  address: settings.address,
+  map: settings.mapUrl,
+  openingHours: settings.openingHours
+} : contact
 
 function StoreProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('dxLang') || 'vi')
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
   const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
+  const [support, setSupport] = useState(contact)
   const [catalogLoading, setCatalogLoading] = useState(true), [toast, setToast] = useState('')
   const [authLoading, setAuthLoading] = useState(true)
   const notify = message => { setToast(message); window.setTimeout(() => setToast(''), 2500) }
   useEffect(() => {
     Promise.all([api.products(), api.collections()]).then(([page, groups]) => { setProducts(page.content); setCollections(groups) }).catch(error => notify(error.message)).finally(() => setCatalogLoading(false))
+    api.supportSettings().then(settings => setSupport(supportToContact(settings))).catch(() => {})
     api.me().then(current => { setUser(current); return current.role === 'USER' ? api.cart() : null }).then(value => value && setCart(value)).catch(() => {}).finally(() => setAuthLoading(false))
   }, [])
   useEffect(() => { localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang])
@@ -37,13 +47,13 @@ function StoreProvider({ children }) {
     if (user.role !== 'USER') { notify('Tài khoản quản trị không có giỏ hàng.'); return false }
     try { setCart(await api.addCart(productId)); notify('Đã thêm vào giỏ hàng.'); return true } catch (error) { notify(error.message); return false }
   }
-  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, catalogLoading, authLoading, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
+  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, catalogLoading, authLoading, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
 const useStore = () => useContext(Store)
 
 function Layout({ children }) {
   const { cart, user, lang, setLang } = useStore()
-  return <><header className="site-header"><Link className="brand" to="/"><span className="pot-mark">◯</span>Đàng Xem</Link><nav className="main-nav"><NavLink to="/">{pick(lang, 'Trang chủ', 'Home')}</NavLink><NavLink to="/products">{pick(lang, 'Sản phẩm', 'Products')}</NavLink><NavLink to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</NavLink>{user && <NavLink to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</NavLink>}</nav><div className="header-tools"><button className="lang-btn" type="button" onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}>{lang === 'vi' ? 'EN' : 'VI'}</button><Link className="icon-btn cart-btn" to="/checkout">{pick(lang, 'Giỏ', 'Cart')} <span className="cart-count">{cart.items.reduce((sum, item) => sum + item.quantity, 0)}</span></Link>{user ? <Link className="icon-btn" to="/account">{user.fullName}</Link> : <DirectGoogleLogin />}</div></header>{children}<BilingualFooter /><div className="floating-chat"><a className="zalo" href={`https://zalo.me/${contact.phones[0]}`} target="_blank" rel="noreferrer" aria-label={`Zalo ${contact.phones[0]}`} title={`Zalo ${contact.phones[0]}`}>Z</a><a className="facebook" href={contact.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" title="Facebook">f</a></div></>
+  return <><header className="site-header"><Link className="brand" to="/"><span className="pot-mark">◯</span>Đàng Xem</Link><nav className="main-nav"><NavLink to="/">{pick(lang, 'Trang chủ', 'Home')}</NavLink><NavLink to="/products">{pick(lang, 'Sản phẩm', 'Products')}</NavLink><NavLink to="/workshop">{pick(lang, 'Workshop', 'Workshop')}</NavLink><NavLink to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</NavLink>{user?.role === 'USER' && <NavLink to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</NavLink>}{user?.role === 'ADMIN' && <NavLink to="/admin">{pick(lang, 'Quản trị', 'Admin')}</NavLink>}</nav><div className="header-tools"><button className="lang-btn" type="button" onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}>{lang === 'vi' ? 'EN' : 'VI'}</button>{user?.role !== 'ADMIN' && <Link className="icon-btn cart-btn" to="/checkout">{pick(lang, 'Giỏ', 'Cart')} <span className="cart-count">{cart.items.reduce((sum, item) => sum + item.quantity, 0)}</span></Link>}{user ? <Link className="icon-btn" to={user.role === 'ADMIN' ? '/admin' : '/account'}>{user.role === 'ADMIN' ? pick(lang, 'Quản trị', 'Admin') : user.fullName}</Link> : <DirectGoogleLogin />}</div></header>{children}<BilingualFooter /><div className="floating-chat"><a className="zalo" href={`https://zalo.me/${contact.phones[0]}`} target="_blank" rel="noreferrer" aria-label={`Zalo ${contact.phones[0]}`} title={`Zalo ${contact.phones[0]}`}>Z</a><a className="facebook" href={contact.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" title="Facebook">f</a></div></>
 }
 
 function DirectGoogleLogin() {
@@ -85,8 +95,8 @@ function DirectGoogleLogin() {
   return <button className="icon-btn direct-login" type="button" onClick={openGoogle}>{pick(lang, 'Đăng nhập', 'Sign in')}</button>
 }
 function BilingualFooter() {
-  const { lang } = useStore()
-  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">Đàng Xem</Link><p className="footer-slogan">{pick(lang, 'Đất hóa hồn — Tay giữ lửa', 'Earth given soul — Hands guarding fire')}</p><p>{pick(lang, 'Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.')}</p></div><div className="footer-col"><h3>{pick(lang, 'Liên kết', 'Links')}</h3><Link to="/products">{pick(lang, 'Sản phẩm', 'Products')}</Link><Link to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</Link><Link to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</Link></div><div className="footer-col"><h3>{pick(lang, 'Liên hệ', 'Contact')}</h3><a href={`mailto:${contact.email}`}>{contact.email}</a>{contact.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}<a href={contact.facebook} target="_blank" rel="noreferrer">Facebook</a><a href={contact.map} target="_blank" rel="noreferrer">{contact.address}</a></div></div></footer>
+  const { lang, support } = useStore()
+  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">Đàng Xem</Link><p className="footer-slogan">{pick(lang, 'Đất hóa hồn — Tay giữ lửa', 'Earth given soul — Hands guarding fire')}</p><p>{pick(lang, 'Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.')}</p></div><div className="footer-col"><h3>{pick(lang, 'Liên kết', 'Links')}</h3><Link to="/products">{pick(lang, 'Sản phẩm', 'Products')}</Link><Link to="/workshop">Workshop</Link><Link to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</Link><Link to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</Link></div><div className="footer-col"><h3>{pick(lang, 'Liên hệ', 'Contact')}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
 }
 function LegacyLayout({ children }) {
   const { cart, user } = useStore()
@@ -161,7 +171,7 @@ function Account() {
   async function login(credential) { setLoading(true); try { const result = await api.googleLogin(credential); setUser(result.user); if (result.user.role === 'USER') setCart(await api.cart()); notify(pick(lang, 'Đăng nhập thành công.', 'Signed in successfully.')); navigate('/products') } catch (error) { notify(error.message) } finally { setLoading(false) } }
   async function logout() { try { await api.logout() } finally { setUser(null); setCart({ items: [], totalAmount: 0 }); navigate('/') } }
   if (!user) return <Navigate to="/" replace />
-  return <Layout><main className="auth-page"><section className="auth-card"><span className="account-avatar">{user.fullName?.charAt(0)}</span><span className="kicker">{pick(lang, 'Tài khoản', 'Account')}</span><h1>{pick(lang, 'Xin chào', 'Hello')}, {user.fullName}</h1><p>{user.email}</p><div className="account-actions"><Link className="button dark" to="/orders">{pick(lang, 'Xem đơn hàng', 'View orders')}</Link><button className="button light" onClick={logout}>{pick(lang, 'Đăng xuất', 'Sign out')}</button></div></section></main></Layout>
+  return <Layout><main className="auth-page"><section className="auth-card"><span className="account-avatar">{user.fullName?.charAt(0)}</span><span className="kicker">{pick(lang, 'Tài khoản', 'Account')}</span><h1>{pick(lang, 'Xin chào', 'Hello')}, {user.fullName}</h1><p>{user.email}</p><div className="account-actions">{user.role === 'ADMIN' ? <Link className="button dark" to="/admin">{pick(lang, 'Vào quản trị', 'Open admin')}</Link> : <Link className="button dark" to="/orders">{pick(lang, 'Xem đơn hàng', 'View orders')}</Link>}<button className="button light" onClick={logout}>{pick(lang, 'Đăng xuất', 'Sign out')}</button></div></section></main></Layout>
 }
 function LegacyAccount() {
   const { user, setUser, setCart, notify } = useStore(); const [loading, setLoading] = useState(false); const navigate = useNavigate()
@@ -195,7 +205,33 @@ function OrderDetail() {
   const { id } = useParams(); const { user, lang, authLoading } = useStore(); const query = useMyOrder(id, user?.role === 'USER'); const order = query.data
   return <Layout><main className="page"><div className="page-title"><span className="kicker">Chi tiết đơn hàng</span><h1>{order?.orderCode || 'Đơn hàng'}</h1></div>{authLoading || query.isLoading ? <Loading /> : !user || user.role !== 'USER' ? <Empty>Vui lòng đăng nhập bằng tài khoản khách hàng.</Empty> : query.isError && query.error.status === 404 ? <Empty>Không tìm thấy đơn hàng.</Empty> : query.isError ? <div className="state-box error" role="alert">{query.error.message}<button onClick={() => query.refetch()}>Thử lại</button></div> : <div className="order-detail"><section><h3>Thông tin nhận hàng</h3><p>{order.receiverName} · {order.phone}</p>{order.email && <p>{order.email}</p>}<p>{order.address}</p>{order.note && <p>Ghi chú: {order.note}</p>}<p>Ngày tạo: {date(order.createdAt, lang)}</p><p>Đơn hàng: <b>{orderStatusLabel(order.orderStatus, lang)}</b></p><p>Thanh toán: <b>{paymentStatusLabel(order.paymentStatus, lang)}</b></p></section><aside className="order-summary">{order.items.map(item => <div className="summary-line" key={item.productId}><span>{lang === 'vi' ? item.productNameVi : item.productNameEn} × {item.quantity}<small>{money(item.sellingPrice, lang)} / sản phẩm</small></span><b>{money(item.totalPrice, lang)}</b></div>)}<div className="summary-line"><span>Tạm tính</span><b>{money(order.subtotal, lang)}</b></div><div className="summary-line total"><span>Tổng cộng</span><b>{money(order.totalAmount, lang)}</b></div></aside></div>}</main></Layout>
 }
-function Support() { const { lang } = useStore(); return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">{pick(lang, 'Hỗ trợ', 'Support')}</span><h1>{pick(lang, 'Liên hệ với chúng tôi', 'Contact us')}</h1></div><div className="support-layout"><section className="contact-card"><h2>{pick(lang, 'Cơ sở gốm Bàu Trúc Đàng Xem', 'Dang Xem Bau Truc Pottery')}</h2><p><b>Email:</b> <a href={`mailto:${contact.email}`}>{contact.email}</a></p><p><b>Zalo:</b> {contact.phones.map((phone, index) => <span key={phone}>{index > 0 && ' · '}<a href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">{phone}</a></span>)}</p><p><b>Facebook:</b> <a href={contact.facebook} target="_blank" rel="noreferrer">{pick(lang, 'Xem trang Facebook', 'Open Facebook page')}</a></p><p><b>{pick(lang, 'Địa chỉ', 'Address')}:</b> <a href={contact.map} target="_blank" rel="noreferrer">{contact.address}</a></p></section><section className="faq-list"><details open><summary>{pick(lang, 'Gốm Bàu Trúc có dùng bàn xoay không?', 'Is Bau Truc pottery made with a wheel?')}</summary><p>{pick(lang, 'Không. Sản phẩm được tạo hình hoàn toàn bằng tay theo kỹ thuật truyền thống của người Chăm.', 'No. Every piece is shaped entirely by hand using traditional Cham techniques.')}</p></details><details><summary>{pick(lang, 'Làm sao theo dõi đơn hàng?', 'How can I track an order?')}</summary><p>{pick(lang, 'Đăng nhập và mở mục Đơn hàng trên thanh điều hướng.', 'Sign in and open Orders in the navigation bar.')}</p></details></section></div></main></Layout> }
+function Workshop() {
+  const { user, notify, lang, support } = useStore()
+  const [workshops, setWorkshops] = useState([])
+  const [selectedId, setSelectedId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [created, setCreated] = useState(null)
+  useEffect(() => { api.workshops().then(setWorkshops).catch(error => notify(error.message)) }, [])
+  const defaultName = user?.fullName || ''
+  const defaultEmail = user?.email || ''
+  async function submit(event) {
+    event.preventDefault()
+    if (submitting) return
+    const values = Object.fromEntries(new FormData(event.currentTarget))
+    values.workshopId = values.workshopId ? Number(values.workshopId) : null
+    values.participants = Number(values.participants)
+    values.preferredAt = `${values.preferredAt}:00+07:00`
+    setSubmitting(true)
+    try {
+      const result = await api.workshopBooking(values)
+      setCreated(result)
+      event.currentTarget.reset()
+      notify('Đã gửi yêu cầu đặt lịch workshop.')
+    } catch (error) { notify(error.message) } finally { setSubmitting(false) }
+  }
+  return <Layout><main className="page workshop-page"><section className="workshop-hero"><div><span className="kicker">Workshop Bàu Trúc</span><h1>{pick(lang, 'Đặt lịch trải nghiệm làm gốm', 'Book a pottery workshop')}</h1><p>{pick(lang, 'Trải nghiệm tạo hình gốm Chăm bằng tay, tìm hiểu đất sét Bàu Trúc và quy trình nung lộ thiên truyền thống.', 'Shape Cham pottery by hand, learn about Bau Truc clay, and explore the traditional open-firing process.')}</p><div className="workshop-facts"><span>Gói trải nghiệm rõ giá</span><span>Đặt lịch linh hoạt</span><span>Xác nhận thủ công</span></div></div><img src="/assets/images/artisan.jpg" alt="Nghệ nhân gốm Bàu Trúc" /></section>{workshops.length > 0 && <section className="workshop-cards">{workshops.map(item => <article className={String(item.id) === String(selectedId) ? 'selected' : ''} key={item.id}><img src={item.imageUrl || '/assets/images/tour.jpg'} alt={item.title} /><div><h2>{item.title}</h2><p>{item.description}</p><b>{money(item.priceAmount, lang)}</b><span>{item.durationMinutes} phút · tối đa {item.maxParticipants} khách</span><button className="button light full" onClick={() => setSelectedId(String(item.id))}>Chọn gói này</button></div></article>)}</section>}<section className="workshop-layout"><form className="workshop-form" onSubmit={submit}><h2>Thông tin đặt lịch</h2>{created && <div className="form-success" role="status">Yêu cầu #{created.id} đã được ghi nhận. Cửa hàng sẽ liên hệ xác nhận.</div>}<label className="wide">Gói workshop<select name="workshopId" value={selectedId} onChange={e => setSelectedId(e.target.value)}><option value="">Tư vấn chọn gói</option>{workshops.map(item => <option key={item.id} value={item.id}>{item.title} · {money(item.priceAmount, lang)}</option>)}</select></label><label>Họ và tên<input name="fullName" defaultValue={defaultName} maxLength="255" required /></label><label>Email<input name="email" type="email" defaultValue={defaultEmail} maxLength="320" required /></label><label>Số điện thoại<input name="phone" maxLength="32" required /></label><label>Ngày giờ mong muốn<input name="preferredAt" type="datetime-local" required /></label><label>Số người<input name="participants" type="number" min="1" max="30" defaultValue="2" required /></label><label>Ghi chú<textarea name="note" maxLength="1000" placeholder="Ví dụ: có trẻ em đi cùng, cần tư vấn gói trải nghiệm..." /></label><button className="button dark full" disabled={submitting}>{submitting ? 'Đang gửi...' : 'Gửi yêu cầu đặt lịch'}</button></form><aside className="workshop-info"><h2>Thông tin trải nghiệm</h2><p><b>Địa điểm:</b> {support.address}</p><p><b>Liên hệ:</b> {support.phones.join(' · ')}</p>{support.openingHours && <p><b>Giờ mở cửa:</b> {support.openingHours}</p>}<p><b>Lưu ý:</b> Đây là yêu cầu đặt lịch. Admin sẽ xác nhận lại thời gian qua điện thoại hoặc email.</p><Link className="button light full" to="/support">Cần tư vấn thêm</Link></aside></section></main></Layout>
+}
+function Support() { const { lang, support } = useStore(); return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">{pick(lang, 'Hỗ trợ', 'Support')}</span><h1>{pick(lang, 'Liên hệ với chúng tôi', 'Contact us')}</h1></div><div className="support-layout"><section className="contact-card"><h2>{pick(lang, 'Cơ sở gốm Bàu Trúc Đàng Xem', 'Dang Xem Bau Truc Pottery')}</h2><p><b>Email:</b> <a href={`mailto:${support.email}`}>{support.email}</a></p><p><b>Zalo:</b> {support.phones.map((phone, index) => <span key={phone}>{index > 0 && ' · '}<a href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">{phone}</a></span>)}</p>{support.facebook && <p><b>Facebook:</b> <a href={support.facebook} target="_blank" rel="noreferrer">{pick(lang, 'Xem trang Facebook', 'Open Facebook page')}</a></p>}<p><b>{pick(lang, 'Địa chỉ', 'Address')}:</b> {support.map ? <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a> : support.address}</p>{support.openingHours && <p><b>Giờ mở cửa:</b> {support.openingHours}</p>}</section><section className="faq-list"><details open><summary>{pick(lang, 'Gốm Bàu Trúc có dùng bàn xoay không?', 'Is Bau Truc pottery made with a wheel?')}</summary><p>{pick(lang, 'Không. Sản phẩm được tạo hình hoàn toàn bằng tay theo kỹ thuật truyền thống của người Chăm.', 'No. Every piece is shaped entirely by hand using traditional Cham techniques.')}</p></details><details><summary>{pick(lang, 'Làm sao theo dõi đơn hàng?', 'How can I track an order?')}</summary><p>{pick(lang, 'Đăng nhập và mở mục Đơn hàng trên thanh điều hướng.', 'Sign in and open Orders in the navigation bar.')}</p></details></section></div></main></Layout> }
 
 function AdminPortal() {
   const store = useStore()
@@ -204,4 +240,4 @@ function AdminPortal() {
   return <Admin user={store.user} products={store.products} collections={store.collections} notify={store.notify} onLogout={logout} />
 }
 
-export default function App() { return <StoreProvider><Routes><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/support" element={<Support />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<Home />} /></Routes></StoreProvider> }
+export default function App() { return <StoreProvider><Routes><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/workshop" element={<Workshop />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/support" element={<Support />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<Home />} /></Routes></StoreProvider> }

@@ -43,7 +43,7 @@ class BautrucEcommerceApplicationTest {
     @Test
     void contextLoadsWithPostgreSqlAndFlyway() {
         assertThat(dataSource).isNotNull();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
         List<String> appliedVersions = jdbcTemplate.queryForList(
                 """
                 select version
@@ -53,7 +53,7 @@ class BautrucEcommerceApplicationTest {
                 """,
                 String.class
         );
-        assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8");
+        assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
         Long sequenceCount = jdbcTemplate.queryForObject(
                 "select count(*) from pg_class where relkind = 'S' and relname = 'app_global_id_seq'",
                 Long.class
@@ -84,6 +84,21 @@ class BautrucEcommerceApplicationTest {
                 String.class
         );
         assertThat(notificationTables).containsExactly("notification_recipients", "notifications");
+        Long workshopTableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables where table_schema='public' and table_name='workshop_bookings'",
+                Long.class
+        );
+        assertThat(workshopTableCount).isEqualTo(1);
+        Long workshopOfferingTableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables where table_schema='public' and table_name='workshop_offerings'",
+                Long.class
+        );
+        assertThat(workshopOfferingTableCount).isEqualTo(1);
+        Long supportSettingsTableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables where table_schema='public' and table_name='support_settings'",
+                Long.class
+        );
+        assertThat(supportSettingsTableCount).isEqualTo(1);
         String idDefault = jdbcTemplate.queryForObject(
                 """
                 select column_default
