@@ -35,6 +35,7 @@ async function ensureCsrfToken() {
       )
     )
   )
+  }
   csrfToken = payload.data.token
   return csrfToken
 }
