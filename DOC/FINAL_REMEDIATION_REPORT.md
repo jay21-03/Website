@@ -37,7 +37,7 @@ This report reflects source edits after the latest remediation pass. No tests, l
 | E2E fixture enum cleanup | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Inventory mock status was aligned to backend inventory status values. |
 | Playwright reporting clarity | DOCUMENTED | INDEPENDENT RETEST PENDING | Browser suite should be described as mock-backed UI contract coverage, not full-stack Spring/PostgreSQL E2E. |
 | Typecheck reporting clarity | DOCUMENTED | INDEPENDENT RETEST PENDING | `tsc --noEmit` command exists, but JS semantic checking remains limited while `checkJs=false`. |
-| FINAL-FIX-17 Complete i18n | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Checkout validation, generic API fallbacks, audited backend error-code mappings, and admin inventory product names support VI/EN via existing language helpers. |
+| FINAL-FIX-17 Complete i18n | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Checkout validation, generic API fallbacks, audited backend error-code mappings including checkout/cancel/refund edge cases, and admin inventory product names support VI/EN via existing language helpers. |
 | FINAL-FIX-18 Admin Workshop Booking pagination | SOURCE REMEDIATED | INDEPENDENT RETEST PENDING | Workshop booking admin list uses backend `status`/`page`/`size` pagination with Previous/Next controls; status updates reset to page 0. |
 
 ## 4. Backend Retest Needed
@@ -113,6 +113,10 @@ Changes:
 - Checkout validation supports VI/EN.
 - Generic API fallbacks support VI/EN.
 - All audited user-facing Backend error codes have VI/EN mappings.
+- Audited user-facing Backend error codes now include mappings for:
+  - `CHECKOUT_NOT_FOUND`
+  - `ORDER_CANCELLATION_NOT_ALLOWED`
+  - `REFUND_NOT_ALLOWED`
 - Inventory product name follows current language.
 
 Verification:

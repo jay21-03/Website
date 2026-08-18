@@ -208,6 +208,11 @@ const messages = {
     en: 'Your order is being finalized. Please check again shortly.'
   },
 
+  CHECKOUT_NOT_FOUND: {
+    vi: 'Không tìm thấy phiên đặt hàng. Vui lòng thử đặt hàng lại.',
+    en: 'Checkout session not found. Please try checking out again.'
+  },
+
   PAYOS_REQUEST_FAILED: {
     vi: 'Không thể tạo yêu cầu thanh toán. Vui lòng thử lại.',
     en: 'Unable to create the payment request. Please try again.'
@@ -236,6 +241,11 @@ const messages = {
   ORDER_NOT_PAID: {
     vi: 'Đơn hàng chưa được thanh toán.',
     en: 'The order has not been paid.'
+  },
+
+  ORDER_CANCELLATION_NOT_ALLOWED: {
+    vi: 'Không thể hủy đơn hàng với trạng thái thanh toán hiện tại.',
+    en: 'The order cannot be cancelled with its current payment status.'
   },
 
 
@@ -271,6 +281,11 @@ const messages = {
   PAYMENT_LATE_SUCCESS_REQUIRES_REVIEW: {
     vi: 'Thanh toán đến muộn và cần quản trị viên kiểm tra.',
     en: 'Late payment success requires admin review.'
+  },
+
+  REFUND_NOT_ALLOWED: {
+    vi: 'Chỉ có thể ghi nhận hoàn tiền cho đơn hàng đã hủy và đã thanh toán.',
+    en: 'A manual refund can only be recorded for a cancelled paid order.'
   },
 
 
