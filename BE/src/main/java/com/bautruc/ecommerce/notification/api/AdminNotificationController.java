@@ -8,36 +8,67 @@ import com.bautruc.ecommerce.notification.api.response.NotificationResponse;
 import com.bautruc.ecommerce.notification.application.AdminNotificationService;
 import com.bautruc.ecommerce.notification.domain.NotificationType;
 import com.bautruc.ecommerce.notification.infrastructure.SseEmitterRegistry;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1/admin/notifications")
 public class AdminNotificationController {
+
     private final AdminNotificationService notifications;
     private final SseEmitterRegistry emitters;
     private final BusinessClock clock;
 
-    public AdminNotificationController(AdminNotificationService notifications, SseEmitterRegistry emitters,
-                                       BusinessClock clock) {
-        this.notifications = notifications; this.emitters = emitters; this.clock = clock;
+    public AdminNotificationController(
+            AdminNotificationService notifications,
+            SseEmitterRegistry emitters,
+            BusinessClock clock
+    ) {
+        this.notifications = notifications;
+        this.emitters = emitters;
+        this.clock = clock;
     }
 
     @GetMapping
-    public ApiResponse<PageResponse<NotificationResponse>> list(@RequestParam(required = false) Boolean isRead,
-            @RequestParam(required = false) NotificationType type, @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size, @RequestParam(required = false) String sort) {
+    public ApiResponse<PageResponse<NotificationResponse>> list(
+            @RequestParam(required = false) Boolean isRead,
+            @RequestParam(required = false) NotificationType type,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort
+    ) {
         return ok(notifications.list(isRead, type, page, size, sort));
     }
 
-    @PatchMapping("/{id}/read")
-    public ApiResponse<NotificationResponse> markRead(@PathVariable Long id) { return ok(notifications.markRead(id)); }
-
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream() { return emitters.connect(notifications.currentAdminId(), clock.now()); }
+    public SseEmitter stream(HttpServletResponse response) {
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Cache-Control", "no-cache");
+
+        return emitters.connect(
+                notifications.currentAdminId(),
+                clock.now()
+        );
+    }
+
+    @PatchMapping("/{id}/read")
+    public ApiResponse<NotificationResponse> markRead(@PathVariable Long id) {
+        return ok(notifications.markRead(id));
+    }
 
     private <T> ApiResponse<T> ok(T data) {
-        return ApiResponse.success(data, null, clock.businessNow().toOffsetDateTime(), LogContext.currentCorrelationId());
+        return ApiResponse.success(
+                data,
+                null,
+                clock.businessNow().toOffsetDateTime(),
+                LogContext.currentCorrelationId()
+        );
     }
 }

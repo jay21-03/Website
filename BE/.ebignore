@@ -1,0 +1,32 @@
+# Elastic Beanstalk deployment ignore file
+# Safety guard to ensure sensitive files, local compose files,
+# scripts, and intermediate build artifacts are never bundled by the EB CLI.
+#
+# NOTE: The primary production deployment strategy uses the explicit staging bundle
+# script (BE/scripts/build-eb-bundle.ps1) which creates a minimal zip containing only
+# app.jar and Procfile. This .ebignore file acts as an additional defense-in-depth safety guard.
+
+# Secrets and local environments
+.env
+.env.*
+!.env.example
+
+# Local development infrastructure
+docker-compose.yml
+
+# Build outputs and deployment artifacts
+target/
+artifacts/
+*.zip
+
+# Source control & IDEs
+.git/
+.idea/
+.vscode/
+*.log
+
+# Infrastructure and local automation scripts
+infra/
+scripts/
+review_changes/
+node_modules/

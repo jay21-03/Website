@@ -15,8 +15,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -88,6 +90,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsNoResourceFoundExceptionTo404() throws Exception {
+        mockMvc.perform(get("/test/no-resource").header(LogContext.CORRELATION_ID_HEADER, "corr-no-resource"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success", is(false)))
+                .andExpect(jsonPath("$.error.code", is("RESOURCE_NOT_FOUND")))
+                .andExpect(jsonPath("$.error.message", is("Resource not found.")))
+                .andExpect(jsonPath("$.correlationId", is("corr-no-resource")));
+    }
+
+    @Test
     void mapsConflictTo409() throws Exception {
         mockMvc.perform(get("/test/conflict").header(LogContext.CORRELATION_ID_HEADER, "corr-conflict"))
                 .andExpect(status().isConflict())
@@ -131,6 +143,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/not-found")
         void notFound() {
             throw new ResourceNotFoundException("Missing test resource");
+        }
+
+        @GetMapping("/test/no-resource")
+        void noResource() throws Exception {
+            throw new NoResourceFoundException(HttpMethod.GET, "/test/no-resource");
         }
 
         @GetMapping("/test/conflict")

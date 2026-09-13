@@ -42,6 +42,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(exception.status()).body(failure(error));
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(
+            org.springframework.web.servlet.resource.NoResourceFoundException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = ApiError.of(
+                RESOURCE_NOT_FOUND,
+                "Resource not found."
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(failure(error));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValid(
             MethodArgumentNotValidException exception,

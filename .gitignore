@@ -10,3 +10,7 @@ npm-debug.log*
 FE/test-results/
 FE/playwright-report/
 FE/blob-report/
+# Deployment bundles and build artifacts
+artifacts/
+BE/artifacts/
+*.zip
