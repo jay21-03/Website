@@ -1,0 +1,484 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Bau Truc production regional infrastructure:
+  RDS PostgreSQL, Elastic Beanstalk roles/application/environment,
+  security groups, and backend deployment artifact storage.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - staging
+      - prod
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+
+  CloudFrontPrefixListId:
+    Type: String
+    Default: pl-31a34658
+    Description: AWS managed prefix list com.amazonaws.global.cloudfront.origin-facing.
+
+  BackendInstanceType:
+    Type: String
+    Default: t3.micro
+
+  ElasticBeanstalkSolutionStack:
+    Type: String
+    Default: "64bit Amazon Linux 2023 v4.12.8 running Corretto 21"
+
+  ElasticBeanstalkApplicationName:
+    Type: String
+    Default: bautruc-ecommerce-prod
+
+  ElasticBeanstalkEnvironmentName:
+    Type: String
+    Default: bautruc-backend-prod
+
+  ApplicationBundleS3Key:
+    Type: String
+    Default: ""
+    Description: >
+      Object key of the EB deployment bundle in BackendArtifactsBucket.
+      Leave empty on the first base-infrastructure deployment.
+
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+
+  DbEngineVersion:
+    Type: String
+    Default: "16.15"
+
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+
+  DbName:
+    Type: String
+    Default: bautruc_ecommerce
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9_]*"
+
+  DbUsername:
+    Type: String
+    Default: bautruc
+
+  DbPasswordParameterName:
+    Type: String
+    Default: /bautruc/prod/DB_PASSWORD
+    Description: Existing SSM SecureString parameter name.
+
+  JwtSecretParameterName:
+    Type: String
+    Default: /bautruc/prod/JWT_SECRET_BASE64
+    Description: Existing SSM SecureString parameter name.
+
+  ProductImagesBucketName:
+    Type: String
+
+  ProductImagesPublicBaseUrl:
+    Type: String
+
+  ProductImagesBackendPolicyArn:
+    Type: String
+
+  GoogleClientId:
+    Type: String
+    Default: ""
+
+  AdminEmails:
+    Type: String
+    Default: ""
+
+  FrontendBaseUrl:
+    Type: String
+    Default: "https://example.invalid"
+    Description: >
+      Initially a harmless placeholder. Update to the main CloudFront URL
+      after the edge stack has been created.
+
+  AllowedOrigins:
+    Type: String
+    Default: "https://example.invalid"
+    Description: >
+      Initially a harmless placeholder. Update to the main CloudFront URL
+      after the edge stack has been created.
+
+Conditions:
+  HasApplicationBundle:
+    !Not [!Equals [!Ref ApplicationBundleS3Key, ""]]
+
+  HasGoogleClientId:
+    !Not [!Equals [!Ref GoogleClientId, ""]]
+
+  HasAdminEmails:
+    !Not [!Equals [!Ref AdminEmails, ""]]
+
+  CreateBackendEnvironment:
+    !And
+      - !Condition HasApplicationBundle
+      - !Condition HasGoogleClientId
+      - !Condition HasAdminEmails
+
+Resources:
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP to Bau Truc backend only from CloudFront origin-facing addresses
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+          Description: CloudFront origin-facing HTTP
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow PostgreSQL only from the Bau Truc backend
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BackendSecurityGroup
+          Description: PostgreSQL from backend only
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Bau Truc PostgreSQL subnet group
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: postgres
+      EngineVersion: !Ref DbEngineVersion
+      DBInstanceClass: !Ref DbInstanceClass
+      DBName: !Ref DbName
+      MasterUsername: !Ref DbUsername
+      MasterUserPassword:
+        !Sub "{{resolve:ssm-secure:${DbPasswordParameterName}}}"
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: false
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      BackupRetentionPeriod: 7
+      CopyTagsToSnapshot: true
+      AutoMinorVersionUpgrade: true
+      EnablePerformanceInsights: false
+      DeletionProtection: false
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldBackendBundles
+            Status: Enabled
+            ExpirationInDays: 30
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  ElasticBeanstalkServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - elasticbeanstalk.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkEnhancedHealth
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkManagedUpdatesCustomerRolePolicy
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+        - !Ref ProductImagesBackendPolicyArn
+      Policies:
+        - PolicyName: ReadBauTrucRuntimeParameters
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DbPasswordParameterName}"
+                  - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${JwtSecretParameterName}"
+        - PolicyName: ReadBackendDeploymentArtifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt BackendArtifactsBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "${BackendArtifactsBucket.Arn}/*"
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BackendInstanceRole
+
+  ElasticBeanstalkApplication:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: !Ref ElasticBeanstalkApplicationName
+      Description: Bau Truc Spring Boot backend
+
+  BackendApplicationVersion:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Condition: HasApplicationBundle
+    Properties:
+      ApplicationName: !Ref ElasticBeanstalkApplication
+      Description: !Sub "Bau Truc backend bundle ${ApplicationBundleS3Key}"
+      SourceBundle:
+        S3Bucket: !Ref BackendArtifactsBucket
+        S3Key: !Ref ApplicationBundleS3Key
+
+  BackendEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Condition: CreateBackendEnvironment
+    Properties:
+      ApplicationName: !Ref ElasticBeanstalkApplication
+      EnvironmentName: !Ref ElasticBeanstalkEnvironmentName
+      Description: Bau Truc production backend
+      SolutionStackName: !Ref ElasticBeanstalkSolutionStack
+      VersionLabel: !Ref BackendApplicationVersion
+      Tier:
+        Name: WebServer
+        Type: Standard
+      OptionSettings:
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: EnvironmentType
+          Value: SingleInstance
+
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: ServiceRole
+          Value: !GetAtt ElasticBeanstalkServiceRole.Arn
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: !Ref BackendInstanceProfile
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: DisableDefaultEC2SecurityGroup
+          Value: "true"
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: SecurityGroups
+          Value: !Ref BackendSecurityGroup
+
+        - Namespace: aws:ec2:instances
+          OptionName: InstanceTypes
+          Value: !Ref BackendInstanceType
+
+        - Namespace: aws:ec2:vpc
+          OptionName: VPCId
+          Value: !Ref VpcId
+
+        - Namespace: aws:ec2:vpc
+          OptionName: Subnets
+          Value: !Join [",", !Ref SubnetIds]
+
+        - Namespace: aws:ec2:vpc
+          OptionName: AssociatePublicIpAddress
+          Value: "true"
+
+        - Namespace: aws:elasticbeanstalk:application
+          OptionName: Application Healthcheck URL
+          Value: /actuator/health
+
+        - Namespace: aws:elasticbeanstalk:healthreporting:system
+          OptionName: SystemType
+          Value: enhanced
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: SPRING_PROFILES_ACTIVE
+          Value: prod
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: PORT
+          Value: "8080"
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: SERVER_PORT
+          Value: "8080"
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: JAVA_TOOL_OPTIONS
+          Value: "-Duser.timezone=Asia/Ho_Chi_Minh"
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: DB_URL
+          Value:
+            !Sub "jdbc:postgresql://${Database.Endpoint.Address}:${Database.Endpoint.Port}/${DbName}"
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: DB_USERNAME
+          Value: !Ref DbUsername
+
+        - Namespace: aws:elasticbeanstalk:application:environmentsecrets
+          OptionName: DB_PASSWORD
+          Value:
+            !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${DbPasswordParameterName}"
+
+        - Namespace: aws:elasticbeanstalk:application:environmentsecrets
+          OptionName: JWT_SECRET_BASE64
+          Value:
+            !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${JwtSecretParameterName}"
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: FRONTEND_BASE_URL
+          Value: !Ref FrontendBaseUrl
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: ALLOWED_ORIGINS
+          Value: !Ref AllowedOrigins
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: GOOGLE_CLIENT_ID
+          Value: !Ref GoogleClientId
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: ADMIN_EMAILS
+          Value: !Ref AdminEmails
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: AWS_REGION
+          Value: !Ref AWS::Region
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: S3_BUCKET_NAME
+          Value: !Ref ProductImagesBucketName
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: S3_PUBLIC_BASE_URL
+          Value: !Ref ProductImagesPublicBaseUrl
+
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: NOTIFICATION_SSE_HEARTBEAT_MS
+          Value: "15000"
+
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  BackendArtifactsBucketName:
+    Description: Upload bautruc-ecommerce-eb.zip here before creating the EB environment.
+    Value: !Ref BackendArtifactsBucket
+
+  DatabaseEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+
+  DatabasePort:
+    Value: !GetAtt Database.Endpoint.Port
+
+  DatabaseName:
+    Value: !Ref DbName
+
+  DatabaseUsername:
+    Value: !Ref DbUsername
+
+  BackendSecurityGroupId:
+    Value: !Ref BackendSecurityGroup
+
+  DatabaseSecurityGroupId:
+    Value: !Ref DatabaseSecurityGroup
+
+  BackendInstanceProfileName:
+    Value: !Ref BackendInstanceProfile
+
+  ElasticBeanstalkApplicationName:
+    Value: !Ref ElasticBeanstalkApplication
+
+  ElasticBeanstalkEnvironmentName:
+    Condition: CreateBackendEnvironment
+    Value: !Ref BackendEnvironment

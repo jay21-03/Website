@@ -28,10 +28,10 @@ bautruc:
     issuer: ${JWT_ISSUER:bautruc-ecommerce}
     ttl-seconds: ${JWT_TTL_SECONDS:7200}
   payos:
-  client-id: ${PAYOS_CLIENT_ID:}
-  api-key: ${PAYOS_API_KEY:}
-  checksum-key: ${PAYOS_CHECKSUM_KEY:}
-  base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
+    client-id: ${PAYOS_CLIENT_ID:}
+    api-key: ${PAYOS_API_KEY:}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:}
+    base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
   aws:
     region: ${AWS_REGION}
     s3:
