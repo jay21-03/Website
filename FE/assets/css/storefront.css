@@ -1,0 +1,6 @@
+@layer theme, base, legacy, utilities;
+@import "./reference.css";
+@import "./main.css" layer(legacy);
+@import "./about.css" layer(legacy);
+@import "./catalog.css" layer(legacy);
+@import "./design-overrides.css";

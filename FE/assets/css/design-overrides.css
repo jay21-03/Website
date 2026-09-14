@@ -1,0 +1,34 @@
+:root {
+  --ink: var(--foreground);
+  --white: var(--background);
+  --soft: var(--card);
+  --line: var(--border);
+  --accent: var(--clay);
+  --muted: var(--muted-foreground);
+}
+body { background: var(--background); color: var(--foreground); font-weight: 400; font-size: 16px; line-height: 1.5; }
+@layer legacy { .reference-page :where(h1,h2,h3,p) { margin: 0; } }
+.reference-page { display: contents; }
+header nav a.active { color: var(--primary); }
+header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
+.site-footer { margin-top: 96px; background: var(--card); border-top: 1px solid var(--primary); padding: 64px max(20px, calc((100vw - 1216px)/2)); color: var(--foreground); }
+.footer-grid { max-width: 1216px; margin: auto; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 48px; }
+.site-footer p, .footer-col a { color: var(--muted-foreground); line-height: 1.7; font-size: 14px; overflow-wrap: anywhere; }
+.site-footer .footer-slogan { font: italic 20px var(--font-serif); color: var(--primary); }
+.footer-col h3 { font: 600 20px var(--font-display); }
+.catalog-hero { background: var(--background); }
+.catalog-hero::before { background-image: url('../../src/design/assets/p-vase.jpg'); }
+.catalog-page .catalog-card { background: var(--card); border-radius: 4px; }
+.button { border-radius: 4px; }
+.button.dark { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.button.dark:hover { background: var(--wood); }
+.workshop-page, .support-page { padding-top: 0; padding-inline: 5vw; }
+.workshop-page > .reference-page, .support-page > .reference-page { display: block; margin-inline: -5vw; }
+.workshop-cards, .workshop-layout, .support-layout { margin-top: 64px; }
+.workshop-cards article, .workshop-form, .workshop-info, .contact-card, .faq-list details { border-radius: 4px; background: var(--card); border-color: var(--border); }
+.workshop-cards img { aspect-ratio: 4/3; object-fit: cover; }
+.workshop-form input, .workshop-form select, .workshop-form textarea { background: var(--background); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px; }
+.floating-chat { bottom: 100px; }
+@media(min-width:1024px) { .floating-chat { bottom: 28px; } }
+@media(max-width:767px) { .footer-grid { grid-template-columns: 1fr; gap: 32px; } }
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } .reveal { opacity: 1; transform: none; transition: none; } }
