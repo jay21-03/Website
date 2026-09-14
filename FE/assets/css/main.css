@@ -1540,3 +1540,116 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:760px){.order-row{grid-template-columns:1fr 1fr}.order-detail{grid-template-columns:1fr}.header-tools .icon-btn:last-child{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 @media(max-width:760px){.product-detail-layout{grid-template-columns:1fr}.product-detail-info{padding:24px}.product-detail-info h1{font-size:32px}}
 @media(max-width:760px){.workshop-hero,.workshop-layout,.workshop-form{grid-template-columns:1fr}.workshop-hero h1{font-size:38px}.workshop-info{position:static}}
+/* Contact/about page adapted from the supplied reference. */
+.about-container { width: 100%; max-width: 1280px; padding-inline: 32px; margin-inline: auto }
+.about-hero { border-bottom: 1px solid var(--line); background: linear-gradient(rgba(251,246,236,.87), rgba(251,246,236,.87)), url('/assets/images/hero-pottery.jpg') center / cover }
+.about-hero .about-container { padding-block: 128px }
+.about-hero h1 { max-width: 800px; margin: 0; font: 500 clamp(36px, 4.6vw, 60px)/1.1 'Playfair Display', serif }
+.about-hero p { max-width: 660px; margin: 24px 0 0; font-size: 18px; line-height: 1.7; color: var(--muted) }
+.about-contact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; padding-block: 96px }
+.about-section-heading { margin-bottom: 48px }
+.about-section-heading > span { display: block; margin-bottom: 12px; color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .25em }
+.about-page h2 { margin: 0; font: 500 clamp(30px, 3vw, 36px)/1.25 'Playfair Display', serif }
+.about-details { list-style: none; padding: 0; margin: 0; display: grid; gap: 24px }
+.about-details li { display: flex; gap: 16px; align-items: flex-start }
+.about-details svg { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; margin-top: 2px }
+.about-details li > div { min-width: 0 }
+.about-details h3 { margin: 0 0 7px; font: 400 12px 'DM Sans', sans-serif; text-transform: uppercase; letter-spacing: .18em; color: var(--muted) }
+.about-details p, .about-details a { margin: 0; display: block; font-size: 16px; line-height: 1.7; overflow-wrap: anywhere }
+.about-page a:hover { color: var(--accent) }
+.about-socials { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 40px }
+.about-socials a { padding: 12px 16px; border: 1px solid var(--line); border-radius: 2px; color: var(--accent) }
+.about-socials a:hover { background: var(--accent); color: var(--white) }
+.about-form { display: grid; gap: 20px; scroll-margin-top: 110px }
+.about-form-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px }
+.about-form label { display: grid; gap: 8px; line-height: 1.5; min-width: 0 }
+.about-form input, .about-form select, .about-form textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 2px; padding: 12px 16px; background: var(--white); color: var(--ink); font: inherit }
+.about-form textarea { resize: vertical; min-height: 140px }
+.about-form .button { justify-self: start; gap: 12px }
+.about-form-note { margin: 0; font-size: 12px; line-height: 1.7; color: var(--muted) }
+.about-map { padding-bottom: 96px }
+.about-map iframe { display: block; width: 100%; height: 380px; border: 1px solid var(--line); border-radius: 2px }
+.about-map > a { display: inline-block; margin-top: 16px; color: var(--accent) }
+.about-partners { background: var(--soft); padding: 96px 24px; text-align: center }
+.about-partners > div { max-width: 720px; margin: auto }
+.about-partners p { margin: 24px 0 40px; font-size: 16px; line-height: 2; color: var(--muted) }
+.about-partners .button { gap: 12px }
+@media (max-width: 900px) {
+  .about-contact-grid { grid-template-columns: 1fr; gap: 56px; padding-block: 64px }
+  .about-hero .about-container { padding-block: 88px }
+}
+@media (max-width: 560px) {
+  .about-container { padding-inline: 20px }
+  .about-hero .about-container { padding-block: 64px }
+  .about-hero p { font-size: 16px }
+  .about-section-heading { margin-bottom: 32px }
+  .about-form-fields { grid-template-columns: 1fr }
+  .about-map { padding-bottom: 56px }
+  .about-map iframe { height: 300px }
+  .about-partners { padding: 64px 20px }
+}
+
+/* Storefront styling adapted from the supplied pottery catalog reference. */
+body { font-family: 'DM Sans', sans-serif; font-weight: 400 }
+.site-header { height: auto; min-height: 76px; grid-template-columns: auto 1fr auto; gap: 24px; padding: 16px max(24px, calc((100vw - 1216px) / 2)); }
+.site-header .brand { display: flex; align-items: center; gap: 10px; white-space: nowrap }
+.site-header .pot-mark { width: 28px; height: 28px; border: 0; border-radius: 0; flex-shrink: 0 }
+.site-header .main-nav { display: flex; justify-content: center; gap: 22px }
+.main-nav a { font-size: 14px; white-space: nowrap }
+.header-tools { gap: 6px; font-size: 12px }
+.store-menu-toggle { display: none }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px }
+.catalog-page { width: 100%; max-width: none; padding: 0; margin: 0 }
+.catalog-hero { border-bottom: 1px solid var(--line); background: linear-gradient(rgba(251,246,236,.86), rgba(251,246,236,.86)), url('/assets/images/vase.jpg') center 48% / cover }
+.catalog-hero > div { max-width: 1280px; margin: auto; padding: 100px 32px }
+.catalog-hero h1 { max-width: 780px; margin: 18px 0 22px; font: 500 clamp(36px, 4.6vw, 60px)/1.12 'Playfair Display', serif }
+.catalog-hero p { max-width: 660px; font-size: 18px; line-height: 1.7; color: var(--muted); margin: 0 }
+.catalog-content { max-width: 1280px; margin: auto; padding: 64px 32px 0 }
+.collection-tabs { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 24px; border-bottom: 1px solid var(--line) }
+.collection-tabs button { min-height: 42px; padding: 10px 22px; border: 1px solid var(--line); border-radius: 2px; color: var(--muted); background: transparent; cursor: pointer }
+.collection-tabs button:hover { border-color: var(--accent); color: var(--accent) }
+.collection-tabs button[aria-pressed="true"] { background: var(--accent); color: var(--white); border-color: var(--accent) }
+.catalog-page .catalog-layout { display: flex; flex-direction: column; gap: 28px; margin-top: 28px }
+.catalog-page .filters { display: grid; grid-template-columns: auto minmax(120px, 1fr) auto minmax(120px, 1fr); gap: 12px 16px; align-items: center; padding: 20px; background: var(--soft); border: 1px solid var(--line) }
+.catalog-page .filters label { margin: 0; font-size: 12px }
+.catalog-page .filters input, .catalog-page .filters select { min-width: 0; color: var(--ink); border-radius: 2px }
+.catalog-page .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px }
+.catalog-page .product-image { aspect-ratio: 1; height: auto }
+.catalog-page .product-image img { width: 100%; height: 100%; object-fit: cover }
+.product-card { border-radius: 2px; overflow: hidden; transition: box-shadow .25s }
+.catalog-page .product-info { padding: 24px }
+.catalog-page .product-top { display: flex; flex-direction: column; align-items: flex-start; gap: 16px }
+.catalog-page .product-top h3 { font: 500 22px/1.4 'Playfair Display', serif }
+.catalog-page .product-top p { color: var(--wood); font: italic 16px 'Cormorant Garamond', serif }
+.catalog-page .price { color: var(--accent); font-size: 14px }
+.catalog-page .card-actions { flex-wrap: wrap; gap: 8px }
+.catalog-page .card-actions button { min-height: 44px; border: 1px solid var(--accent); color: var(--accent); background: transparent; border-radius: 2px; padding: 10px 14px }
+.catalog-page .card-actions button:hover { background: var(--accent); color: var(--white) }
+.catalog-contact { margin-top: 72px; border: 1px solid var(--line); padding: 40px 24px; text-align: center; background: var(--soft) }
+.catalog-contact p { color: var(--wood); font: italic 24px/1.5 'Cormorant Garamond', serif; margin: 0 0 24px }
+@media(max-width:1200px) {
+  .site-header { grid-template-columns: 1fr auto auto; gap: 14px }
+  .store-menu-toggle { display: block; grid-column: 3; grid-row: 1; width: 42px; height: 42px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-size: 24px; cursor: pointer }
+  .site-header .header-tools { grid-column: 2; grid-row: 1 }
+  .site-header .main-nav { display: none; grid-column: 1 / -1; width: 100%; padding: 16px 0 4px; border-top: 1px solid var(--line) }
+  .site-header .main-nav.is-open { display: flex; flex-wrap: wrap; justify-content: flex-start }
+}
+@media(max-width:760px) {
+  .catalog-hero > div { padding: 64px 20px }
+  .catalog-content { padding: 36px 20px 0 }
+  .catalog-page .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px }
+  .catalog-page .filters { grid-template-columns: 90px minmax(0, 1fr); padding: 16px }
+  .catalog-hero p { font-size: 16px }
+}
+@media(max-width:560px) {
+  .site-header { padding: 12px 16px; gap: 8px }
+  .site-header .brand { font-size: 20px; gap: 6px }
+  .site-header .header-tools { gap: 2px }
+  .site-header .header-tools .lang-btn { display: block }
+  .site-header .header-tools .icon-btn { padding: 6px; max-width: 70px }
+  .site-header .main-nav.is-open { flex-direction: column; gap: 0 }
+  .main-nav a { padding: 12px 0 }
+  .catalog-page .product-grid { grid-template-columns: 1fr }
+  .catalog-contact { margin-top: 40px }
+}
+@media(prefers-reduced-motion: reduce) { html { scroll-behavior: auto } .product-card, .product-image img { transition: none } }
