@@ -191,7 +191,7 @@ Resources:
       DBSubnetGroupName: !Ref DatabaseSubnetGroup
       VPCSecurityGroups:
         - !Ref DatabaseSecurityGroup
-      BackupRetentionPeriod: 7
+      BackupRetentionPeriod: 1
       CopyTagsToSnapshot: true
       AutoMinorVersionUpgrade: true
       EnablePerformanceInsights: false
@@ -204,7 +204,7 @@ Resources:
 
   BackendArtifactsBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
+    DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
     Properties:
       BucketEncryption:

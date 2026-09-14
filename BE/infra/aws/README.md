@@ -11,6 +11,7 @@ Production uses:
 - `/api/*` routed by CloudFront to one Elastic Beanstalk Single Instance backend;
 - Elastic Beanstalk Java SE on Amazon Linux 2023 / Corretto 21;
 - RDS PostgreSQL 16, Single-AZ, `db.t4g.micro`;
+- RDS automated backup retention is currently set to 1 day for AWS Free Plan compatibility;
 - a separate private S3 + CloudFront OAC stack for product images;
 - SSM Parameter Store for production runtime secrets;
 - IAM instance roles instead of static AWS credentials.
