@@ -142,7 +142,8 @@ async function mockApi(page, role = 'USER') {
 test('public catalog delegates search/filter/sort to backend and opens product detail', async ({ page }) => {
   await mockApi(page)
   await page.goto('/products')
-  await expect(page.getByRole('heading', { name: /Tất cả sản phẩm|All products/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Từng Sản Phẩm|Every Piece/i })).toBeVisible()
+  await page.getByText(/Tìm kiếm & bộ lọc|Search & filters/i).click()
   await page.getByPlaceholder(/Tên sản phẩm|Product name/i).fill('binh')
   await page.getByText('Binh gom do').click()
   await expect(page.getByRole('heading', { name: 'Binh gom do' })).toBeVisible()
@@ -256,7 +257,7 @@ test('public workshop booking and support settings render on mobile', async ({ p
   await page.setViewportSize({ width: 390, height: 844 })
   await mockApi(page)
   await page.goto('/workshop')
-  await expect(page.getByRole('heading', { name: /Đặt lịch trải nghiệm/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Chạm Tay Vào Lịch Sử/i })).toBeVisible()
   await page.getByLabel('Họ và tên').fill('Nguyen Van A')
   await page.getByLabel('Email').fill('a@example.com')
   await page.getByLabel('Số điện thoại').fill('0909000000')
