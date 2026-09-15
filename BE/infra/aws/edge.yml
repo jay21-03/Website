@@ -27,6 +27,21 @@ Parameters:
       - PriceClass_200
       - PriceClass_All
 
+
+  CustomDomainName:
+    Type: String
+    Default: dangxembautruc.com
+    Description: Apex production domain name.
+
+  Route53HostedZoneId:
+    Type: String
+    Description: Public Route 53 hosted zone ID for the production domain.
+
+  AcmCertificateArn:
+    Type: String
+    Description: >
+      ACM certificate ARN in us-east-1 covering the apex and www domains.
+
 Resources:
   FrontendBucket:
     Type: AWS::S3::Bucket
@@ -102,6 +117,9 @@ Resources:
         IPV6Enabled: true
         PriceClass: !Ref PriceClass
         DefaultRootObject: index.html
+        Aliases:
+          - !Ref CustomDomainName
+          - !Sub "www.${CustomDomainName}"
 
         Origins:
           - Id: FrontendS3Origin
@@ -170,13 +188,60 @@ Resources:
             Compress: false
 
         ViewerCertificate:
-          CloudFrontDefaultCertificate: true
+          AcmCertificateArn: !Ref AcmCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
 
       Tags:
         - Key: Application
           Value: bautruc-ecommerce
         - Key: Environment
           Value: !Ref Environment
+
+
+  MainDomainARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Ref CustomDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt MainDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  MainDomainAAAARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Ref CustomDomainName
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt MainDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  WwwDomainARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Sub "www.${CustomDomainName}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt MainDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  WwwDomainAAAARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Sub "www.${CustomDomainName}"
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt MainDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
