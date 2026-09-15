@@ -158,8 +158,7 @@ Resources:
       InstanceType: !Ref InstanceType
       SubnetId: !Ref SubnetId
 
-      IamInstanceProfile:
-        Name: !Ref InstanceProfile
+      IamInstanceProfile: !Ref InstanceProfile
 
       SecurityGroupIds:
         - !Ref BackendSecurityGroup
