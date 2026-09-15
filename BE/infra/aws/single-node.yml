@@ -1,0 +1,262 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Bau Truc low-cost single-node production backend.
+  Spring Boot and PostgreSQL will run on one EC2 Graviton instance.
+
+Parameters:
+
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - staging
+      - prod
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+
+  CloudFrontPrefixListId:
+    Type: String
+
+  InstanceType:
+    Type: String
+    Default: t4g.small
+
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+
+  RootVolumeSize:
+    Type: Number
+    Default: 30
+    MinValue: 20
+
+  ProductImagesBackendPolicyArn:
+    Type: String
+
+  Route53HostedZoneId:
+    Type: String
+
+  OriginDomainName:
+    Type: String
+    Default: origin.dangxembautruc.com
+
+Resources:
+
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CloudFront-only HTTP access to Bau Truc single-node backend
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: CloudFront origin-facing HTTP
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+      Tags:
+        - Key: Name
+          Value: !Sub "bautruc-single-node-${Environment}"
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  DatabaseBackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldDatabaseBackups
+            Status: Enabled
+            ExpirationInDays: 35
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: database-backups
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - !Ref ProductImagesBackendPolicyArn
+      Policies:
+        - PolicyName: BautrucRuntimeSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/bautruc/prod/*"
+
+        - PolicyName: BautrucDatabaseBackups
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource:
+                  - !GetAtt DatabaseBackupBucket.Arn
+
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub "${DatabaseBackupBucket.Arn}/*"
+
+      Tags:
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  BackendInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+
+      IamInstanceProfile:
+        Name: !Ref InstanceProfile
+
+      SecurityGroupIds:
+        - !Ref BackendSecurityGroup
+
+      CreditSpecification:
+        CPUCredits: standard
+
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+
+      Monitoring: false
+
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !Ref RootVolumeSize
+            Encrypted: true
+            DeleteOnTermination: true
+
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+
+          systemctl enable amazon-ssm-agent || true
+          systemctl start amazon-ssm-agent || true
+
+          mkdir -p /opt/bautruc
+          mkdir -p /opt/bautruc/releases
+          mkdir -p /opt/bautruc/backups
+
+          chmod 755 /opt/bautruc
+
+      Tags:
+        - Key: Name
+          Value: !Sub "bautruc-single-node-${Environment}"
+        - Key: Application
+          Value: bautruc-ecommerce
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "bautruc-single-node-${Environment}-eip"
+        - Key: Application
+          Value: bautruc-ecommerce
+
+  BackendElasticIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt BackendElasticIp.AllocationId
+      InstanceId: !Ref BackendInstance
+
+  OriginDnsRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - BackendElasticIpAssociation
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Ref OriginDomainName
+      Type: A
+      TTL: 60
+      ResourceRecords:
+        - !Ref BackendElasticIp
+
+Outputs:
+
+  InstanceId:
+    Value: !Ref BackendInstance
+
+  InstanceType:
+    Value: !Ref InstanceType
+
+  SecurityGroupId:
+    Value: !Ref BackendSecurityGroup
+
+  ElasticIp:
+    Value: !Ref BackendElasticIp
+
+  OriginDomainName:
+    Value: !Ref OriginDomainName
+
+  OriginUrl:
+    Value: !Sub "http://${OriginDomainName}"
+
+  DatabaseBackupBucketName:
+    Value: !Ref DatabaseBackupBucket
+
+  InstanceRoleName:
+    Value: !Ref InstanceRole
+
+  InstanceProfileName:
+    Value: !Ref InstanceProfile
