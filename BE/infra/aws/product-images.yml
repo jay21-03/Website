@@ -132,7 +132,7 @@ Resources:
   ProductImagesBackendPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      Description: Allow the Bau Truc backend to upload and delete product and homepage media objects only.
+      Description: Allow the Bau Truc backend to upload and delete product image objects only.
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
