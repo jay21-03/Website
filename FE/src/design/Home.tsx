@@ -1,6 +1,6 @@
+import type { SyntheticEvent } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Leaf, Landmark } from "lucide-react";
-import { ClayImage } from "./ClayImage";
 import { Reveal } from "./Reveal";
 import { SectionTitle } from "./PageHero";
 import { PotIcon } from "./PotIcon";
@@ -8,8 +8,10 @@ import { useI18n } from "./i18n";
 import heroPottery from "./assets/hero-pottery.jpg";
 import artisan from "./assets/artisan.jpg";
 import pVase from "./assets/p-vase.jpg";
-import pTea from "./assets/p-tea.jpg";
-import pUnique from "./assets/p-unique.jpg";
+import pKit from "./assets/p-kit.jpg";
+import pApsara from "./assets/p-apsara.jpg";
+import wsFamily from "./assets/ws-family.jpg";
+import wsTour from "./assets/ws-tour.jpg";
 
 
 const TRUST = [
@@ -36,32 +38,47 @@ const TRUST = [
   },
 ];
 
-const FEATURED = [
-  {
-    vi: "Bình Trang Trí",
-    en: "Decorative Vases",
-    img: pVase,
-    dVi: "Bình gốm trang trí với hoa văn Chăm khắc tay, màu nung tự nhiên loang đặc trưng.",
-    dEn: "Decorative vases with hand-carved Cham motifs and natural fire-marked colours.",
-  },
-  {
-    vi: "Đồ Gia Dụng",
-    en: "Homeware",
-    img: pTea,
-    dVi: "Nồi, chén, ấm gốm mộc — giữ nhiệt tốt, an toàn, dùng được mỗi ngày.",
-    dEn: "Pots, bowls and kettles — unglazed, safe and made for everyday use.",
-  },
-  {
-    vi: "Sản Phẩm Độc Bản",
-    en: "One-of-a-kind Pieces",
-    img: pUnique,
-    dVi: "Tác phẩm duy nhất, không lặp lại, kèm giấy chứng nhận tên nghệ nhân.",
-    dEn: "Unrepeatable works, each with a certificate naming the artisan.",
-  },
-];
+type HomepageMedia = {
+  slot: string;
+  url?: string | null;
+};
 
-export default function Home() {
+type HomepageProduct = {
+  slot?: number;
+  id: number;
+  nameVi: string;
+  nameEn?: string | null;
+  descriptionVi?: string | null;
+  descriptionEn?: string | null;
+  thumbnailUrl?: string | null;
+};
+
+type HomepageData = {
+  heroImageUrl?: string | null;
+  storyImageUrl?: string | null;
+  socialImages?: HomepageMedia[];
+  featuredProducts?: HomepageProduct[];
+};
+
+type HomeProps = {
+  home?: HomepageData | null;
+  fallbackProducts?: HomepageProduct[];
+};
+
+const SOCIAL_FALLBACKS = [artisan, pVase, pKit, wsFamily, pApsara, wsTour];
+
+function imageFallback(event: SyntheticEvent<HTMLImageElement>, fallback: string) {
+  if (event.currentTarget.dataset.fallbackApplied === "true") return;
+  event.currentTarget.dataset.fallbackApplied = "true";
+  event.currentTarget.src = fallback;
+}
+
+
+export default function Home({ home, fallbackProducts = [] }: HomeProps) {
   const { t } = useI18n();
+  const managedFeatured = [...(home?.featuredProducts ?? [])].sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  const featuredProducts = managedFeatured.length === 3 ? managedFeatured : fallbackProducts.slice(0, 3);
+  const socialBySlot = new Map((home?.socialImages ?? []).map(item => [item.slot, item.url]));
 
   return (
     <main>
@@ -69,11 +86,12 @@ export default function Home() {
       <section className="grain relative isolate flex min-h-[88svh] items-center sm:min-h-screen overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <img
-            src={heroPottery}
+            src={home?.heroImageUrl || heroPottery}
             alt={t("Nghệ nhân Chăm tạo hình gốm bằng tay", "A Cham artisan shaping pottery by hand")}
             width={1600}
             height={1008}
             className="h-full w-full object-cover"
+            onError={event => imageFallback(event, heroPottery)}
           />
           <div className="absolute inset-0 bg-background/72" />
         </div>
@@ -143,12 +161,13 @@ export default function Home() {
           <Reveal>
             <div className="aspect-4/3 overflow-hidden rounded-sm border border-primary/25">
               <img
-                src={artisan}
+                src={home?.storyImageUrl || artisan}
                 alt={t("Nghệ nhân Đàng Xem bên lò nung gốm", "Artisan Đàng Xem beside the open kiln")}
                 width={1000}
                 height={750}
                 loading="lazy"
                 className="h-full w-full object-cover"
+                onError={event => imageFallback(event, artisan)}
               />
             </div>
           </Reveal>
@@ -180,34 +199,48 @@ export default function Home() {
             {t("Sản Phẩm Nổi Bật", "Featured Products")}
           </SectionTitle>
         </Reveal>
-        <div className="grid gap-8 md:grid-cols-3">
-          {FEATURED.map((p, i) => (
-            <Reveal key={p.vi} delay={i * 100} as="article">
-              <div className="group flex h-full flex-col rounded-sm border border-border bg-card transition-shadow duration-300 hover:shadow-[0_14px_36px_rgba(44,26,14,0.16)]">
-                <div className="aspect-square overflow-hidden rounded-t-sm">
-                  <img
-                    src={p.img}
-                    alt={t(p.vi, p.en)}
-                    width={700}
-                    height={700}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="flex flex-1 flex-col p-6">
-                  <h3 className="font-display text-xl">{t(p.vi, p.en)}</h3>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{t(p.dVi, p.dEn)}</p>
-                  <Link
-                    to="/san-pham"
-                    className="mt-6 inline-flex w-fit items-center gap-2 rounded-sm border border-primary px-5 py-2.5 text-sm text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
-                  >
-                    {t("Xem Thêm", "View More")} <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
+        {featuredProducts.length > 0 ? (
+          <div className="grid gap-8 md:grid-cols-3">
+            {featuredProducts.map((product, i) => {
+              const name = t(product.nameVi, product.nameEn || product.nameVi);
+              const description = t(
+                product.descriptionVi || "Gốm Bàu Trúc được tạo hình thủ công theo kỹ thuật truyền thống của người Chăm.",
+                product.descriptionEn || "Bàu Trúc pottery shaped by hand using traditional Cham techniques.",
+              );
+              return (
+                <Reveal key={product.id} delay={i * 100} as="article">
+                  <div className="group flex h-full flex-col rounded-sm border border-border bg-card transition-shadow duration-300 hover:shadow-[0_14px_36px_rgba(44,26,14,0.16)]">
+                    <div className="aspect-square overflow-hidden rounded-t-sm">
+                      <img
+                        src={product.thumbnailUrl || pVase}
+                        alt={name}
+                        width={700}
+                        height={700}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={event => imageFallback(event, pVase)}
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-col p-6">
+                      <h3 className="font-display text-xl">{name}</h3>
+                      <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
+                      <Link
+                        to={`/products/${product.id}`}
+                        className="mt-6 inline-flex w-fit items-center gap-2 rounded-sm border border-primary px-5 py-2.5 text-sm text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                      >
+                        {t("Xem Chi Tiết", "View Details")} <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </Reveal>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-sm border border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+            {t("Sản phẩm nổi bật đang được cập nhật.", "Featured products are being updated.")}
+          </div>
+        )}
       </section>
 
       {/* Experience teaser */}
@@ -254,18 +287,25 @@ export default function Home() {
           <p className="mt-3 text-sm tracking-wide text-primary">@dangxem.baoutruc</p>
         </Reveal>
         <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((n, i) => (
-            <Reveal key={n} delay={i * 60}>
-              <div className="aspect-square overflow-hidden rounded-sm border border-border">
-                <ClayImage
-                  seed={`baotruc-feed-${n}`}
-                  alt={t(`Ảnh xưởng gốm ${n}`, `Pottery workshop photo ${n}`)}
-                  w={600}
-                  h={600}
-                />
-              </div>
-            </Reveal>
-          ))}
+          {[1, 2, 3, 4, 5, 6].map((n, i) => {
+            const fallback = SOCIAL_FALLBACKS[i];
+            const src = socialBySlot.get(`HOME_SOCIAL_${n}`) || fallback;
+            return (
+              <Reveal key={n} delay={i * 60}>
+                <div className="aspect-square overflow-hidden rounded-sm border border-border">
+                  <img
+                    src={src}
+                    alt={t(`Ảnh xưởng gốm ${n}`, `Pottery workshop photo ${n}`)}
+                    width={600}
+                    height={600}
+                    loading="lazy"
+                    className="h-full w-full rounded-sm object-cover"
+                    onError={event => imageFallback(event, fallback)}
+                  />
+                </div>
+              </Reveal>
+            );
+          })}
         </div>
 
       </section>

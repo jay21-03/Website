@@ -22,6 +22,16 @@ describe('API client security', () => {
     expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/checkout', expect.objectContaining({ credentials: 'include', headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'memory-token' }) }))
   })
 
+  it('reads public homepage content without CSRF mutation flow', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ success: true, data: { heroImageUrl: 'https://cdn.example/hero.jpg', socialImages: [], featuredProducts: [] } }))
+
+    await api.home()
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith('/api/v1/home', expect.objectContaining({ credentials: 'include' }))
+  })
+
   it('builds authoritative product query parameters for backend filtering', async () => {
     fetch.mockResolvedValueOnce(response({ success: true, data: { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, first: true, last: true } }))
     const { api } = await import('./api')
@@ -61,4 +71,48 @@ describe('API client security', () => {
       headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'fresh-token' })
     }))
   })
+
+  it('uses PUT multipart with CSRF for managed homepage media', async () => {
+    const { api } = await import('./api')
+    const file = new Blob(['homepage-image'], { type: 'image/png' })
+    fetch.mockResolvedValueOnce(response({ data: { token: 'home-token' } })).mockResolvedValueOnce(response({ success: true, data: { slot: 'HOME_HERO', url: 'https://cdn.example/home.png' } }))
+
+    await api.uploadHomeMedia('HOME_HERO', file)
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/media/HOME_HERO', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'include',
+      body: expect.any(FormData),
+      headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'home-token' })
+    }))
+    expect(fetch.mock.calls[1][1].headers['Content-Type']).toBeUndefined()
+  })
+
+  it('uses authenticated CSRF-protected DELETE when resetting homepage media', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ data: { token: 'home-delete-token' } })).mockResolvedValueOnce(response({ success: true, data: { slot: 'HOME_STORY', url: null } }))
+
+    await api.clearHomeMedia('HOME_STORY')
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/media/HOME_STORY', expect.objectContaining({
+      method: 'DELETE',
+      credentials: 'include',
+      headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'home-delete-token' })
+    }))
+  })
+
+  it('updates exactly three homepage featured product ids with CSRF protection', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ data: { token: 'featured-token' } })).mockResolvedValueOnce(response({ success: true, data: { featuredProducts: [] } }))
+
+    await api.updateHomeFeaturedProducts([10, 12, 13])
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/featured-products', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ productIds: [10, 12, 13] }),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-XSRF-TOKEN': 'featured-token' })
+    }))
+  })
+
 })

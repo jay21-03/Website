@@ -21,7 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import com.bautruc.ecommerce.catalog.application.ObjectStoragePort;
+import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import com.bautruc.ecommerce.catalog.application.ProductImageService;
 import com.bautruc.ecommerce.common.security.JwtAuthenticationFilter;
 import com.bautruc.ecommerce.common.security.JwtTokenService;

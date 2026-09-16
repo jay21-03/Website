@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import { businessDateTimeLocal, businessLocalDateTimeToOffset, formatBusinessDateTime, localBusinessDate, monthStartBusinessDate } from './utils/businessDate'
+import heroPottery from './design/assets/hero-pottery.jpg'
+import artisan from './design/assets/artisan.jpg'
+import pVase from './design/assets/p-vase.jpg'
+import pKit from './design/assets/p-kit.jpg'
+import wsFamily from './design/assets/ws-family.jpg'
+import pApsara from './design/assets/p-apsara.jpg'
+import wsTour from './design/assets/ws-tour.jpg'
 import '../assets/css/admin.css'
 
 const cash = value => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value || 0)
@@ -20,6 +27,18 @@ async function loadAllAdminCollections() {
   }
   return result
 }
+async function loadAllActiveAdminProducts() {
+  const result = []
+  let page = 0
+  let last = false
+  while (!last) {
+    const response = await api.adminProducts(new URLSearchParams({ status: 'ACTIVE', page, size: 100, sort: 'nameVi,asc' }).toString())
+    result.push(...pageContent(response))
+    last = response?.last ?? true
+    page += 1
+  }
+  return result
+}
 function useImagePreviews(files) {
   const [previews, setPreviews] = useState([])
   useEffect(() => {
@@ -30,7 +49,7 @@ function useImagePreviews(files) {
   return previews
 }
 const adminSections = [
-  ['dashboard', 'Tổng quan', 'Dashboard'], ['products', 'Sản phẩm', 'Products'], ['collections', 'Bộ sưu tập', 'Collections'],
+  ['dashboard', 'Tổng quan', 'Dashboard'], ['products', 'Sản phẩm', 'Products'], ['collections', 'Bộ sưu tập', 'Collections'], ['homepage', 'Trang chủ', 'Homepage'],
   ['workshop', 'Workshop', 'Workshop'], ['inventory', 'Kho hàng', 'Inventory'], ['orders', 'Đơn hàng', 'Orders'], ['users', 'Người dùng', 'Users'], ['notifications', 'Thông báo', 'Notifications'], ['settings', 'Cấu hình', 'Settings']
 ]
 const adminSectionIds = new Set(adminSections.map(([id]) => id))
@@ -49,7 +68,7 @@ export default function Admin({ user, notify, onLogout, lang = 'vi' }) {
   }, [requestedSection, section, setSearchParams])
   if (!user) return <Navigate to="/" replace />
   if (user.role !== 'ADMIN') return <Navigate to="/" replace />
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams({ section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams({ section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'homepage' && <HomepageContent notify={notify} lang={lang} />}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
 }
 
 function LoadState({ loading, error, empty, children, lang = 'vi' }) {
@@ -613,6 +632,240 @@ function Notifications({ notify, lang = 'vi' }) {
 
   const rows = pageContent(data)
   return <Panel title={`${adminText(lang, 'Thông báo', 'Notifications')} (${unreadTotal} ${adminText(lang, 'chưa đọc', 'unread')})`}><form className="admin-search" onSubmit={e => { e.preventDefault(); load() }}><select value={filters.isRead} onChange={e => updateFilter({ isRead: e.target.value })}><option value="">{adminText(lang, 'Mọi trạng thái đọc', 'All read states')}</option><option value="false">{adminText(lang, 'Chưa đọc', 'Unread')}</option><option value="true">{adminText(lang, 'Đã đọc', 'Read')}</option></select><select value={filters.type} onChange={e => updateFilter({ type: e.target.value })}><option value="">{adminText(lang, 'Mọi loại', 'All types')}</option><option>NEW_ORDER</option><option>PAYMENT_SUCCESS</option><option>PAYMENT_FAILED</option><option>LOW_STOCK</option><option>OUT_OF_STOCK</option></select><select value={filters.sort} onChange={e => updateFilter({ sort: e.target.value })}><option value="createdAt,desc">{adminText(lang, 'Mới nhất', 'Newest')}</option><option value="createdAt,asc">{adminText(lang, 'Cũ nhất', 'Oldest')}</option></select><button>{adminText(lang, 'Tải', 'Load')}</button></form><div className="notification-list">{rows.map(x => <article className={x.isRead ? '' : 'unread'} key={x.id}><div><b>{x.title}</b><p>{x.message}</p><small>{when(x.createdAt, lang)}</small></div>{!x.isRead && <button onClick={() => read(x)}>{adminText(lang, 'Đánh dấu đã đọc', 'Mark as read')}</button>}</article>)}</div>{data && <nav className="pagination"><button disabled={data.first} onClick={() => updateFilter({ page: Math.max(0, data.page - 1) })}>{adminText(lang, 'Trước', 'Previous')}</button><span>{adminText(lang, 'Trang', 'Page')} {data.page + 1}/{Math.max(data.totalPages, 1)} · {data.totalElements} {adminText(lang, 'thông báo', 'notifications')}</span><button disabled={data.last} onClick={() => updateFilter({ page: data.page + 1 })}>{adminText(lang, 'Sau', 'Next')}</button></nav>}</Panel>
+}
+
+
+const homepageMediaConfig = [
+  { slot: 'HOME_HERO', vi: 'Ảnh Hero', en: 'Hero image', helpVi: 'Ảnh lớn đầu trang chủ.', helpEn: 'Large image at the top of the homepage.', fallback: heroPottery, shape: 'wide' },
+  { slot: 'HOME_STORY', vi: 'Ảnh câu chuyện', en: 'Story image', helpVi: 'Ảnh trong phần câu chuyện hơn 15 năm giữ lửa nghề Chăm.', helpEn: 'Image used in the homepage story section.', fallback: artisan, shape: 'wide' },
+  { slot: 'HOME_SOCIAL_1', vi: 'Hành trình 1', en: 'Journey 1', fallback: artisan, shape: 'square' },
+  { slot: 'HOME_SOCIAL_2', vi: 'Hành trình 2', en: 'Journey 2', fallback: pVase, shape: 'square' },
+  { slot: 'HOME_SOCIAL_3', vi: 'Hành trình 3', en: 'Journey 3', fallback: pKit, shape: 'square' },
+  { slot: 'HOME_SOCIAL_4', vi: 'Hành trình 4', en: 'Journey 4', fallback: wsFamily, shape: 'square' },
+  { slot: 'HOME_SOCIAL_5', vi: 'Hành trình 5', en: 'Journey 5', fallback: pApsara, shape: 'square' },
+  { slot: 'HOME_SOCIAL_6', vi: 'Hành trình 6', en: 'Journey 6', fallback: wsTour, shape: 'square' }
+]
+
+const homepageFeaturedSlots = [1, 2, 3]
+const featuredIdsFromHome = home => {
+  const bySlot = new Map((home?.featuredProducts || []).map(item => [Number(item.slot), String(item.id)]))
+  return homepageFeaturedSlots.map(slot => bySlot.get(slot) || '')
+}
+
+function HomepageContent({ notify, lang = 'vi' }) {
+  const [home, setHome] = useState(null)
+  const [products, setProducts] = useState([])
+  const [featuredIds, setFeaturedIds] = useState(['', '', ''])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busySlot, setBusySlot] = useState('')
+  const [savingFeatured, setSavingFeatured] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [homepage, activeProducts] = await Promise.all([api.adminHome(), loadAllActiveAdminProducts()])
+      setHome(homepage)
+      setProducts(activeProducts)
+      setFeaturedIds(featuredIdsFromHome(homepage))
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const replaceMedia = item => setHome(current => {
+    if (!current) return current
+    const media = [...(current.media || [])]
+    const index = media.findIndex(existing => existing.slot === item.slot)
+    if (index >= 0) media[index] = item
+    else media.push(item)
+    return { ...current, media }
+  })
+
+  async function upload(slot, file) {
+    setBusySlot(slot)
+    try {
+      const updated = await api.uploadHomeMedia(slot, file)
+      replaceMedia(updated)
+      const config = homepageMediaConfig.find(item => item.slot === slot)
+      notify(adminText(lang, `Đã cập nhật ${config?.vi || 'ảnh trang chủ'}.`, `${config?.en || 'Homepage image'} updated.`))
+      return true
+    } catch (e) {
+      notify(e.message)
+      return false
+    } finally {
+      setBusySlot('')
+    }
+  }
+
+  async function clear(slot) {
+    const config = homepageMediaConfig.find(item => item.slot === slot)
+    if (!window.confirm(adminText(lang, `Đặt lại ${config?.vi || 'ảnh này'} về ảnh mặc định?`, `Reset ${config?.en || 'this image'} to the default image?`))) return
+    setBusySlot(slot)
+    try {
+      const updated = await api.clearHomeMedia(slot)
+      replaceMedia(updated)
+      notify(adminText(lang, `Đã đặt lại ${config?.vi || 'ảnh trang chủ'} về mặc định.`, `${config?.en || 'Homepage image'} reset to default.`))
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setBusySlot('')
+    }
+  }
+
+  async function saveFeatured(event) {
+    event.preventDefault()
+    const ids = featuredIds.map(value => Number(value))
+    if (ids.some(id => !Number.isInteger(id) || id <= 0)) {
+      notify(adminText(lang, 'Hãy chọn đủ 3 sản phẩm nổi bật.', 'Select all three featured products.'))
+      return
+    }
+    if (new Set(ids).size !== homepageFeaturedSlots.length) {
+      notify(adminText(lang, 'Mỗi vị trí phải dùng một sản phẩm khác nhau.', 'Each slot must use a different product.'))
+      return
+    }
+    setSavingFeatured(true)
+    try {
+      const updated = await api.updateHomeFeaturedProducts(ids)
+      setHome(updated)
+      setFeaturedIds(featuredIdsFromHome(updated))
+      notify(adminText(lang, 'Đã cập nhật 3 sản phẩm nổi bật.', 'Featured products updated.'))
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setSavingFeatured(false)
+    }
+  }
+
+  const mediaBySlot = new Map((home?.media || []).map(item => [item.slot, item]))
+  const primary = homepageMediaConfig.slice(0, 2)
+  const social = homepageMediaConfig.slice(2)
+
+  return <Panel
+    title={adminText(lang, 'Nội dung hình ảnh trang chủ', 'Homepage image content')}
+    action={<button type="button" onClick={load} disabled={loading || Boolean(busySlot)}>{adminText(lang, 'Tải lại', 'Reload')}</button>}
+  >
+    <p className="homepage-admin-intro">{adminText(lang, 'Ảnh được tải lên sẽ được sử dụng cho các vị trí tương ứng trên trang chủ. Nếu chưa tải ảnh hoặc đặt lại, website dùng ảnh mặc định hiện có.', 'Uploaded images are managed for the homepage. When no managed image exists, the website uses its current default image.')}</p>
+    <LoadState loading={loading} error={error} lang={lang}>
+      <section className="homepage-featured-section">
+        <div className="homepage-media-section-head homepage-featured-head">
+          <h3>{adminText(lang, 'Sản phẩm nổi bật', 'Featured products')}</h3>
+          <p>{adminText(lang, 'Chọn đúng 3 sản phẩm ACTIVE và sắp xếp theo vị trí hiển thị. Ảnh đại diện luôn lấy từ sản phẩm hiện tại.', 'Choose exactly three ACTIVE products and order them by display slot. Thumbnails always come from the current product data.')}</p>
+        </div>
+        <form className="homepage-featured-form" onSubmit={saveFeatured}>
+          <div className="homepage-featured-grid">
+            {homepageFeaturedSlots.map((slot, index) => {
+              const selectedId = featuredIds[index]
+              const selectedProduct = products.find(product => String(product.id) === selectedId)
+              return <article className="homepage-featured-slot" key={slot}>
+                <div className="homepage-featured-preview">
+                  {selectedProduct?.thumbnailUrl ? <img src={selectedProduct.thumbnailUrl} alt="" /> : <div className="homepage-featured-empty">{adminText(lang, 'Chưa chọn sản phẩm', 'No product selected')}</div>}
+                  <span>{adminText(lang, 'Vị trí', 'Slot')} {slot}</span>
+                </div>
+                <label>
+                  <b>{adminText(lang, `Sản phẩm vị trí ${slot}`, `Product in slot ${slot}`)}</b>
+                  <select
+                    aria-label={adminText(lang, `Sản phẩm nổi bật vị trí ${slot}`, `Featured product slot ${slot}`)}
+                    value={selectedId}
+                    disabled={savingFeatured}
+                    onChange={event => setFeaturedIds(values => values.map((value, valueIndex) => valueIndex === index ? event.target.value : value))}
+                    required
+                  >
+                    <option value="">{adminText(lang, 'Chọn sản phẩm', 'Select product')}</option>
+                    {products.map(product => {
+                      const productId = String(product.id)
+                      const usedElsewhere = featuredIds.some((value, valueIndex) => valueIndex !== index && value === productId)
+                      return <option key={product.id} value={productId} disabled={usedElsewhere}>{lang === 'vi' ? product.nameVi : product.nameEn || product.nameVi}</option>
+                    })}
+                  </select>
+                </label>
+                {selectedProduct && <div className="homepage-featured-meta">
+                  <strong>{lang === 'vi' ? selectedProduct.nameVi : selectedProduct.nameEn || selectedProduct.nameVi}</strong>
+                  <span>{cash(selectedProduct.sellingPrice)}</span>
+                </div>}
+              </article>
+            })}
+          </div>
+          {products.length < homepageFeaturedSlots.length && <div className="admin-state error homepage-featured-warning">{adminText(lang, 'Cần ít nhất 3 sản phẩm ACTIVE để cấu hình khu vực nổi bật.', 'At least three ACTIVE products are required to configure featured products.')}</div>}
+          <div className="homepage-featured-actions">
+            <button className="admin-primary" disabled={savingFeatured || products.length < homepageFeaturedSlots.length}>{savingFeatured ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu sản phẩm nổi bật', 'Save featured products')}</button>
+          </div>
+        </form>
+      </section>
+      <div className="homepage-media-grid homepage-media-grid-primary">
+        {primary.map(config => <HomepageMediaCard key={config.slot} config={config} media={mediaBySlot.get(config.slot)} busy={busySlot === config.slot} onUpload={upload} onClear={clear} lang={lang} />)}
+      </div>
+      <div className="homepage-media-section-head">
+        <h3>{adminText(lang, 'Theo dõi hành trình gốm', 'Pottery journey gallery')}</h3>
+        <p>{adminText(lang, 'Quản lý 6 ảnh ở phần cuối trang chủ.', 'Manage the six gallery images near the bottom of the homepage.')}</p>
+      </div>
+      <div className="homepage-media-grid homepage-media-grid-social">
+        {social.map(config => <HomepageMediaCard key={config.slot} config={config} media={mediaBySlot.get(config.slot)} busy={busySlot === config.slot} onUpload={upload} onClear={clear} lang={lang} compact />)}
+      </div>
+    </LoadState>
+  </Panel>
+}
+
+function HomepageMediaCard({ config, media, busy, onUpload, onClear, lang = 'vi', compact = false }) {
+  const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl('')
+      return undefined
+    }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  const managed = Boolean(media?.url)
+  const src = previewUrl || media?.url || config.fallback
+  const label = adminText(lang, config.vi, config.en)
+
+  async function submit() {
+    if (!file || busy) return
+    if (await onUpload(config.slot, file)) {
+      setFile(null)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  return <article className={`homepage-media-card ${compact ? 'compact' : ''}`}>
+    <div className={`homepage-media-preview ${config.shape}`}>
+      <img src={src} alt={label} />
+      <span className={`homepage-media-source ${managed ? 'managed' : 'default'}`}>{managed ? adminText(lang, 'Ảnh quản lý', 'Managed') : adminText(lang, 'Ảnh mặc định', 'Default')}</span>
+      {previewUrl && <span className="homepage-media-pending">{adminText(lang, 'Xem trước ảnh mới', 'New image preview')}</span>}
+    </div>
+    <div className="homepage-media-copy">
+      <h3>{label}</h3>
+      {config.helpVi && <p>{adminText(lang, config.helpVi, config.helpEn)}</p>}
+      {managed && media?.updatedAt && <small>{adminText(lang, 'Cập nhật', 'Updated')}: {when(media.updatedAt, lang)}</small>}
+    </div>
+    <label className="homepage-media-picker">
+      <span>{adminText(lang, 'Chọn ảnh mới', 'Choose new image')}</span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        aria-label={`${adminText(lang, 'Chọn ảnh mới cho', 'Choose new image for')} ${label}`}
+        disabled={busy}
+        onChange={event => setFile(event.target.files?.[0] || null)}
+      />
+      <small>{adminText(lang, 'JPEG, PNG hoặc WebP. Kích thước tối đa do server kiểm soát.', 'JPEG, PNG or WebP. Maximum size is enforced by the server.')}</small>
+    </label>
+    <div className="homepage-media-actions">
+      <button type="button" className="admin-primary" disabled={!file || busy} onClick={submit}>{busy ? adminText(lang, 'Đang xử lý...', 'Working...') : adminText(lang, 'Tải ảnh đã chọn', 'Upload selected image')}</button>
+      <button type="button" disabled={!managed || busy} onClick={() => onClear(config.slot)}>{adminText(lang, 'Dùng ảnh mặc định', 'Use default image')}</button>
+    </div>
+  </article>
 }
 
 function SupportSettings({ notify, lang = 'vi' }) {

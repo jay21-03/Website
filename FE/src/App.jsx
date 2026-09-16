@@ -133,7 +133,11 @@ function CatalogCard({ product }) {
     </div>
   </article>
 }
-function Home() { return <Layout><div className="reference-page"><ReferenceHome /></div></Layout> }
+function Home() {
+  const { products } = useStore()
+  const homepage = useQuery({ queryKey: ['home'], queryFn: api.home })
+  return <Layout><div className="reference-page"><ReferenceHome home={homepage.data} fallbackProducts={products} /></div></Layout>
+}
 function Products() {
   const { collections, lang } = useStore(); const [searchParams] = useSearchParams(); const [filters, setFilters] = useState(() => ({ keyword: searchParams.get('keyword') || '', collectionId: searchParams.get('collectionId') || '', minPrice: searchParams.get('minPrice') || '', maxPrice: searchParams.get('maxPrice') || '', page: Number(searchParams.get('page') || 0), size: 20, sort: searchParams.get('sort') || 'createdAt,desc' }))
   const updateFilter = changes => setFilters(value => ({ ...value, ...changes, page: changes.page ?? 0 }))

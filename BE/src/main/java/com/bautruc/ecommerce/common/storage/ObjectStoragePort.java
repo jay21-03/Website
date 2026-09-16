@@ -1,4 +1,4 @@
-package com.bautruc.ecommerce.catalog.application;
+package com.bautruc.ecommerce.common.storage;
 
 public interface ObjectStoragePort extends AutoCloseable {
     void put(String objectKey, byte[] content, String contentType);

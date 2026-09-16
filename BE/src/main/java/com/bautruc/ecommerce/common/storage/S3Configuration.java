@@ -1,6 +1,5 @@
-package com.bautruc.ecommerce.catalog.infrastructure;
+package com.bautruc.ecommerce.common.storage;
 
-import com.bautruc.ecommerce.catalog.application.ObjectStoragePort;
 import com.bautruc.ecommerce.common.config.ApplicationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

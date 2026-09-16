@@ -8,6 +8,8 @@ import com.bautruc.ecommerce.catalog.domain.ProductImage;
 import com.bautruc.ecommerce.catalog.infrastructure.ProductImageJpaRepository;
 import com.bautruc.ecommerce.common.config.ApplicationProperties;
 import com.bautruc.ecommerce.common.exception.BusinessException;
+import com.bautruc.ecommerce.common.storage.ObjectStorageException;
+import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;

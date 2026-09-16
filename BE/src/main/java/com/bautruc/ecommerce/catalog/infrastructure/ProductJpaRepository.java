@@ -12,6 +12,7 @@ public interface ProductJpaRepository extends JpaRepository<Product,Long>, JpaSp
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
     Page<Product> findByStatusAndDeletedAtIsNull(ProductStatus status,Pageable pageable);
     Page<Product> findByDeletedAtIsNull(Pageable pageable);
+    List<Product> findByIdInAndStatusAndDeletedAtIsNull(Collection<Long> ids, ProductStatus status);
     boolean existsByCollectionIdAndDeletedAtIsNull(Long collectionId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id=:id and p.deletedAt is null")
