@@ -64,4 +64,20 @@ class ModuleBoundaryArchTest {
                     "..reporting.infrastructure..",
                     "..workshop.infrastructure.."
             );
+
+    @ArchTest
+    static final ArchRule siteContentDoesNotDependOnOtherBusinessInfrastructure = noClasses()
+            .that().resideInAPackage("..sitecontent..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "..catalog.infrastructure..",
+                    "..cart.infrastructure..",
+                    "..inventory.infrastructure..",
+                    "..identity.infrastructure..",
+                    "..order.infrastructure..",
+                    "..payment.infrastructure..",
+                    "..notification.infrastructure..",
+                    "..reporting.infrastructure..",
+                    "..workshop.infrastructure..",
+                    "..support.infrastructure.."
+            );
 }
