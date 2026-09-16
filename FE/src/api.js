@@ -107,6 +107,13 @@ export const api = {
   orders: (page = 0, size = 20) => request(`/me/orders?page=${page}&size=${size}`),
   order: id => request(`/me/orders/${id}`),
   adminDashboard: () => request('/admin/dashboard'),
+  adminHome: () => request('/admin/home'),
+  uploadHomeMedia: (slot, file) => {
+    const body = new FormData()
+    body.append('file', file)
+    return request(`/admin/home/media/${encodeURIComponent(slot)}`, { method: 'PUT', body })
+  },
+  clearHomeMedia: slot => request(`/admin/home/media/${encodeURIComponent(slot)}`, { method: 'DELETE' }),
   adminProducts: (params = '') => request(`/admin/products${params ? `?${params}` : ''}`),
   adminProduct: id => request(`/admin/products/${encodeURIComponent(id)}`),
   adminCollections: (params = '') => request(`/admin/collections${params ? `?${params}` : ''}`),

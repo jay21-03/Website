@@ -61,4 +61,34 @@ describe('API client security', () => {
       headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'fresh-token' })
     }))
   })
+
+  it('uses PUT multipart with CSRF for managed homepage media', async () => {
+    const { api } = await import('./api')
+    const file = new Blob(['homepage-image'], { type: 'image/png' })
+    fetch.mockResolvedValueOnce(response({ data: { token: 'home-token' } })).mockResolvedValueOnce(response({ success: true, data: { slot: 'HOME_HERO', url: 'https://cdn.example/home.png' } }))
+
+    await api.uploadHomeMedia('HOME_HERO', file)
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/media/HOME_HERO', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'include',
+      body: expect.any(FormData),
+      headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'home-token' })
+    }))
+    expect(fetch.mock.calls[1][1].headers['Content-Type']).toBeUndefined()
+  })
+
+  it('uses authenticated CSRF-protected DELETE when resetting homepage media', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ data: { token: 'home-delete-token' } })).mockResolvedValueOnce(response({ success: true, data: { slot: 'HOME_STORY', url: null } }))
+
+    await api.clearHomeMedia('HOME_STORY')
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/media/HOME_STORY', expect.objectContaining({
+      method: 'DELETE',
+      credentials: 'include',
+      headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'home-delete-token' })
+    }))
+  })
+
 })

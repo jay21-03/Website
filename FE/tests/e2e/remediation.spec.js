@@ -82,6 +82,19 @@ async function mockApi(page, role = 'USER') {
   let orderPolls = 0
   let adminProducts = [product, inactiveProduct]
   let adminCollections = [collection, inactiveCollection]
+  let adminHome = {
+    media: [
+      { slot: 'HOME_HERO', url: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', updatedAt: order.createdAt },
+      { slot: 'HOME_STORY', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_1', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_2', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_3', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_4', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_5', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_6', url: null, updatedAt: order.createdAt }
+    ],
+    featuredProducts: []
+  }
   const adminUsers = [
     { id: 1, fullName: 'Admin User', email: 'admin@example.com', role: 'ADMIN', status: 'ACTIVE', createdAt: order.createdAt },
     { id: 2, fullName: 'Customer User', email: 'customer@example.com', role: 'USER', status: 'ACTIVE', createdAt: order.createdAt }
@@ -106,6 +119,19 @@ async function mockApi(page, role = 'USER') {
     if (path === '/workshops') return ok([{ id: 5, title: 'Lam gom co ban', description: 'Trai nghiem tao hinh gom.', priceAmount: 150000, durationMinutes: 120, maxParticipants: 10, imageUrl: '/assets/images/tour.jpg', status: 'ACTIVE' }])
     if (path === '/workshop/bookings') return created({ id: 9, status: 'NEW' })
     if (path === '/admin/dashboard') return ok({ totalOrders: 1, totalRevenue: 200000, newOrders: 1, lowStockProducts: [], recentOrders: [order], bestSellingProducts: [{ productNameVi: product.nameVi, totalQuantity: 2, totalRevenue: 400000 }] })
+    if (path === '/admin/home' && route.request().method() === 'GET') return ok(adminHome)
+    if (path.startsWith('/admin/home/media/') && route.request().method() === 'PUT') {
+      const slot = decodeURIComponent(path.split('/').pop())
+      const updated = { slot, url: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', updatedAt: order.createdAt }
+      adminHome = { ...adminHome, media: adminHome.media.map(item => item.slot === slot ? updated : item) }
+      return ok(updated)
+    }
+    if (path.startsWith('/admin/home/media/') && route.request().method() === 'DELETE') {
+      const slot = decodeURIComponent(path.split('/').pop())
+      const updated = { slot, url: null, updatedAt: order.createdAt }
+      adminHome = { ...adminHome, media: adminHome.media.map(item => item.slot === slot ? updated : item) }
+      return ok(updated)
+    }
     if (path === '/admin/reports/revenue') return ok({ totalRevenue: 200000, points: [{ periodStart: '2026-08-17', revenue: 200000 }] })
     if (path === '/admin/reports/best-selling') return ok([{ productNameVi: product.nameVi, soldQuantity: 2 }])
     if (path === '/admin/notifications') return ok({ content: [{ id: 1, title: 'Don moi', message: 'Co don hang moi', createdAt: order.createdAt, isRead: false }], page: 0, size: 10, totalElements: 37, totalPages: 4, first: true, last: false })
@@ -202,6 +228,25 @@ test('admin dashboard, notifications, workshop, support and reporting render wit
   await expect(page.getByText('Lịch hẹn workshop')).toBeVisible()
   await page.getByRole('button', { name: 'Cấu hình' }).click()
   await expect(page.locator('input[name="email"]')).toHaveValue('support@example.com')
+})
+
+
+test('admin homepage media supports preview, upload and reset to default', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  page.on('dialog', dialog => dialog.accept())
+  await page.goto('/admin?section=homepage')
+  await expect(page.getByRole('heading', { name: 'Trang chủ', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nội dung hình ảnh trang chủ' })).toBeVisible()
+
+  const hero = page.locator('.homepage-media-card').filter({ hasText: 'Ảnh Hero' })
+  await expect(hero.getByText('Ảnh quản lý')).toBeVisible()
+  await hero.locator('input[type="file"]').setInputFiles({ name: 'hero.png', mimeType: 'image/png', buffer: Buffer.from('mock-home-image') })
+  await hero.getByRole('button', { name: 'Tải ảnh đã chọn' }).click()
+  await expect(page.getByText('Đã cập nhật Ảnh Hero.')).toBeVisible()
+
+  await hero.getByRole('button', { name: 'Dùng ảnh mặc định' }).click()
+  await expect(page.getByText('Đã đặt lại Ảnh Hero về mặc định.')).toBeVisible()
+  await expect(hero.getByText('Ảnh mặc định', { exact: true })).toBeVisible()
 })
 
 test('admin catalog uses admin APIs for inactive products, discount prefill and collection delete', async ({ page }) => {
