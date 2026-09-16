@@ -33,12 +33,23 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
       LifecycleConfiguration:
         Rules:
           - Id: AbortIncompleteMultipartUploads
             Status: Enabled
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 7
+          - Id: ExpireNoncurrentProductImageVersions
+            Status: Enabled
+            Prefix: products/
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+          - Id: RemoveExpiredProductImageDeleteMarkers
+            Status: Enabled
+            Prefix: products/
+            ExpiredObjectDeleteMarker: true
       Tags:
         - Key: Application
           Value: bautruc-ecommerce

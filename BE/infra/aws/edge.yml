@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Bau Truc production edge stack:
   private frontend S3 bucket, CloudFront OAC, SPA rewrite,
-  and same-origin /api/* routing to Elastic Beanstalk.
+  and same-origin /api/* routing to the production backend.
 
 Parameters:
   Environment:
@@ -15,9 +15,8 @@ Parameters:
   BackendOriginDomainName:
     Type: String
     Description: >
-      Actual Elastic Beanstalk environment CNAME returned by
-      describe-environments. Do not use EndpointURL for a SingleInstance
-      environment. Do not include http:// or https://.
+      Production backend origin hostname used by CloudFront.
+      Do not include http:// or https://.
 
   PriceClass:
     Type: String
@@ -275,6 +274,11 @@ Outputs:
     Value: !GetAtt MainDistribution.DomainName
 
   FrontendBaseUrl:
-    Description: Use this for FRONTEND_BASE_URL and ALLOWED_ORIGINS.
+    Description: Canonical production frontend URL for FRONTEND_BASE_URL.
     Value:
-      !Sub "https://${MainDistribution.DomainName}"
+      !Sub "https://${CustomDomainName}"
+
+  FrontendAllowedOrigins:
+    Description: Canonical credentialed browser origins for ALLOWED_ORIGINS.
+    Value:
+      !Sub "https://${CustomDomainName},https://www.${CustomDomainName}"
