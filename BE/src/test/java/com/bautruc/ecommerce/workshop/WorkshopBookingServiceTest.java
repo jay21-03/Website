@@ -53,7 +53,7 @@ class WorkshopBookingServiceTest {
 
     @Test
     void flywayCreatesWorkshopBookingsTable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
         Long tableCount = jdbcTemplate.queryForObject(
                 """
                 select count(*)
