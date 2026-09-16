@@ -66,6 +66,23 @@ class ModuleBoundaryArchTest {
             );
 
     @ArchTest
+    static final ArchRule commonStorageDoesNotDependOnBusinessModules = noClasses()
+            .that().resideInAPackage("..common.storage..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "..catalog..",
+                    "..sitecontent..",
+                    "..cart..",
+                    "..inventory..",
+                    "..identity..",
+                    "..order..",
+                    "..payment..",
+                    "..notification..",
+                    "..reporting..",
+                    "..workshop..",
+                    "..support.."
+            );
+
+    @ArchTest
     static final ArchRule siteContentDoesNotDependOnOtherBusinessInfrastructure = noClasses()
             .that().resideInAPackage("..sitecontent..")
             .should().dependOnClassesThat().resideInAnyPackage(

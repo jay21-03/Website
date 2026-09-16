@@ -1,9 +1,7 @@
-package com.bautruc.ecommerce.catalog.infrastructure;
+package com.bautruc.ecommerce.common.storage;
 
 import java.util.Objects;
 
-import com.bautruc.ecommerce.catalog.application.ObjectStorageException;
-import com.bautruc.ecommerce.catalog.application.ObjectStoragePort;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;

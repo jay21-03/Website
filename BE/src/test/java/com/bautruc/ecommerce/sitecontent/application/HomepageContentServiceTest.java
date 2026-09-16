@@ -13,6 +13,7 @@ import java.util.List;
 import com.bautruc.ecommerce.catalog.application.HomepageProductQuery;
 import com.bautruc.ecommerce.catalog.application.HomepageProductView;
 import com.bautruc.ecommerce.common.exception.BusinessException;
+import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import com.bautruc.ecommerce.common.time.BusinessClock;
 import com.bautruc.ecommerce.sitecontent.infrastructure.HomepageFeaturedProductJpaRepository;
 import com.bautruc.ecommerce.sitecontent.infrastructure.SiteMediaJpaRepository;
@@ -35,6 +36,9 @@ class HomepageContentServiceTest {
     @Mock
     HomepageProductQuery products;
 
+    @Mock
+    ObjectStoragePort storage;
+
     HomepageContentService service;
 
     @BeforeEach
@@ -50,7 +54,7 @@ class HomepageContentServiceTest {
                 return ZoneId.of("Asia/Ho_Chi_Minh");
             }
         };
-        service = new HomepageContentService(media, featured, products, clock);
+        service = new HomepageContentService(media, featured, products, clock, storage);
     }
 
     @Test

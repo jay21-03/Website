@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import com.bautruc.ecommerce.catalog.infrastructure.ProductImageJpaRepository;
 import com.bautruc.ecommerce.common.config.ApplicationProperties;
 import com.bautruc.ecommerce.common.exception.BusinessException;
+import com.bautruc.ecommerce.common.storage.ObjectStorageException;
+import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 

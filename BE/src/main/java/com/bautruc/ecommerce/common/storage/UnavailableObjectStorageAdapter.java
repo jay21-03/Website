@@ -1,7 +1,5 @@
-package com.bautruc.ecommerce.catalog.infrastructure;
+package com.bautruc.ecommerce.common.storage;
 
-import com.bautruc.ecommerce.catalog.application.ObjectStorageException;
-import com.bautruc.ecommerce.catalog.application.ObjectStoragePort;
 
 final class UnavailableObjectStorageAdapter implements ObjectStoragePort {
     private static final String MESSAGE = "S3 object storage is not configured";

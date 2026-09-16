@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 
-import com.bautruc.ecommerce.catalog.application.ObjectStoragePort;
+import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import com.bautruc.ecommerce.common.security.JwtAuthenticationFilter;
 import com.bautruc.ecommerce.common.security.JwtTokenService;
 import com.bautruc.ecommerce.identity.domain.User;

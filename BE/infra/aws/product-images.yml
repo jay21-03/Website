@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Private product image storage, CloudFront delivery, and least-privilege backend policy.
+Description: Private product and site media storage, CloudFront delivery, and least-privilege backend policy.
 
 Parameters:
   Environment:
@@ -49,6 +49,15 @@ Resources:
           - Id: RemoveExpiredProductImageDeleteMarkers
             Status: Enabled
             Prefix: products/
+            ExpiredObjectDeleteMarker: true
+          - Id: ExpireNoncurrentSiteMediaVersions
+            Status: Enabled
+            Prefix: site/
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+          - Id: RemoveExpiredSiteMediaDeleteMarkers
+            Status: Enabled
+            Prefix: site/
             ExpiredObjectDeleteMarker: true
       Tags:
         - Key: Application
@@ -113,7 +122,9 @@ Resources:
             Principal:
               Service: cloudfront.amazonaws.com
             Action: s3:GetObject
-            Resource: !Sub "${ProductImagesBucket.Arn}/products/*"
+            Resource:
+              - !Sub "${ProductImagesBucket.Arn}/products/*"
+              - !Sub "${ProductImagesBucket.Arn}/site/*"
             Condition:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${ProductImagesDistribution}"
@@ -121,7 +132,7 @@ Resources:
   ProductImagesBackendPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      Description: Allow the Bau Truc backend to upload and delete product image objects only.
+      Description: Allow the Bau Truc backend to upload and delete product and homepage media objects only.
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -130,7 +141,9 @@ Resources:
             Action:
               - s3:PutObject
               - s3:DeleteObject
-            Resource: !Sub "${ProductImagesBucket.Arn}/products/*"
+            Resource:
+              - !Sub "${ProductImagesBucket.Arn}/products/*"
+              - !Sub "${ProductImagesBucket.Arn}/site/*"
 
 Outputs:
   BucketName:

@@ -11,6 +11,7 @@ import java.util.Set;
 import com.bautruc.ecommerce.catalog.application.HomepageProductQuery;
 import com.bautruc.ecommerce.catalog.application.HomepageProductView;
 import com.bautruc.ecommerce.common.exception.BusinessException;
+import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import com.bautruc.ecommerce.common.time.BusinessClock;
 import com.bautruc.ecommerce.sitecontent.domain.HomepageFeaturedProduct;
 import com.bautruc.ecommerce.sitecontent.domain.SiteMedia;
@@ -28,17 +29,20 @@ public class HomepageContentService {
     private final HomepageFeaturedProductJpaRepository featured;
     private final HomepageProductQuery productQuery;
     private final BusinessClock clock;
+    private final ObjectStoragePort storage;
 
     public HomepageContentService(
             SiteMediaJpaRepository media,
             HomepageFeaturedProductJpaRepository featured,
             HomepageProductQuery productQuery,
-            BusinessClock clock
+            BusinessClock clock,
+            ObjectStoragePort storage
     ) {
         this.media = media;
         this.featured = featured;
         this.productQuery = productQuery;
         this.clock = clock;
+        this.storage = storage;
     }
 
     @Transactional(readOnly = true)
@@ -51,7 +55,8 @@ public class HomepageContentService {
         List<SiteMediaView> mediaViews = new ArrayList<>();
         for (SiteMediaSlot slot : SiteMediaSlot.values()) {
             SiteMedia item = mediaBySlot.get(slot);
-            mediaViews.add(new SiteMediaView(slot, null, item == null ? null : item.getUpdatedAt()));
+            String url = item == null || item.getObjectKey() == null ? null : storage.publicUrl(item.getObjectKey());
+            mediaViews.add(new SiteMediaView(slot, url, item == null ? null : item.getUpdatedAt()));
         }
 
         List<HomepageFeaturedProduct> configured = featured.findAllByOrderBySlotAsc();
