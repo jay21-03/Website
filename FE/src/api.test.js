@@ -91,4 +91,18 @@ describe('API client security', () => {
     }))
   })
 
+  it('updates exactly three homepage featured product ids with CSRF protection', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ data: { token: 'featured-token' } })).mockResolvedValueOnce(response({ success: true, data: { featuredProducts: [] } }))
+
+    await api.updateHomeFeaturedProducts([10, 12, 13])
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/featured-products', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ productIds: [10, 12, 13] }),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-XSRF-TOKEN': 'featured-token' })
+    }))
+  })
+
 })

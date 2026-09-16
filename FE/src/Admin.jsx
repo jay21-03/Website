@@ -27,6 +27,18 @@ async function loadAllAdminCollections() {
   }
   return result
 }
+async function loadAllActiveAdminProducts() {
+  const result = []
+  let page = 0
+  let last = false
+  while (!last) {
+    const response = await api.adminProducts(new URLSearchParams({ status: 'ACTIVE', page, size: 100, sort: 'nameVi,asc' }).toString())
+    result.push(...pageContent(response))
+    last = response?.last ?? true
+    page += 1
+  }
+  return result
+}
 function useImagePreviews(files) {
   const [previews, setPreviews] = useState([])
   useEffect(() => {
@@ -634,17 +646,29 @@ const homepageMediaConfig = [
   { slot: 'HOME_SOCIAL_6', vi: 'Hành trình 6', en: 'Journey 6', fallback: wsTour, shape: 'square' }
 ]
 
+const homepageFeaturedSlots = [1, 2, 3]
+const featuredIdsFromHome = home => {
+  const bySlot = new Map((home?.featuredProducts || []).map(item => [Number(item.slot), String(item.id)]))
+  return homepageFeaturedSlots.map(slot => bySlot.get(slot) || '')
+}
+
 function HomepageContent({ notify, lang = 'vi' }) {
   const [home, setHome] = useState(null)
+  const [products, setProducts] = useState([])
+  const [featuredIds, setFeaturedIds] = useState(['', '', ''])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busySlot, setBusySlot] = useState('')
+  const [savingFeatured, setSavingFeatured] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      setHome(await api.adminHome())
+      const [homepage, activeProducts] = await Promise.all([api.adminHome(), loadAllActiveAdminProducts()])
+      setHome(homepage)
+      setProducts(activeProducts)
+      setFeaturedIds(featuredIdsFromHome(homepage))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -694,6 +718,30 @@ function HomepageContent({ notify, lang = 'vi' }) {
     }
   }
 
+  async function saveFeatured(event) {
+    event.preventDefault()
+    const ids = featuredIds.map(value => Number(value))
+    if (ids.some(id => !Number.isInteger(id) || id <= 0)) {
+      notify(adminText(lang, 'Hãy chọn đủ 3 sản phẩm nổi bật.', 'Select all three featured products.'))
+      return
+    }
+    if (new Set(ids).size !== homepageFeaturedSlots.length) {
+      notify(adminText(lang, 'Mỗi vị trí phải dùng một sản phẩm khác nhau.', 'Each slot must use a different product.'))
+      return
+    }
+    setSavingFeatured(true)
+    try {
+      const updated = await api.updateHomeFeaturedProducts(ids)
+      setHome(updated)
+      setFeaturedIds(featuredIdsFromHome(updated))
+      notify(adminText(lang, 'Đã cập nhật 3 sản phẩm nổi bật.', 'Featured products updated.'))
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setSavingFeatured(false)
+    }
+  }
+
   const mediaBySlot = new Map((home?.media || []).map(item => [item.slot, item]))
   const primary = homepageMediaConfig.slice(0, 2)
   const social = homepageMediaConfig.slice(2)
@@ -704,6 +752,51 @@ function HomepageContent({ notify, lang = 'vi' }) {
   >
     <p className="homepage-admin-intro">{adminText(lang, 'Ảnh được tải lên sẽ được sử dụng cho các vị trí tương ứng trên trang chủ. Nếu chưa tải ảnh hoặc đặt lại, website dùng ảnh mặc định hiện có.', 'Uploaded images are managed for the homepage. When no managed image exists, the website uses its current default image.')}</p>
     <LoadState loading={loading} error={error} lang={lang}>
+      <section className="homepage-featured-section">
+        <div className="homepage-media-section-head homepage-featured-head">
+          <h3>{adminText(lang, 'Sản phẩm nổi bật', 'Featured products')}</h3>
+          <p>{adminText(lang, 'Chọn đúng 3 sản phẩm ACTIVE và sắp xếp theo vị trí hiển thị. Ảnh đại diện luôn lấy từ sản phẩm hiện tại.', 'Choose exactly three ACTIVE products and order them by display slot. Thumbnails always come from the current product data.')}</p>
+        </div>
+        <form className="homepage-featured-form" onSubmit={saveFeatured}>
+          <div className="homepage-featured-grid">
+            {homepageFeaturedSlots.map((slot, index) => {
+              const selectedId = featuredIds[index]
+              const selectedProduct = products.find(product => String(product.id) === selectedId)
+              return <article className="homepage-featured-slot" key={slot}>
+                <div className="homepage-featured-preview">
+                  {selectedProduct?.thumbnailUrl ? <img src={selectedProduct.thumbnailUrl} alt="" /> : <div className="homepage-featured-empty">{adminText(lang, 'Chưa chọn sản phẩm', 'No product selected')}</div>}
+                  <span>{adminText(lang, 'Vị trí', 'Slot')} {slot}</span>
+                </div>
+                <label>
+                  <b>{adminText(lang, `Sản phẩm vị trí ${slot}`, `Product in slot ${slot}`)}</b>
+                  <select
+                    aria-label={adminText(lang, `Sản phẩm nổi bật vị trí ${slot}`, `Featured product slot ${slot}`)}
+                    value={selectedId}
+                    disabled={savingFeatured}
+                    onChange={event => setFeaturedIds(values => values.map((value, valueIndex) => valueIndex === index ? event.target.value : value))}
+                    required
+                  >
+                    <option value="">{adminText(lang, 'Chọn sản phẩm', 'Select product')}</option>
+                    {products.map(product => {
+                      const productId = String(product.id)
+                      const usedElsewhere = featuredIds.some((value, valueIndex) => valueIndex !== index && value === productId)
+                      return <option key={product.id} value={productId} disabled={usedElsewhere}>{lang === 'vi' ? product.nameVi : product.nameEn || product.nameVi}</option>
+                    })}
+                  </select>
+                </label>
+                {selectedProduct && <div className="homepage-featured-meta">
+                  <strong>{lang === 'vi' ? selectedProduct.nameVi : selectedProduct.nameEn || selectedProduct.nameVi}</strong>
+                  <span>{cash(selectedProduct.sellingPrice)}</span>
+                </div>}
+              </article>
+            })}
+          </div>
+          {products.length < homepageFeaturedSlots.length && <div className="admin-state error homepage-featured-warning">{adminText(lang, 'Cần ít nhất 3 sản phẩm ACTIVE để cấu hình khu vực nổi bật.', 'At least three ACTIVE products are required to configure featured products.')}</div>}
+          <div className="homepage-featured-actions">
+            <button className="admin-primary" disabled={savingFeatured || products.length < homepageFeaturedSlots.length}>{savingFeatured ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu sản phẩm nổi bật', 'Save featured products')}</button>
+          </div>
+        </form>
+      </section>
       <div className="homepage-media-grid homepage-media-grid-primary">
         {primary.map(config => <HomepageMediaCard key={config.slot} config={config} media={mediaBySlot.get(config.slot)} busy={busySlot === config.slot} onUpload={upload} onClear={clear} lang={lang} />)}
       </div>

@@ -32,6 +32,26 @@ const inactiveProduct = {
   }
 }
 
+const featuredProduct2 = {
+  ...product,
+  id: 12,
+  nameVi: 'Binh gom xanh',
+  nameEn: 'Blue pottery vase',
+  sellingPrice: 220000,
+  thumbnailUrl: '/assets/images/plate.jpg',
+  status: 'ACTIVE'
+}
+
+const featuredProduct3 = {
+  ...product,
+  id: 13,
+  nameVi: 'Bo tra gom',
+  nameEn: 'Pottery tea set',
+  sellingPrice: 320000,
+  thumbnailUrl: '/assets/images/tour.jpg',
+  status: 'ACTIVE'
+}
+
 const collection = { id: 1, nameVi: 'Bo suu tap do', nameEn: 'Red collection', descriptionVi: 'Gom mau dat nung.', descriptionEn: 'Fired clay tones.', status: 'ACTIVE' }
 const inactiveCollection = { id: 2, nameVi: 'Bo suu tap cu', nameEn: 'Archive collection', descriptionVi: 'Dang an.', descriptionEn: 'Hidden.', status: 'INACTIVE' }
 
@@ -120,6 +140,18 @@ async function mockApi(page, role = 'USER') {
     if (path === '/workshop/bookings') return created({ id: 9, status: 'NEW' })
     if (path === '/admin/dashboard') return ok({ totalOrders: 1, totalRevenue: 200000, newOrders: 1, lowStockProducts: [], recentOrders: [order], bestSellingProducts: [{ productNameVi: product.nameVi, totalQuantity: 2, totalRevenue: 400000 }] })
     if (path === '/admin/home' && route.request().method() === 'GET') return ok(adminHome)
+    if (path === '/admin/home/featured-products' && route.request().method() === 'PUT') {
+      const { productIds } = await route.request().postDataJSON()
+      const candidates = [{ ...product, status: 'ACTIVE' }, featuredProduct2, featuredProduct3]
+      adminHome = {
+        ...adminHome,
+        featuredProducts: productIds.map((id, index) => {
+          const selected = candidates.find(item => item.id === id)
+          return { slot: index + 1, id: selected.id, nameVi: selected.nameVi, nameEn: selected.nameEn, descriptionVi: selected.descriptionVi, descriptionEn: selected.descriptionEn, basePrice: selected.basePrice, sellingPrice: selected.sellingPrice, thumbnailUrl: selected.thumbnailUrl }
+        })
+      }
+      return ok(adminHome)
+    }
     if (path.startsWith('/admin/home/media/') && route.request().method() === 'PUT') {
       const slot = decodeURIComponent(path.split('/').pop())
       const updated = { slot, url: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', updatedAt: order.createdAt }
@@ -137,7 +169,8 @@ async function mockApi(page, role = 'USER') {
     if (path === '/admin/notifications') return ok({ content: [{ id: 1, title: 'Don moi', message: 'Co don hang moi', createdAt: order.createdAt, isRead: false }], page: 0, size: 10, totalElements: 37, totalPages: 4, first: true, last: false })
     if (path === '/admin/products' && route.request().method() === 'GET') {
       let rows = adminProducts
-      if (url.searchParams.get('status')) rows = rows.filter(item => item.status === url.searchParams.get('status'))
+      if (url.searchParams.get('status') === 'ACTIVE') rows = [{ ...product, status: 'ACTIVE' }, featuredProduct2, featuredProduct3]
+      else if (url.searchParams.get('status')) rows = rows.filter(item => item.status === url.searchParams.get('status'))
       return ok({ content: rows, page: Number(url.searchParams.get('page') || 0), size: Number(url.searchParams.get('size') || 20), totalElements: rows.length, totalPages: 1, first: true, last: true })
     }
     if (path === '/admin/products/11' && route.request().method() === 'PUT') {
@@ -247,6 +280,28 @@ test('admin homepage media supports preview, upload and reset to default', async
   await hero.getByRole('button', { name: 'Dùng ảnh mặc định' }).click()
   await expect(page.getByText('Đã đặt lại Ảnh Hero về mặc định.')).toBeVisible()
   await expect(hero.getByText('Ảnh mặc định', { exact: true })).toBeVisible()
+})
+
+test('admin homepage configures three distinct ACTIVE featured products in slot order', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  await page.goto('/admin?section=homepage')
+
+  const slot1 = page.getByLabel('Sản phẩm nổi bật vị trí 1')
+  const slot2 = page.getByLabel('Sản phẩm nổi bật vị trí 2')
+  const slot3 = page.getByLabel('Sản phẩm nổi bật vị trí 3')
+
+  await slot1.selectOption('10')
+  await expect(slot2.locator('option[value="10"]')).toHaveAttribute('disabled', '')
+  await slot2.selectOption('12')
+  await slot3.selectOption('13')
+
+  await page.getByRole('button', { name: 'Lưu sản phẩm nổi bật' }).click()
+  await expect(page.getByText('Đã cập nhật 3 sản phẩm nổi bật.')).toBeVisible()
+
+  const slots = page.locator('.homepage-featured-slot')
+  await expect(slots.nth(0)).toContainText('Binh gom do')
+  await expect(slots.nth(1)).toContainText('Binh gom xanh')
+  await expect(slots.nth(2)).toContainText('Bo tra gom')
 })
 
 test('admin catalog uses admin APIs for inactive products, discount prefill and collection delete', async ({ page }) => {

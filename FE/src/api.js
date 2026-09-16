@@ -114,6 +114,7 @@ export const api = {
     return request(`/admin/home/media/${encodeURIComponent(slot)}`, { method: 'PUT', body })
   },
   clearHomeMedia: slot => request(`/admin/home/media/${encodeURIComponent(slot)}`, { method: 'DELETE' }),
+  updateHomeFeaturedProducts: productIds => request('/admin/home/featured-products', { method: 'PUT', body: JSON.stringify({ productIds }) }),
   adminProducts: (params = '') => request(`/admin/products${params ? `?${params}` : ''}`),
   adminProduct: id => request(`/admin/products/${encodeURIComponent(id)}`),
   adminCollections: (params = '') => request(`/admin/collections${params ? `?${params}` : ''}`),
