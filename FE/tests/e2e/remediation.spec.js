@@ -104,7 +104,7 @@ async function mockApi(page, role = 'USER') {
   let adminCollections = [collection, inactiveCollection]
   let adminHome = {
     media: [
-      { slot: 'HOME_HERO', url: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', updatedAt: order.createdAt },
+      { slot: 'HOME_HERO', url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', updatedAt: order.createdAt },
       { slot: 'HOME_STORY', url: null, updatedAt: order.createdAt },
       { slot: 'HOME_SOCIAL_1', url: null, updatedAt: order.createdAt },
       { slot: 'HOME_SOCIAL_2', url: null, updatedAt: order.createdAt },
@@ -114,6 +114,23 @@ async function mockApi(page, role = 'USER') {
       { slot: 'HOME_SOCIAL_6', url: null, updatedAt: order.createdAt }
     ],
     featuredProducts: []
+  }
+  const publicHome = {
+    heroImageUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+    storyImageUrl: null,
+    socialImages: [
+      { slot: 'HOME_SOCIAL_1', url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_2', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_3', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_4', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_5', url: null, updatedAt: order.createdAt },
+      { slot: 'HOME_SOCIAL_6', url: null, updatedAt: order.createdAt }
+    ],
+    featuredProducts: [
+      { ...product, slot: 1 },
+      { ...featuredProduct2, slot: 2 },
+      { ...featuredProduct3, slot: 3 }
+    ]
   }
   const adminUsers = [
     { id: 1, fullName: 'Admin User', email: 'admin@example.com', role: 'ADMIN', status: 'ACTIVE', createdAt: order.createdAt },
@@ -128,6 +145,7 @@ async function mockApi(page, role = 'USER') {
 
     if (path === '/auth/csrf') return ok({ token: 'csrf-e2e' })
     if (path === '/me') return ok({ id: 1, fullName: 'Admin User', email: 'admin@example.com', role, status: 'ACTIVE' })
+    if (path === '/home') return ok(publicHome)
     if (path === '/products') return ok({ content: [product], page: Number(url.searchParams.get('page') || 0), size: 20, totalElements: 1, totalPages: 1, first: true, last: true })
     if (path === '/products/10') return ok(product)
     if (path === '/collections') return ok([collection])
@@ -154,7 +172,7 @@ async function mockApi(page, role = 'USER') {
     }
     if (path.startsWith('/admin/home/media/') && route.request().method() === 'PUT') {
       const slot = decodeURIComponent(path.split('/').pop())
-      const updated = { slot, url: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', updatedAt: order.createdAt }
+      const updated = { slot, url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', updatedAt: order.createdAt }
       adminHome = { ...adminHome, media: adminHome.media.map(item => item.slot === slot ? updated : item) }
       return ok(updated)
     }
@@ -197,6 +215,21 @@ async function mockApi(page, role = 'USER') {
     return ok(null)
   })
 }
+
+test('public homepage renders managed media and backend featured products', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+
+  const hero = page.getByRole('img', { name: 'Nghệ nhân Chăm tạo hình gốm bằng tay' })
+  await expect(hero).toHaveAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==')
+
+  const featured = page.locator('article').filter({ hasText: 'Binh gom xanh' })
+  await expect(featured.getByRole('heading', { name: 'Binh gom xanh' })).toBeVisible()
+  await expect(featured.getByRole('link', { name: /Xem Chi Tiết|View Details/i })).toHaveAttribute('href', '/products/12')
+
+  const journeyImage = page.getByRole('img', { name: 'Ảnh xưởng gốm 1' })
+  await expect(journeyImage).toHaveAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==')
+})
 
 test('public catalog delegates search/filter/sort to backend and opens product detail', async ({ page }) => {
   await mockApi(page)

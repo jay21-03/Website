@@ -87,6 +87,7 @@ const queryString = params => {
 }
 
 export const api = {
+  home: () => request('/home'),
   products: (params = {}, size) => {
     const normalized = typeof params === 'number' ? { page: params, size: size ?? 20 } : params
     return request(`/products?${queryString({ page: 0, size: 20, ...normalized })}`)

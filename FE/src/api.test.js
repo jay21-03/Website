@@ -22,6 +22,16 @@ describe('API client security', () => {
     expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/checkout', expect.objectContaining({ credentials: 'include', headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'memory-token' }) }))
   })
 
+  it('reads public homepage content without CSRF mutation flow', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ success: true, data: { heroImageUrl: 'https://cdn.example/hero.jpg', socialImages: [], featuredProducts: [] } }))
+
+    await api.home()
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith('/api/v1/home', expect.objectContaining({ credentials: 'include' }))
+  })
+
   it('builds authoritative product query parameters for backend filtering', async () => {
     fetch.mockResolvedValueOnce(response({ success: true, data: { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, first: true, last: true } }))
     const { api } = await import('./api')
