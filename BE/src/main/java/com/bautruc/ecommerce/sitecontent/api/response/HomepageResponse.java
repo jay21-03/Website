@@ -1,11 +1,15 @@
 package com.bautruc.ecommerce.sitecontent.api.response;
 
 import java.util.List;
+import java.util.Map;
 import com.bautruc.ecommerce.sitecontent.application.HomepageContentSnapshot;
 import com.bautruc.ecommerce.sitecontent.application.SiteMediaView;
 import com.bautruc.ecommerce.sitecontent.domain.SiteMediaSlot;
 
 public record HomepageResponse(
+        String sloganVi,
+        String sloganEn,
+        Map<String, String> copy,
         String heroImageUrl,
         String storyImageUrl,
         List<HomepageMediaResponse> socialImages,
@@ -13,6 +17,9 @@ public record HomepageResponse(
 ) {
     public static HomepageResponse from(HomepageContentSnapshot snapshot) {
         return new HomepageResponse(
+                snapshot.sloganVi(),
+                snapshot.sloganEn(),
+                snapshot.copy(),
                 url(snapshot, SiteMediaSlot.HOME_HERO),
                 url(snapshot, SiteMediaSlot.HOME_STORY),
                 snapshot.media().stream()

@@ -9,12 +9,15 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 import com.bautruc.ecommerce.catalog.application.HomepageProductQuery;
 import com.bautruc.ecommerce.catalog.application.HomepageProductView;
 import com.bautruc.ecommerce.common.exception.BusinessException;
 import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import com.bautruc.ecommerce.common.time.BusinessClock;
+import com.bautruc.ecommerce.sitecontent.domain.HomepageContent;
+import com.bautruc.ecommerce.sitecontent.infrastructure.HomepageContentJpaRepository;
 import com.bautruc.ecommerce.sitecontent.infrastructure.HomepageFeaturedProductJpaRepository;
 import com.bautruc.ecommerce.sitecontent.infrastructure.SiteMediaJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +29,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class HomepageContentServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-16T04:00:00Z");
+
+    @Mock
+    HomepageContentJpaRepository content;
 
     @Mock
     SiteMediaJpaRepository media;
@@ -54,7 +60,7 @@ class HomepageContentServiceTest {
                 return ZoneId.of("Asia/Ho_Chi_Minh");
             }
         };
-        service = new HomepageContentService(media, featured, products, clock, storage);
+        service = new HomepageContentService(content, media, featured, products, clock, storage);
     }
 
     @Test
@@ -90,6 +96,18 @@ class HomepageContentServiceTest {
         verify(featured).deleteAllInBatch();
         verify(featured).saveAll(org.mockito.ArgumentMatchers.anyList());
         verify(featured).flush();
+    }
+
+    @Test
+    void updatesHomepageSloganContent() {
+        HomepageContent copy = org.mockito.Mockito.mock(HomepageContent.class);
+        when(content.findById(HomepageContent.SINGLETON_ID)).thenReturn(Optional.of(copy));
+        when(featured.findAllByOrderBySlotAsc()).thenReturn(List.of());
+
+        service.updateSlogan("  Slogan vi  ", "  Slogan en  ");
+
+        verify(copy).updateSlogan("  Slogan vi  ", "  Slogan en  ", NOW);
+        verify(content).flush();
     }
 
     private HomepageProductView product(Long id) {

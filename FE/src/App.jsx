@@ -13,6 +13,7 @@ import { ThemeProvider } from './design/theme'
 import { DesignContext } from './design/i18n'
 import { validateCheckout } from './domain/checkout'
 import { useCheckout, useMyOrder, useMyOrders } from './hooks/useOrders'
+import { addGuestCartItem, clearGuestCart, loadGuestCart, updateGuestCartItem } from './services/guestCart'
 import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
@@ -38,10 +39,19 @@ const supportToContact = settings => settings ? {
   openingHours: settings.openingHours
 } : contact
 
+async function mergeGuestCartToAccount(guestCart) {
+  let merged = null
+  for (const item of guestCart.items || []) {
+    merged = await api.addCart(item.productId, item.quantity)
+  }
+  clearGuestCart()
+  return merged || api.cart()
+}
+
 function StoreProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('dxLang') || 'vi')
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
-  const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
+  const [cart, setCart] = useState(() => loadGuestCart()), [user, setUser] = useState(null)
   const [support, setSupport] = useState(contact)
   const [catalogLoading, setCatalogLoading] = useState(true), [toast, setToast] = useState('')
   const [authLoading, setAuthLoading] = useState(true)
@@ -49,13 +59,23 @@ function StoreProvider({ children }) {
   useEffect(() => {
     Promise.all([api.products(), api.collections()]).then(([page, groups]) => { setProducts(page.content); setCollections(groups) }).catch(error => notify(error.message)).finally(() => setCatalogLoading(false))
     api.supportSettings().then(settings => setSupport(supportToContact(settings))).catch(() => {})
-    api.me().then(current => { setUser(current); return current.role === 'USER' ? api.cart() : null }).then(value => value && setCart(value)).catch(() => {}).finally(() => setAuthLoading(false))
+    api.me().then(current => { setUser(current); return current.role === 'USER' ? api.cart() : null }).then(value => value && setCart(value)).catch(() => setCart(loadGuestCart())).finally(() => setAuthLoading(false))
   }, [notify])
   useEffect(() => { localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang])
-  async function add(productId) {
-    if (!user) { notify(pick(lang, 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.', 'Please sign in to add products to the cart.')); return false }
+  async function add(productOrId) {
+    if (!user) {
+      try {
+        const product = typeof productOrId === 'object' ? productOrId : await api.product(productOrId)
+        setCart(current => addGuestCartItem(current, product))
+        notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.'))
+        return true
+      } catch (error) {
+        notify(error.message)
+        return false
+      }
+    }
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
-    try { setCart(await api.addCart(productId)); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
+    try { setCart(await api.addCart(typeof productOrId === 'object' ? productOrId.id : productOrId)); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
   }
   return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, catalogLoading, authLoading, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
@@ -85,7 +105,7 @@ function DirectGoogleLogin() {
     try {
       const result = await api.googleLogin(credential)
       setUser(result.user)
-      if (result.user.role === 'USER') setCart(await api.cart())
+      if (result.user.role === 'USER') setCart(await mergeGuestCartToAccount(loadGuestCart()))
       notify(pick(lang, 'Đăng nhập thành công.', 'Signed in successfully.'))
       if (result.user.role === 'ADMIN') navigate('/admin', { replace: true })
     } catch (error) { notify(error.message) }
@@ -115,7 +135,7 @@ function DirectGoogleLogin() {
 }
 function BilingualFooter() {
   const { lang, support } = useStore()
-  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">Đàng Xem</Link><p className="footer-slogan">{pick(lang, 'Tinh hoa gốm Chăm - Gìn giữ hồn di sản', 'The essence of Cham pottery - preserving heritage soul')}</p><p>{pick(lang, 'Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.')}</p></div><div className="footer-col"><h3>{pick(lang, 'Liên kết', 'Links')}</h3><Link to="/products">{pick(lang, 'Sản phẩm', 'Products')}</Link><Link to="/workshop">Workshop</Link><Link to="/cart">{pick(lang, 'Giỏ hàng', 'Cart')}</Link><Link to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</Link><Link to="/ve-chung-toi">{pick(lang, 'Về chúng tôi', 'About us')}</Link><Link to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</Link><Link to="/faq">FAQ</Link><Link to="/policy">{pick(lang, 'Chính sách', 'Policy')}</Link></div><div className="footer-col"><h3>{pick(lang, 'Liên hệ', 'Contact')}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
+  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">Đàng Xem</Link><p className="footer-slogan">{pick(lang, 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản', 'The essence of Cham pottery - preserving heritage soul')}</p><p>{pick(lang, 'Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.')}</p></div><div className="footer-col"><h3>{pick(lang, 'Liên kết', 'Links')}</h3><Link to="/products">{pick(lang, 'Sản phẩm', 'Products')}</Link><Link to="/workshop">Workshop</Link><Link to="/cart">{pick(lang, 'Giỏ hàng', 'Cart')}</Link><Link to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</Link><Link to="/ve-chung-toi">{pick(lang, 'Về chúng tôi', 'About us')}</Link><Link to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</Link><Link to="/faq">FAQ</Link><Link to="/policy">{pick(lang, 'Chính sách', 'Policy')}</Link></div><div className="footer-col"><h3>{pick(lang, 'Liên hệ', 'Contact')}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
 }
 function Loading({ text = 'Đang tải dữ liệu...' }) { return <div className="state-box">{text}</div> }
 function Empty({ children }) { return <div className="state-box">{children}</div> }
@@ -173,12 +193,21 @@ function ProductDetail() {
   if (!product) return <Layout><main className="page"><Empty>{pick(lang, 'Không tìm thấy sản phẩm.', 'Product not found.')}</Empty></main></Layout>
   const name = lang === 'vi' ? product.nameVi : product.nameEn
   const description = lang === 'vi' ? product.descriptionVi : product.descriptionEn
-  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product.id)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div></main></Layout>
+  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div></main></Layout>
 }
 function Cart() {
-  const { cart, setCart, user, notify, lang, authLoading } = useStore()
-  async function change(item, quantity) { try { setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)) } catch (error) { notify(error.message) } }
-  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link><small className="cart-signin-note">{pick(lang, 'Đăng nhập khi thêm sản phẩm để lưu giỏ hàng và theo dõi đơn sau khi đặt.', 'Sign in when adding products to save your cart and track orders after checkout.')}</small></Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b><span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span><span><button type="button" onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div><Link className="button dark full" to="/checkout">{pick(lang, 'Tiếp tục thanh toán', 'Continue to checkout')}</Link></section></div>}</main></Layout>
+  const { cart, setCart, user, notify, lang } = useStore()
+  const isCustomer = user?.role === 'USER'
+  async function change(item, quantity) {
+    try {
+      if (!isCustomer) {
+        setCart(current => updateGuestCartItem(current, item.productId, quantity))
+        return
+      }
+      setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity))
+    } catch (error) { notify(error.message) }
+  }
+  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{!cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link>{!isCustomer && <small className="cart-signin-note">{pick(lang, 'Bạn có thể thêm sản phẩm khi chưa đăng nhập. Đăng nhập trước khi thanh toán để lưu giỏ hàng vào tài khoản.', 'You can add products before signing in. Sign in before checkout to save the cart to your account.')}</small>}</Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{!isCustomer && <small className="cart-signin-note">{pick(lang, 'Giỏ hàng này đang được lưu trên trình duyệt của bạn.', 'This cart is saved in your browser.')}</small>}{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{!item.guest && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" disabled={!item.guest && item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div>{isCustomer ? <Link className="button dark full" to="/checkout">{pick(lang, 'Tiếp tục thanh toán', 'Continue to checkout')}</Link> : <div className="guest-checkout-action"><DirectGoogleLogin /></div>}</section></div>}</main></Layout>
 }
 function Checkout() {
   const { cart, setCart, user, notify, lang, authLoading } = useStore(); const [errors, setErrors] = useState({}); const [submitError, setSubmitError] = useState(''); const navigate = useNavigate(); const checkout = useCheckout()

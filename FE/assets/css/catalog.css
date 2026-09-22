@@ -18,7 +18,7 @@
 .catalog-page .catalog-card .product-info { display: flex; flex: 1; flex-direction: column; padding: 24px }
 .catalog-card h3 { margin: 0; font: 500 20px/1.4 'Playfair Display', serif }
 .catalog-card .catalog-translation { margin: 2px 0 0; font: italic 14px/1.5 'Cormorant Garamond', serif; color: var(--wood) }
-.catalog-card .catalog-description { flex: 1; margin: 12px 0 0; color: var(--muted); font-size: 14px; line-height: 1.625; overflow-wrap: anywhere }
+.catalog-card .catalog-description { flex: 1; margin: 12px 0 0; color: #3f3026; font-size: 14px; line-height: 1.625; overflow-wrap: anywhere }
 .catalog-card .catalog-price { margin: 16px 0 0; font-size: 14px; color: var(--accent) }
 .catalog-price s { margin-left: 10px; color: var(--muted); font-size: 12px }
 .catalog-more { display: inline-flex; align-items: center; align-self: flex-start; gap: 12px; margin-top: 20px; padding: 10px 20px; border: 1px solid var(--accent); border-radius: 2px; color: var(--accent); font-size: 14px; min-height: 44px }

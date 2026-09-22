@@ -116,6 +116,8 @@ export const api = {
   },
   clearHomeMedia: slot => request(`/admin/home/media/${encodeURIComponent(slot)}`, { method: 'DELETE' }),
   updateHomeFeaturedProducts: productIds => request('/admin/home/featured-products', { method: 'PUT', body: JSON.stringify({ productIds }) }),
+  updateHomeSlogan: values => request('/admin/home/slogan', { method: 'PUT', body: JSON.stringify(values) }),
+  updateHomeCopy: copy => request('/admin/home/copy', { method: 'PUT', body: JSON.stringify({ copy }) }),
   adminProducts: (params = '') => request(`/admin/products${params ? `?${params}` : ''}`),
   adminProduct: id => request(`/admin/products/${encodeURIComponent(id)}`),
   adminCollections: (params = '') => request(`/admin/collections${params ? `?${params}` : ''}`),

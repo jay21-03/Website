@@ -4,6 +4,8 @@ import com.bautruc.ecommerce.common.logging.LogContext;
 import com.bautruc.ecommerce.common.response.ApiResponse;
 import com.bautruc.ecommerce.common.time.BusinessClock;
 import com.bautruc.ecommerce.sitecontent.api.request.UpdateFeaturedProductsRequest;
+import com.bautruc.ecommerce.sitecontent.api.request.UpdateHomepageCopyRequest;
+import com.bautruc.ecommerce.sitecontent.api.request.UpdateHomepageSloganRequest;
 import com.bautruc.ecommerce.sitecontent.api.response.AdminHomepageResponse;
 import com.bautruc.ecommerce.sitecontent.api.response.HomepageMediaResponse;
 import com.bautruc.ecommerce.sitecontent.api.response.HomepageResponse;
@@ -52,6 +54,20 @@ public class HomepageContentController {
             @Valid @RequestBody UpdateFeaturedProductsRequest request
     ) {
         return ok(AdminHomepageResponse.from(service.updateFeaturedProducts(request.productIds())));
+    }
+
+    @PutMapping("/api/v1/admin/home/slogan")
+    public ApiResponse<AdminHomepageResponse> updateSlogan(
+            @Valid @RequestBody UpdateHomepageSloganRequest request
+    ) {
+        return ok(AdminHomepageResponse.from(service.updateSlogan(request.sloganVi(), request.sloganEn())));
+    }
+
+    @PutMapping("/api/v1/admin/home/copy")
+    public ApiResponse<AdminHomepageResponse> updateCopy(
+            @Valid @RequestBody UpdateHomepageCopyRequest request
+    ) {
+        return ok(AdminHomepageResponse.from(service.updateCopy(request.copy())));
     }
 
     @PutMapping(value = "/api/v1/admin/home/media/{slot}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

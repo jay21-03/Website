@@ -5,6 +5,7 @@ public final class SiteContentErrorCodes {
     }
 
     public static final String HOMEPAGE_FEATURED_PRODUCTS_INVALID = "HOMEPAGE_FEATURED_PRODUCTS_INVALID";
+    public static final String HOMEPAGE_CONTENT_NOT_FOUND = "HOMEPAGE_CONTENT_NOT_FOUND";
     public static final String HOMEPAGE_MEDIA_EMPTY = "HOMEPAGE_MEDIA_EMPTY";
     public static final String HOMEPAGE_MEDIA_TOO_LARGE = "HOMEPAGE_MEDIA_TOO_LARGE";
     public static final String HOMEPAGE_MEDIA_TYPE_UNSUPPORTED = "HOMEPAGE_MEDIA_TYPE_UNSUPPORTED";

@@ -115,4 +115,37 @@ describe('API client security', () => {
     }))
   })
 
+  it('updates homepage slogan with CSRF-protected JSON payload', async () => {
+    const { api } = await import('./api')
+    const values = {
+      sloganVi: 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản',
+      sloganEn: 'The essence of Cham pottery - preserving heritage soul'
+    }
+    fetch.mockResolvedValueOnce(response({ data: { token: 'slogan-token' } })).mockResolvedValueOnce(response({ success: true, data: values }))
+
+    await api.updateHomeSlogan(values)
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/slogan', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify(values),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-XSRF-TOKEN': 'slogan-token' })
+    }))
+  })
+
+  it('updates homepage copy with CSRF-protected JSON payload', async () => {
+    const { api } = await import('./api')
+    const copy = { heroEyebrowVi: 'Làng gốm mới', heroEyebrowEn: 'New pottery village' }
+    fetch.mockResolvedValueOnce(response({ data: { token: 'copy-token' } })).mockResolvedValueOnce(response({ success: true, data: { copy } }))
+
+    await api.updateHomeCopy(copy)
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/copy', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ copy }),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-XSRF-TOKEN': 'copy-token' })
+    }))
+  })
+
 })

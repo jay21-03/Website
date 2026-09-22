@@ -652,6 +652,86 @@ const featuredIdsFromHome = home => {
   return homepageFeaturedSlots.map(slot => bySlot.get(slot) || '')
 }
 
+const homepageCopySections = [
+  {
+    titleVi: 'Hero đầu trang',
+    titleEn: 'Hero',
+    fields: [
+      ['heroEyebrowVi', 'Dòng nhỏ VI', 'Làng gốm Bàu Trúc · Khánh Hòa'],
+      ['heroEyebrowEn', 'Dòng nhỏ EN', 'Bàu Trúc pottery village · Khánh Hòa'],
+      ['heroSubtitleVi', 'Phụ đề VI', 'Gốm thủ công Chăm Bàu Trúc | Di sản UNESCO 2022'],
+      ['heroSubtitleEn', 'Phụ đề EN', 'Handmade Cham pottery from Bàu Trúc | UNESCO Heritage 2022'],
+      ['heroDescriptionVi', 'Mô tả VI', 'Mỗi sản phẩm là một phiên bản duy nhất — được tạo ra hoàn toàn bằng đôi bàn tay của nghệ nhân Chăm, từ đất sét tự nhiên làng Bàu Trúc, Khánh Hòa.', true],
+      ['heroDescriptionEn', 'Mô tả EN', 'Every piece is one of a kind — shaped entirely by the hands of Cham artisans from natural clay of Bàu Trúc village, Khánh Hòa.', true],
+      ['heroPrimaryLabelVi', 'Nút chính VI', 'Khám Phá Sản Phẩm'],
+      ['heroPrimaryLabelEn', 'Nút chính EN', 'Explore Products'],
+      ['heroSecondaryLabelVi', 'Nút phụ VI', 'Đặt Lịch Trải Nghiệm'],
+      ['heroSecondaryLabelEn', 'Nút phụ EN', 'Book an Experience']
+    ]
+  },
+  {
+    titleVi: 'Thanh cam kết',
+    titleEn: 'Trust bar',
+    fields: [
+      ['trust1TitleVi', 'Mục 1 tiêu đề VI', '100% Thủ Công'],
+      ['trust1TitleEn', 'Mục 1 tiêu đề EN', '100% Handmade'],
+      ['trust1DescriptionVi', 'Mục 1 mô tả VI', 'Không khuôn, không bàn xoay máy — tạo hình hoàn toàn bằng tay.', true],
+      ['trust1DescriptionEn', 'Mục 1 mô tả EN', 'No molds, no wheel — every piece is shaped entirely by hand.', true],
+      ['trust2TitleVi', 'Mục 2 tiêu đề VI', 'Nguyên Liệu Tự Nhiên'],
+      ['trust2TitleEn', 'Mục 2 tiêu đề EN', 'Natural Materials'],
+      ['trust2DescriptionVi', 'Mục 2 mô tả VI', 'Đất sét lấy từ cánh đồng Nu Lanh, pha cát mịn sông Quao.', true],
+      ['trust2DescriptionEn', 'Mục 2 mô tả EN', 'Clay from the Nu Lanh fields blended with fine Quao river sand.', true],
+      ['trust3TitleVi', 'Mục 3 tiêu đề VI', 'Di Sản UNESCO'],
+      ['trust3TitleEn', 'Mục 3 tiêu đề EN', 'UNESCO Heritage'],
+      ['trust3DescriptionVi', 'Mục 3 mô tả VI', 'Nghệ thuật gốm Chăm Bàu Trúc được ghi danh năm 2022.', true],
+      ['trust3DescriptionEn', 'Mục 3 mô tả EN', 'Cham pottery of Bàu Trúc was inscribed by UNESCO in 2022.', true]
+    ]
+  },
+  {
+    titleVi: 'Câu chuyện',
+    titleEn: 'Story',
+    fields: [
+      ['storyEyebrowVi', 'Dòng nhỏ VI', 'Câu chuyện'],
+      ['storyEyebrowEn', 'Dòng nhỏ EN', 'Our story'],
+      ['storyTitleVi', 'Tiêu đề VI', 'Hơn 15 năm giữ lửa nghề Chăm'],
+      ['storyTitleEn', 'Tiêu đề EN', 'Over 15 years keeping the Cham craft alive'],
+      ['storyBodyVi', 'Nội dung VI', 'Từ năm 2009, Nghệ nhân Đàng Xem đã gìn giữ và phát triển nghề gốm truyền thống của người Chăm tại làng Bàu Trúc. Mỗi sản phẩm mang trong mình hàng trăm năm lịch sử và dấu ấn riêng của đôi bàn tay tạo ra nó.', true],
+      ['storyBodyEn', 'Nội dung EN', 'Since 2009, artisan Đàng Xem has preserved and developed the traditional Cham pottery craft in Bàu Trúc village. Each piece carries centuries of history and the mark of the hands that made it.', true],
+      ['storyLinkLabelVi', 'Link VI', 'Đọc thêm câu chuyện của chúng tôi →'],
+      ['storyLinkLabelEn', 'Link EN', 'Read more of our story →']
+    ]
+  },
+  {
+    titleVi: 'Các khu vực còn lại',
+    titleEn: 'Remaining sections',
+    fields: [
+      ['featuredEyebrowVi', 'Sản phẩm dòng nhỏ VI', 'Bộ sưu tập'],
+      ['featuredEyebrowEn', 'Sản phẩm dòng nhỏ EN', 'Collection'],
+      ['featuredTitleVi', 'Sản phẩm tiêu đề VI', 'Sản Phẩm Nổi Bật'],
+      ['featuredTitleEn', 'Sản phẩm tiêu đề EN', 'Featured Products'],
+      ['featuredEmptyVi', 'Sản phẩm trống VI', 'Sản phẩm nổi bật đang được cập nhật.'],
+      ['featuredEmptyEn', 'Sản phẩm trống EN', 'Featured products are being updated.'],
+      ['experienceTitleVi', 'Trải nghiệm tiêu đề VI', 'Trải Nghiệm Làm Gốm Cùng Nghệ Nhân'],
+      ['experienceTitleEn', 'Trải nghiệm tiêu đề EN', 'Make Pottery with the Artisan'],
+      ['experienceBodyVi', 'Trải nghiệm mô tả VI', 'Đặt tay vào đất sét — cảm nhận hàng trăm năm văn hóa Chăm qua đôi bàn tay của chính bạn. Workshop phù hợp cho cá nhân, gia đình và đoàn tour.', true],
+      ['experienceBodyEn', 'Trải nghiệm mô tả EN', 'Put your hands in the clay and feel centuries of Cham culture. Workshops for individuals, families and tour groups.', true],
+      ['experienceButtonVi', 'Trải nghiệm nút VI', 'Đặt Lịch Ngay'],
+      ['experienceButtonEn', 'Trải nghiệm nút EN', 'Book Now'],
+      ['partnersTitleVi', 'Đối tác tiêu đề VI', 'Đối Tác Tin Cậy'],
+      ['partnersTitleEn', 'Đối tác tiêu đề EN', 'Trusted Partners'],
+      ['partnersItem1Vi', 'Đối tác 1 VI', 'Amanoi Resort'],
+      ['partnersItem1En', 'Đối tác 1 EN', 'Amanoi Resort'],
+      ['partnersItem2Vi', 'Đối tác 2 VI', 'Tour lữ hành địa phương'],
+      ['partnersItem2En', 'Đối tác 2 EN', 'Local tour operators'],
+      ['partnersItem3Vi', 'Đối tác 3 VI', 'UNESCO'],
+      ['partnersItem3En', 'Đối tác 3 EN', 'UNESCO'],
+      ['socialTitleVi', 'Social tiêu đề VI', 'Theo Dõi Hành Trình Gốm'],
+      ['socialTitleEn', 'Social tiêu đề EN', 'Follow the Pottery Journey'],
+      ['socialHandle', 'Social handle', '@dangxem.baoutruc']
+    ]
+  }
+]
+
 function HomepageContent({ notify, lang = 'vi' }) {
   const [home, setHome] = useState(null)
   const [products, setProducts] = useState([])
@@ -660,6 +740,8 @@ function HomepageContent({ notify, lang = 'vi' }) {
   const [error, setError] = useState('')
   const [busySlot, setBusySlot] = useState('')
   const [savingFeatured, setSavingFeatured] = useState(false)
+  const [savingSlogan, setSavingSlogan] = useState(false)
+  const [savingCopy, setSavingCopy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -742,6 +824,37 @@ function HomepageContent({ notify, lang = 'vi' }) {
     }
   }
 
+  async function saveSlogan(event) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const values = Object.fromEntries(new FormData(form))
+    setSavingSlogan(true)
+    try {
+      const updated = await api.updateHomeSlogan(values)
+      setHome(updated)
+      notify(adminText(lang, 'Đã cập nhật slogan trang chủ.', 'Homepage slogan updated.'))
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setSavingSlogan(false)
+    }
+  }
+
+  async function saveCopy(event) {
+    event.preventDefault()
+    const copy = Object.fromEntries(new FormData(event.currentTarget))
+    setSavingCopy(true)
+    try {
+      const updated = await api.updateHomeCopy(copy)
+      setHome(updated)
+      notify(adminText(lang, 'Đã cập nhật nội dung chữ trang chủ.', 'Homepage copy updated.'))
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setSavingCopy(false)
+    }
+  }
+
   const mediaBySlot = new Map((home?.media || []).map(item => [item.slot, item]))
   const primary = homepageMediaConfig.slice(0, 2)
   const social = homepageMediaConfig.slice(2)
@@ -752,6 +865,45 @@ function HomepageContent({ notify, lang = 'vi' }) {
   >
     <p className="homepage-admin-intro">{adminText(lang, 'Ảnh được tải lên sẽ được sử dụng cho các vị trí tương ứng trên trang chủ. Nếu chưa tải ảnh hoặc đặt lại, website dùng ảnh mặc định hiện có.', 'Uploaded images are managed for the homepage. When no managed image exists, the website uses its current default image.')}</p>
     <LoadState loading={loading} error={error} lang={lang}>
+      <section className="homepage-copy-section">
+        <div className="homepage-media-section-head homepage-featured-head">
+          <h3>{adminText(lang, 'Slogan trang chủ', 'Homepage slogan')}</h3>
+          <p>{adminText(lang, 'Dòng chữ lớn ở banner đầu trang chủ.', 'The large headline shown in the homepage hero.')}</p>
+        </div>
+        <form className="homepage-copy-form" onSubmit={saveSlogan} key={`${home?.sloganVi || ''}:${home?.sloganEn || ''}`}>
+          <label>
+            <span>{adminText(lang, 'Slogan tiếng Việt', 'Vietnamese slogan')}</span>
+            <input name="sloganVi" defaultValue={home?.sloganVi || 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản'} maxLength="255" required />
+          </label>
+          <label>
+            <span>{adminText(lang, 'Slogan tiếng Anh', 'English slogan')}</span>
+            <input name="sloganEn" defaultValue={home?.sloganEn || 'The essence of Cham pottery - preserving heritage soul'} maxLength="255" required />
+          </label>
+          <div className="homepage-copy-actions">
+            <button className="admin-primary" disabled={savingSlogan}>{savingSlogan ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu slogan', 'Save slogan')}</button>
+          </div>
+        </form>
+      </section>
+      <section className="homepage-copy-section">
+        <div className="homepage-media-section-head homepage-featured-head">
+          <h3>{adminText(lang, 'Nội dung chữ trang chủ', 'Homepage copy')}</h3>
+          <p>{adminText(lang, 'Chỉnh các tiêu đề, mô tả, nút và dòng chữ đang hiển thị trên trang chủ.', 'Edit titles, descriptions, buttons, and visible homepage text.')}</p>
+        </div>
+        <form className="homepage-copy-form homepage-copy-form-full" onSubmit={saveCopy} key={`copy:${JSON.stringify(home?.copy || {})}`}>
+          {homepageCopySections.map(section => <fieldset className="homepage-copy-fieldset" key={section.titleEn}>
+            <legend>{adminText(lang, section.titleVi, section.titleEn)}</legend>
+            {section.fields.map(([name, label, fallback, multiline]) => <label className={multiline ? 'wide' : ''} key={name}>
+              <span>{label}</span>
+              {multiline
+                ? <textarea name={name} defaultValue={home?.copy?.[name] || fallback} maxLength="1200" required />
+                : <input name={name} defaultValue={home?.copy?.[name] || fallback} maxLength="255" required />}
+            </label>)}
+          </fieldset>)}
+          <div className="homepage-copy-actions">
+            <button className="admin-primary" disabled={savingCopy}>{savingCopy ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu nội dung trang chủ', 'Save homepage copy')}</button>
+          </div>
+        </form>
+      </section>
       <section className="homepage-featured-section">
         <div className="homepage-media-section-head homepage-featured-head">
           <h3>{adminText(lang, 'Sản phẩm nổi bật', 'Featured products')}</h3>

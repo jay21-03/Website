@@ -70,7 +70,7 @@
   --secondary: var(--sand);
   --secondary-foreground: var(--espresso);
   --muted: var(--sand);
-  --muted-foreground: oklch(0.482 0.048 55);
+  --muted-foreground: oklch(0.36 0.048 55);
   --accent: var(--gold);
   --accent-foreground: var(--espresso);
   --destructive: oklch(0.55 0.19 28);
@@ -99,7 +99,7 @@
   --secondary: var(--sand);
   --secondary-foreground: oklch(0.945 0.016 78);
   --muted: var(--sand);
-  --muted-foreground: oklch(0.755 0.026 70);
+  --muted-foreground: oklch(0.84 0.026 70);
   --accent: var(--gold);
   --accent-foreground: oklch(0.17 0.02 55);
   --destructive: oklch(0.62 0.19 28);

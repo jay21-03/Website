@@ -28,6 +28,9 @@ header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
 .workshop-cards article, .workshop-form, .workshop-info, .contact-card, .faq-list details { border-radius: 4px; background: var(--card); border-color: var(--border); }
 .workshop-cards img { aspect-ratio: 4/3; object-fit: cover; }
 .workshop-form input, .workshop-form select, .workshop-form textarea { background: var(--background); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px; }
+.filters select, .checkout-form select, .workshop-form select, .about-form select { background: var(--popover); color: var(--popover-foreground); border-color: var(--primary); }
+.filters select option, .checkout-form select option, .workshop-form select option, .about-form select option { background: var(--popover); color: var(--popover-foreground); }
+.catalog-card .catalog-description { color: var(--foreground); opacity: .88; }
 .floating-chat { bottom: 100px; }
 @media(min-width:1024px) { .floating-chat { bottom: 28px; } }
 @media(max-width:767px) { .footer-grid { grid-template-columns: 1fr; gap: 32px; } }
