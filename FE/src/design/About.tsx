@@ -176,7 +176,7 @@ export default function About() {
                 {t("Nghệ nhân: Đàng Xem", "Artisan: Đàng Xem")}
               </p>
               <p className="mt-8 font-serif text-lg italic text-wood">
-                {t("Đất hóa hồn — Tay giữ lửa", "Clay becomes soul — Hands keep the fire")}
+                {t("Tinh hoa gốm Chăm - Gìn giữ hồn di sản", "The essence of Cham pottery - preserving heritage soul")}
               </p>
             </div>
           </Reveal>

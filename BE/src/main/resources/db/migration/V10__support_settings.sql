@@ -23,7 +23,7 @@ INSERT INTO support_settings (
     updated_at
 ) VALUES (
     1,
-    'Cosogombautrucdangxem@gmail.com',
+    'dangxembautrucpottery@gmail.com',
     '0343478155',
     '0966477160',
     'https://www.facebook.com/share/18jwSfSPD7/?mibextid=wwXIfr',

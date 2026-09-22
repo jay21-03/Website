@@ -905,7 +905,9 @@ select {
     color: var(--white);
     padding: 14px 20px;
     z-index: 120;
-    font-size: 11px;
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: min(360px, calc(100vw - 32px));
     transform: translateX(130%);
     transition: .3s
 }
@@ -1524,9 +1526,10 @@ select {
 .product-thumbs button.active{border-color:var(--accent)}
 .product-thumbs img{width:100%;height:100%;object-fit:cover}
 .product-detail-info{background:#fff;border:1px solid #ded6ca;padding:34px;display:grid;gap:16px}
-.product-detail-info h1{font:500 42px/1.1 'Playfair Display',serif;margin:0}
-.product-detail-info p{color:var(--muted);line-height:1.8}
-.detail-price{font-size:20px}
+.product-detail-info h1{font:500 42px/1.1 'Playfair Display',serif;margin:0;color:var(--ink)}
+.product-detail-info p{color:#514a43;line-height:1.8}
+.detail-price{font-size:22px;color:#823f28}
+.cart-signin-note{display:block;margin-top:12px;color:#514a43;line-height:1.6}
 .payment-panel{border-top:1px solid var(--line);margin-top:24px;padding-top:22px}
 .payment-panel h3{margin-top:0}
 .payment-qr{width:180px;max-width:100%;margin:14px 0;border:1px solid var(--line);background:#fff}
@@ -1538,7 +1541,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .collection-card h2{font:500 26px 'Playfair Display',serif;margin:0}
 .collection-card p{color:var(--muted);line-height:1.7;min-height:4.5em}
 @media(max-width:760px){.order-row{grid-template-columns:1fr 1fr}.order-detail{grid-template-columns:1fr}.header-tools .icon-btn:last-child{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
-@media(max-width:760px){.product-detail-layout{grid-template-columns:1fr}.product-detail-info{padding:24px}.product-detail-info h1{font-size:32px}}
+@media(max-width:760px){.product-detail-layout{grid-template-columns:1fr}.product-detail-info{padding:24px}.product-detail-info h1{font-size:32px;color:var(--ink)}.detail-price{font-size:21px;color:#823f28}.toast{right:16px;bottom:96px;font-size:13px}}
 @media(max-width:760px){.workshop-hero,.workshop-layout,.workshop-form{grid-template-columns:1fr}.workshop-hero h1{font-size:38px}.workshop-info{position:static}}
 /* Contact/about page adapted from the supplied reference. */
 .about-container { width: 100%; max-width: 1280px; padding-inline: 32px; margin-inline: auto }
