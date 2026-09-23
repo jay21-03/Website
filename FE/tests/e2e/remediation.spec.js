@@ -475,3 +475,33 @@ test('mobile typography has Vietnamese glyphs without clipping, overlap or horiz
   await page.goto('/cart')
   await expect(page.getByRole('heading', { name: 'Giỏ hàng của bạn' })).toBeVisible()
 })
+
+test('dark product title remains readable and mobile UNESCO badge does not overlap', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.addInitScript(() => localStorage.setItem('dangxem-theme', 'dark'))
+  await mockApi(page, null)
+
+  await page.goto('/products/10')
+  const contrast = await page.locator('.product-detail-info h1').evaluate(element => {
+    const parse = value => value.match(/[\d.]+/g).slice(0, 3).map(Number)
+    const luminance = value => {
+      const channels = parse(value).map(channel => {
+        const normalized = channel / 255
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+    }
+    const style = getComputedStyle(element)
+    const foreground = luminance(style.color)
+    const background = luminance(getComputedStyle(element.closest('.product-detail-info')).backgroundColor)
+    return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05)
+  })
+  expect(contrast).toBeGreaterThanOrEqual(4.5)
+
+  await page.goto('/')
+  const badge = await page.getByText('UNESCO Heritage 2022', { exact: true }).boundingBox()
+  const location = await page.getByText('Làng gốm Bàu Trúc · Khánh Hòa', { exact: true }).boundingBox()
+  expect(badge).not.toBeNull()
+  expect(location).not.toBeNull()
+  expect(badge.y + badge.height).toBeLessThanOrEqual(location.y)
+})

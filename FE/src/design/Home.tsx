@@ -96,7 +96,7 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
           <div className="absolute inset-0 bg-background/72" />
         </div>
 
-        <div className="absolute right-4 top-20 z-10 sm:top-24 lg:right-8">
+        <div className="absolute right-4 top-4 z-10 sm:top-24 lg:right-8">
           <span className="inline-flex items-center gap-2 rounded-sm border border-accent bg-accent/25 px-3.5 py-1.5 text-[11px] uppercase tracking-[0.18em] text-foreground">
             <Landmark className="h-3.5 w-3.5" /> UNESCO Heritage 2022
           </span>
