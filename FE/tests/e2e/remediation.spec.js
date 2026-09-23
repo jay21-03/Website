@@ -447,8 +447,8 @@ test('mobile typography has Vietnamese glyphs without clipping, overlap or horiz
             return element.scrollWidth > element.clientWidth + 2 || clipsVertically
           })
           .map(element => element.textContent.trim())
-        const brand = document.querySelector('.site-header .brand')?.getBoundingClientRect()
-        const tools = document.querySelector('.site-header .header-tools')?.getBoundingClientRect()
+        const brand = document.querySelector('header > div > a[href="/"]')?.getBoundingClientRect()
+        const tools = [...document.querySelectorAll('header > div > div')].find(visible)?.getBoundingClientRect()
         const overlaps = brand && tools && brand.right > tools.left && brand.left < tools.right && brand.bottom > tools.top && brand.top < tools.bottom
         return {
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
