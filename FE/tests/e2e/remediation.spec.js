@@ -144,7 +144,10 @@ async function mockApi(page, role = 'USER') {
     const created = data => route.fulfill({ status: 201, contentType: 'application/json', body: envelope(data) })
 
     if (path === '/auth/csrf') return ok({ token: 'csrf-e2e' })
-    if (path === '/me') return ok({ id: 1, fullName: 'Admin User', email: 'admin@example.com', role, status: 'ACTIVE' })
+    if (path === '/me') {
+      if (!role) return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required.' } }) })
+      return ok({ id: 1, fullName: 'Admin User', email: 'admin@example.com', role, status: 'ACTIVE' })
+    }
     if (path === '/home') return ok(publicHome)
     if (path === '/products') return ok({ content: [product], page: Number(url.searchParams.get('page') || 0), size: 20, totalElements: 1, totalPages: 1, first: true, last: true })
     if (path === '/products/10') return ok(product)
@@ -400,4 +403,75 @@ test('public workshop booking and support settings render on mobile', async ({ p
   await page.goto('/support')
   await expect(page.getByRole('main').getByRole('link', { name: 'support@example.com' })).toBeVisible()
   await expect(page.getByRole('main').getByText('Bau Truc')).toBeVisible()
+})
+
+test('guest cart persists locally and only requires sign-in at checkout', async ({ page }) => {
+  await mockApi(page, null)
+  await page.goto('/products/10')
+  await page.getByRole('button', { name: 'Thêm vào giỏ hàng' }).click()
+  await page.goto('/cart')
+  await expect(page.getByRole('heading', { name: 'Giỏ hàng của bạn' })).toBeVisible()
+  await expect(page.getByText('Binh gom do')).toBeVisible()
+  await page.getByRole('button', { name: 'Tăng số lượng' }).click()
+  await page.reload()
+  await expect(page.locator('.checkout-item')).toContainText('2')
+  await page.getByRole('link', { name: 'Đăng nhập để thanh toán' }).click()
+  await expect(page.getByText('Bạn cần đăng nhập bằng tài khoản khách hàng để đặt hàng.')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bautruc.guest-cart.v1')))).toEqual([{ productId: 10, quantity: 2 }])
+})
+
+test('mobile typography has Vietnamese glyphs without clipping, overlap or horizontal overflow', async ({ page }) => {
+  test.setTimeout(60000)
+  await mockApi(page, null)
+  const viewports = [
+    { width: 390, height: 844 },
+    { width: 412, height: 915 },
+    { width: 430, height: 932 }
+  ]
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport)
+    for (const path of ['/', '/products/10', '/cart']) {
+      await page.goto(path)
+      await page.evaluate(() => document.fonts.ready)
+      const audit = await page.evaluate(() => {
+        const visible = element => {
+          const style = getComputedStyle(element)
+          return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0
+        }
+        const clipped = [...document.querySelectorAll('h1,h2,h3,.button,.icon-btn')]
+          .filter(visible)
+          .filter(element => {
+            const style = getComputedStyle(element)
+            const clipsVertically = ['hidden', 'clip'].includes(style.overflowY) && element.scrollHeight > element.clientHeight + 2
+            return element.scrollWidth > element.clientWidth + 2 || clipsVertically
+          })
+          .map(element => element.textContent.trim())
+        const brand = document.querySelector('.site-header .brand')?.getBoundingClientRect()
+        const tools = document.querySelector('.site-header .header-tools')?.getBoundingClientRect()
+        const overlaps = brand && tools && brand.right > tools.left && brand.left < tools.right && brand.bottom > tools.top && brand.top < tools.bottom
+        return {
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          clipped,
+          overlaps,
+          bodyFont: getComputedStyle(document.body).fontFamily,
+          fontLoaded: document.fonts.check('400 16px "Be Vietnam Pro"', 'Gìn giữ hồn di sản'),
+          replacementGlyph: document.body.innerText.includes('\uFFFD')
+        }
+      })
+      expect(audit.overflow, `${path} at ${viewport.width}px`).toBeLessThanOrEqual(1)
+      expect(audit.clipped, `${path} at ${viewport.width}px`).toEqual([])
+      expect(audit.overlaps, `${path} at ${viewport.width}px`).toBeFalsy()
+      expect(audit.bodyFont).toContain('Be Vietnam Pro')
+      expect(audit.fontLoaded).toBeTruthy()
+      expect(audit.replacementGlyph).toBeFalsy()
+    }
+  }
+
+  await page.goto('/')
+  await expect(page.getByText('Tinh hoa gốm Chăm - Gìn giữ hồn di sản').first()).toBeVisible()
+  await page.goto('/products/10')
+  await expect(page.getByRole('button', { name: 'Thêm vào giỏ hàng' })).toBeVisible()
+  await page.goto('/cart')
+  await expect(page.getByRole('heading', { name: 'Giỏ hàng của bạn' })).toBeVisible()
 })

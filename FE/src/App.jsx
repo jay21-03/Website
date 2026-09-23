@@ -13,6 +13,7 @@ import { ThemeProvider } from './design/theme'
 import { DesignContext } from './design/i18n'
 import { validateCheckout } from './domain/checkout'
 import { useCheckout, useMyOrder, useMyOrders } from './hooks/useOrders'
+import { addGuestQuantity, guestCartFromProducts, hydrateGuestCart, mergeGuestCart, readGuestCart, setGuestQuantity, writeGuestCart } from './services/guestCart'
 import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
@@ -37,6 +38,8 @@ const supportToContact = settings => settings ? {
   map: settings.mapUrl,
   openingHours: settings.openingHours
 } : contact
+const emptyCart = () => ({ items: [], totalAmount: 0 })
+const mergeStoredCart = () => mergeGuestCart({ loadCart: api.cart, addItem: api.addCart })
 
 function StoreProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('dxLang') || 'vi')
@@ -45,15 +48,46 @@ function StoreProvider({ children }) {
   const [support, setSupport] = useState(contact)
   const [catalogLoading, setCatalogLoading] = useState(true), [toast, setToast] = useState('')
   const [authLoading, setAuthLoading] = useState(true)
+  const langRef = useRef(lang)
+  langRef.current = lang
   const notify = useCallback(message => { setToast(message); window.setTimeout(() => setToast(''), 2500) }, [])
   useEffect(() => {
     Promise.all([api.products(), api.collections()]).then(([page, groups]) => { setProducts(page.content); setCollections(groups) }).catch(error => notify(error.message)).finally(() => setCatalogLoading(false))
     api.supportSettings().then(settings => setSupport(supportToContact(settings))).catch(() => {})
-    api.me().then(current => { setUser(current); return current.role === 'USER' ? api.cart() : null }).then(value => value && setCart(value)).catch(() => {}).finally(() => setAuthLoading(false))
+    async function initializeCart() {
+      let current
+      try { current = await api.me() } catch {
+        setUser(null)
+        setCart(await hydrateGuestCart(api.product))
+        setAuthLoading(false)
+        return
+      }
+      setUser(current)
+      if (current.role !== 'USER') setCart(emptyCart())
+      else {
+        try {
+          const result = await mergeStoredCart()
+          setCart(result.cart)
+          if (result.failed) notify(pick(langRef.current, 'Một số sản phẩm trong giỏ tạm chưa thể hợp nhất do giá hoặc tồn kho đã thay đổi.', 'Some guest-cart items could not be merged because price or inventory changed.'))
+        } catch (error) {
+          try { setCart(await api.cart()) } catch { setCart(emptyCart()) }
+          notify(error.message)
+        }
+      }
+      setAuthLoading(false)
+    }
+    initializeCart()
   }, [notify])
   useEffect(() => { localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang])
-  async function add(productId) {
-    if (!user) { notify(pick(lang, 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.', 'Please sign in to add products to the cart.')); return false }
+  async function add(product) {
+    const productId = product.id
+    if (!user) {
+      const entries = addGuestQuantity(readGuestCart(), productId)
+      writeGuestCart(entries)
+      setCart(current => guestCartFromProducts(entries, [...current.items, product]))
+      notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.'))
+      return true
+    }
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
     try { setCart(await api.addCart(productId)); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
   }
@@ -85,7 +119,15 @@ function DirectGoogleLogin() {
     try {
       const result = await api.googleLogin(credential)
       setUser(result.user)
-      if (result.user.role === 'USER') setCart(await api.cart())
+      if (result.user.role === 'USER') {
+        try {
+          const merged = await mergeStoredCart()
+          setCart(merged.cart)
+          if (merged.failed) notify(pick(lang, 'Một số sản phẩm trong giỏ tạm chưa thể hợp nhất do giá hoặc tồn kho đã thay đổi.', 'Some guest-cart items could not be merged because price or inventory changed.'))
+        } catch {
+          setCart(await api.cart())
+        }
+      }
       notify(pick(lang, 'Đăng nhập thành công.', 'Signed in successfully.'))
       if (result.user.role === 'ADMIN') navigate('/admin', { replace: true })
     } catch (error) { notify(error.message) }
@@ -147,7 +189,7 @@ function Products() {
 }
 function Account() {
   const { user, setUser, setCart, lang } = useStore(); const navigate = useNavigate()
-  async function logout() { try { await api.logout() } finally { setUser(null); setCart({ items: [], totalAmount: 0 }); navigate('/') } }
+  async function logout() { try { await api.logout() } finally { setUser(null); setCart(await hydrateGuestCart(api.product)); navigate('/') } }
   if (!user) return <Navigate to="/" replace />
   return <Layout><main className="auth-page"><section className="auth-card"><span className="account-avatar">{user.fullName?.charAt(0)}</span><span className="kicker">{pick(lang, 'Tài khoản', 'Account')}</span><h1>{pick(lang, 'Xin chào', 'Hello')}, {user.fullName}</h1><p>{user.email}</p><div className="account-actions">{user.role === 'ADMIN' ? <Link className="button dark" to="/admin">{pick(lang, 'Vào quản trị', 'Open admin')}</Link> : <Link className="button dark" to="/orders">{pick(lang, 'Xem đơn hàng', 'View orders')}</Link>}<button className="button light" onClick={logout}>{pick(lang, 'Đăng xuất', 'Sign out')}</button></div></section></main></Layout>
 }
@@ -173,12 +215,20 @@ function ProductDetail() {
   if (!product) return <Layout><main className="page"><Empty>{pick(lang, 'Không tìm thấy sản phẩm.', 'Product not found.')}</Empty></main></Layout>
   const name = lang === 'vi' ? product.nameVi : product.nameEn
   const description = lang === 'vi' ? product.descriptionVi : product.descriptionEn
-  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product.id)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div></main></Layout>
+  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div></main></Layout>
 }
 function Cart() {
   const { cart, setCart, user, notify, lang, authLoading } = useStore()
-  async function change(item, quantity) { try { setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)) } catch (error) { notify(error.message) } }
-  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link><small className="cart-signin-note">{pick(lang, 'Đăng nhập khi thêm sản phẩm để lưu giỏ hàng và theo dõi đơn sau khi đặt.', 'Sign in when adding products to save your cart and track orders after checkout.')}</small></Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b><span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span><span><button type="button" onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div><Link className="button dark full" to="/checkout">{pick(lang, 'Tiếp tục thanh toán', 'Continue to checkout')}</Link></section></div>}</main></Layout>
+  async function change(item, quantity) {
+    if (!user) {
+      const entries = setGuestQuantity(readGuestCart(), item.productId, quantity)
+      writeGuestCart(entries)
+      setCart(current => guestCartFromProducts(entries, current.items))
+      return
+    }
+    try { setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)) } catch (error) { notify(error.message) }
+  }
+  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : user?.role === 'ADMIN' ? <Empty>{pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')}</Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{user && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div><Link className="button dark full" to="/checkout">{pick(lang, user ? 'Tiếp tục thanh toán' : 'Đăng nhập để thanh toán', user ? 'Continue to checkout' : 'Sign in to checkout')}</Link>{!user && <small className="cart-signin-note">{pick(lang, 'Giỏ hàng đang được lưu tạm trên thiết bị này. Giá và tồn kho sẽ được kiểm tra khi đăng nhập.', 'This cart is saved on this device. Price and inventory will be checked after sign-in.')}</small>}</section></div>}</main></Layout>
 }
 function Checkout() {
   const { cart, setCart, user, notify, lang, authLoading } = useStore(); const [errors, setErrors] = useState({}); const [submitError, setSubmitError] = useState(''); const navigate = useNavigate(); const checkout = useCheckout()
