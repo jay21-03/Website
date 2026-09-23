@@ -39,7 +39,7 @@ class SupportSettingsServiceTest {
 
     @Test
     void readsAndUpdatesSupportSettings() {
-        assertThat(service.current().getEmail()).isEqualTo("Cosogombautrucdangxem@gmail.com");
+        assertThat(service.current().getEmail()).isEqualTo("dangxembautrucpottery@gmail.com");
 
         var updated = service.update(new SupportSettingsRequest(
                 "support@example.com",
