@@ -16,6 +16,7 @@ import com.bautruc.ecommerce.common.exception.BusinessException;
 import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import com.bautruc.ecommerce.common.time.BusinessClock;
 import com.bautruc.ecommerce.sitecontent.infrastructure.HomepageFeaturedProductJpaRepository;
+import com.bautruc.ecommerce.sitecontent.infrastructure.HomepageSettingsJpaRepository;
 import com.bautruc.ecommerce.sitecontent.infrastructure.SiteMediaJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,9 @@ class HomepageContentServiceTest {
 
     @Mock
     HomepageFeaturedProductJpaRepository featured;
+
+    @Mock
+    HomepageSettingsJpaRepository settings;
 
     @Mock
     HomepageProductQuery products;
@@ -54,7 +58,7 @@ class HomepageContentServiceTest {
                 return ZoneId.of("Asia/Ho_Chi_Minh");
             }
         };
-        service = new HomepageContentService(media, featured, products, clock, storage);
+        service = new HomepageContentService(media, featured, settings, products, clock, storage);
     }
 
     @Test
@@ -90,6 +94,18 @@ class HomepageContentServiceTest {
         verify(featured).deleteAllInBatch();
         verify(featured).saveAll(org.mockito.ArgumentMatchers.anyList());
         verify(featured).flush();
+    }
+
+    @Test
+    void trimsAndPersistsHomepageSlogan() {
+        when(featured.findAllByOrderBySlotAsc()).thenReturn(List.of());
+
+        service.updateSlogan("  Slogan Việt  ", "  English slogan  ");
+
+        verify(settings).saveAndFlush(org.mockito.ArgumentMatchers.argThat(value ->
+                value.getSloganVi().equals("Slogan Việt")
+                        && value.getSloganEn().equals("English slogan")
+                        && value.getUpdatedAt().equals(NOW)));
     }
 
     private HomepageProductView product(Long id) {

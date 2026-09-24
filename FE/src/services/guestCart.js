@@ -1,4 +1,5 @@
 export const GUEST_CART_KEY = 'bautruc.guest-cart.v1'
+export const GUEST_CART_MERGE_KEY = 'bautruc.guest-cart-merge.v1'
 export const GUEST_CART_MAX_QUANTITY = 99
 
 const emptyCart = () => ({ items: [], totalAmount: 0 })
@@ -83,17 +84,60 @@ export async function hydrateGuestCart(productLoader, storage = window.localStor
   return guestCartFromProducts(entries, results.map(result => result.status === 'fulfilled' ? result.value : null))
 }
 
-export async function mergeGuestCart({ loadCart, addItem, storage = window.localStorage }) {
+const quantityInCart = (cart, productId) => cart.items.find(item => Number(item.productId) === Number(productId))?.quantity || 0
+
+function readMergePlan(storage) {
+  try {
+    const value = JSON.parse(storage.getItem(GUEST_CART_MERGE_KEY) || 'null')
+    return Array.isArray(value?.entries) ? value : null
+  } catch {
+    return null
+  }
+}
+
+export async function mergeGuestCart({ loadCart, addItem, storage = window.localStorage, planStorage = window.sessionStorage }) {
   let remaining = readGuestCart(storage)
   let cart = await loadCart()
   let merged = 0
   let failed = 0
 
-  for (const entry of [...remaining]) {
+  if (!remaining.length) {
+    planStorage.removeItem(GUEST_CART_MERGE_KEY)
+    return { cart, merged, failed }
+  }
+
+  const sameEntries = plan => plan?.entries.length === remaining.length && remaining.every(entry =>
+    plan.entries.some(item => item.productId === entry.productId && item.guestQuantity === entry.quantity))
+  let plan = readMergePlan(planStorage)
+  if (!sameEntries(plan)) {
+    plan = {
+      entries: remaining.map(entry => ({
+        productId: entry.productId,
+        guestQuantity: entry.quantity,
+        targetQuantity: quantityInCart(cart, entry.productId) + entry.quantity
+      }))
+    }
+    planStorage.setItem(GUEST_CART_MERGE_KEY, JSON.stringify(plan))
+  }
+
+  for (const entry of [...plan.entries]) {
     try {
-      cart = await addItem(entry.productId, entry.quantity)
+      let currentQuantity = quantityInCart(cart, entry.productId)
+      if (currentQuantity < entry.targetQuantity) {
+        try {
+          cart = await addItem(entry.productId, entry.targetQuantity - currentQuantity)
+          if (quantityInCart(cart, entry.productId) < entry.targetQuantity) throw new Error('Cart merge was not confirmed.')
+        } catch (error) {
+          cart = await loadCart()
+          currentQuantity = quantityInCart(cart, entry.productId)
+          if (currentQuantity < entry.targetQuantity) throw error
+        }
+      }
       remaining = remaining.filter(value => value.productId !== entry.productId)
       writeGuestCart(remaining, storage)
+      plan.entries = plan.entries.filter(value => value.productId !== entry.productId)
+      if (plan.entries.length) planStorage.setItem(GUEST_CART_MERGE_KEY, JSON.stringify(plan))
+      else planStorage.removeItem(GUEST_CART_MERGE_KEY)
       merged += 1
     } catch {
       failed += 1

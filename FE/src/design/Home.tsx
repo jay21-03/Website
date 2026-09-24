@@ -56,6 +56,8 @@ type HomepageProduct = {
 type HomepageData = {
   heroImageUrl?: string | null;
   storyImageUrl?: string | null;
+  sloganVi?: string | null;
+  sloganEn?: string | null;
   socialImages?: HomepageMedia[];
   featuredProducts?: HomepageProduct[];
 };
@@ -108,7 +110,10 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
               {t("Làng gốm Bàu Trúc · Khánh Hòa", "Bàu Trúc pottery village · Khánh Hòa")}
             </p>
             <h1 className="max-w-4xl font-display text-[2.4rem] leading-[1.08] sm:text-6xl lg:text-7xl">
-              {t("Tinh hoa gốm Chăm - Gìn giữ hồn di sản", "The essence of Cham pottery - preserving heritage soul")}
+              {t(
+                home?.sloganVi || "Tinh hoa gốm Chăm – Gìn giữ hồn di sản",
+                home?.sloganEn || "The essence of Cham pottery – preserving the soul of heritage",
+              )}
             </h1>
             <p className="mt-6 font-serif text-xl italic text-wood sm:text-2xl">
               {t(

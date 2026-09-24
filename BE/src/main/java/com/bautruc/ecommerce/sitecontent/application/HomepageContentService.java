@@ -14,9 +14,11 @@ import com.bautruc.ecommerce.common.exception.BusinessException;
 import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
 import com.bautruc.ecommerce.common.time.BusinessClock;
 import com.bautruc.ecommerce.sitecontent.domain.HomepageFeaturedProduct;
+import com.bautruc.ecommerce.sitecontent.domain.HomepageSettings;
 import com.bautruc.ecommerce.sitecontent.domain.SiteMedia;
 import com.bautruc.ecommerce.sitecontent.domain.SiteMediaSlot;
 import com.bautruc.ecommerce.sitecontent.infrastructure.HomepageFeaturedProductJpaRepository;
+import com.bautruc.ecommerce.sitecontent.infrastructure.HomepageSettingsJpaRepository;
 import com.bautruc.ecommerce.sitecontent.infrastructure.SiteMediaJpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,9 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class HomepageContentService {
     private static final int FEATURED_COUNT = 3;
+    public static final String DEFAULT_SLOGAN_VI = "Tinh hoa gốm Chăm – Gìn giữ hồn di sản";
+    public static final String DEFAULT_SLOGAN_EN = "The essence of Cham pottery – preserving the soul of heritage";
 
     private final SiteMediaJpaRepository media;
     private final HomepageFeaturedProductJpaRepository featured;
+    private final HomepageSettingsJpaRepository settings;
     private final HomepageProductQuery productQuery;
     private final BusinessClock clock;
     private final ObjectStoragePort storage;
@@ -34,12 +39,14 @@ public class HomepageContentService {
     public HomepageContentService(
             SiteMediaJpaRepository media,
             HomepageFeaturedProductJpaRepository featured,
+            HomepageSettingsJpaRepository settings,
             HomepageProductQuery productQuery,
             BusinessClock clock,
             ObjectStoragePort storage
     ) {
         this.media = media;
         this.featured = featured;
+        this.settings = settings;
         this.productQuery = productQuery;
         this.clock = clock;
         this.storage = storage;
@@ -59,9 +66,13 @@ public class HomepageContentService {
             mediaViews.add(new SiteMediaView(slot, url, item == null ? null : item.getUpdatedAt()));
         }
 
+        HomepageSloganView slogan = settings.findById(HomepageSettings.SINGLETON_ID)
+                .map(value -> new HomepageSloganView(value.getSloganVi(), value.getSloganEn(), value.getUpdatedAt()))
+                .orElse(new HomepageSloganView(DEFAULT_SLOGAN_VI, DEFAULT_SLOGAN_EN, null));
+
         List<HomepageFeaturedProduct> configured = featured.findAllByOrderBySlotAsc();
         if (configured.isEmpty()) {
-            return new HomepageContentSnapshot(List.copyOf(mediaViews), List.of());
+            return new HomepageContentSnapshot(List.copyOf(mediaViews), List.of(), slogan);
         }
 
         List<Long> productIds = configured.stream().map(HomepageFeaturedProduct::getProductId).toList();
@@ -78,7 +89,18 @@ public class HomepageContentService {
             }
         }
 
-        return new HomepageContentSnapshot(List.copyOf(mediaViews), List.copyOf(featuredItems));
+        return new HomepageContentSnapshot(List.copyOf(mediaViews), List.copyOf(featuredItems), slogan);
+    }
+
+    @Transactional
+    public HomepageContentSnapshot updateSlogan(String sloganVi, String sloganEn) {
+        String normalizedVi = sloganVi.trim();
+        String normalizedEn = sloganEn.trim();
+        HomepageSettings value = settings.findById(HomepageSettings.SINGLETON_ID)
+                .orElseGet(() -> new HomepageSettings(normalizedVi, normalizedEn, clock.now()));
+        value.update(normalizedVi, normalizedEn, clock.now());
+        settings.saveAndFlush(value);
+        return current();
     }
 
     @Transactional

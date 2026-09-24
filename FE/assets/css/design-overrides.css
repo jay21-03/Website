@@ -18,6 +18,7 @@ header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
 .product-detail-info { color: #2c1a0e; }
 .product-detail-info h1 { color: #2c1a0e; }
 .button { height: auto; min-height: 48px; line-height: 1.35; white-space: normal; text-align: center; }
+.google-checkout-login { display: flex; justify-content: center; min-height: 44px; overflow: hidden; }
 .site-footer { margin-top: 96px; background: var(--card); border-top: 1px solid var(--primary); padding: 64px max(20px, calc((100vw - 1216px)/2)); color: var(--foreground); }
 .footer-grid { max-width: 1216px; margin: auto; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 48px; }
 .site-footer p, .footer-col a { color: var(--muted-foreground); line-height: 1.7; font-size: 14px; overflow-wrap: anywhere; }

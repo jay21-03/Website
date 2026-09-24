@@ -40,45 +40,138 @@ const supportToContact = settings => settings ? {
 } : contact
 const emptyCart = () => ({ items: [], totalAmount: 0 })
 const mergeStoredCart = () => mergeGuestCart({ loadCart: api.cart, addItem: api.addCart })
+const CHECKOUT_INTENT_KEY = 'bautruc.checkout-intent'
+const waitForStateCommit = () => new Promise(resolve => window.setTimeout(resolve, 0))
 
 function StoreProvider({ children }) {
+  const navigate = useNavigate()
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+  const homepageQuery = useQuery({ queryKey: ['home'], queryFn: api.home })
   const [lang, setLang] = useState(() => localStorage.getItem('dxLang') || 'vi')
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
   const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
   const [support, setSupport] = useState(contact)
   const [catalogLoading, setCatalogLoading] = useState(true), [toast, setToast] = useState('')
   const [authLoading, setAuthLoading] = useState(true)
+  const [googleReady, setGoogleReady] = useState(Boolean(window.google?.accounts?.id))
   const langRef = useRef(lang)
   langRef.current = lang
   const notify = useCallback(message => { setToast(message); window.setTimeout(() => setToast(''), 2500) }, [])
+  const googleCallbackRef = useRef(null)
+  const googleLoginInFlightRef = useRef(false)
   useEffect(() => {
-    Promise.all([api.products(), api.collections()]).then(([page, groups]) => { setProducts(page.content); setCollections(groups) }).catch(error => notify(error.message)).finally(() => setCatalogLoading(false))
-    api.supportSettings().then(settings => setSupport(supportToContact(settings))).catch(() => {})
+    let active = true
+    Promise.all([api.products(), api.collections()]).then(([page, groups]) => {
+      if (active) { setProducts(page.content); setCollections(groups) }
+    }).catch(error => { if (active) notify(error.message) }).finally(() => { if (active) setCatalogLoading(false) })
+    api.supportSettings().then(settings => { if (active) setSupport(supportToContact(settings)) }).catch(() => {})
     async function initializeCart() {
       let current
       try { current = await api.me() } catch {
+        const guestCart = await hydrateGuestCart(api.product)
+        if (!active) return
         setUser(null)
-        setCart(await hydrateGuestCart(api.product))
+        setCart(guestCart)
         setAuthLoading(false)
         return
       }
+      if (!active) return
       setUser(current)
       if (current.role !== 'USER') setCart(emptyCart())
       else {
         try {
           const result = await mergeStoredCart()
+          if (!active) return
           setCart(result.cart)
           if (result.failed) notify(pick(langRef.current, 'Một số sản phẩm trong giỏ tạm chưa thể hợp nhất do giá hoặc tồn kho đã thay đổi.', 'Some guest-cart items could not be merged because price or inventory changed.'))
+          else if (sessionStorage.getItem(CHECKOUT_INTENT_KEY) === 'checkout') {
+            sessionStorage.removeItem(CHECKOUT_INTENT_KEY)
+            if (result.cart.items.length) {
+              await waitForStateCommit()
+              navigateRef.current('/checkout', { replace: true })
+            }
+          }
         } catch (error) {
-          try { setCart(await api.cart()) } catch { setCart(emptyCart()) }
+          let accountCart
+          try { accountCart = await api.cart() } catch { accountCart = emptyCart() }
+          if (!active) return
+          setCart(accountCart)
           notify(error.message)
         }
       }
-      setAuthLoading(false)
+      if (active) setAuthLoading(false)
     }
     initializeCart()
+    return () => { active = false }
   }, [notify])
   useEffect(() => { localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang])
+  googleCallbackRef.current = async credential => {
+    if (googleLoginInFlightRef.current) return
+    googleLoginInFlightRef.current = true
+    const checkoutIntent = sessionStorage.getItem(CHECKOUT_INTENT_KEY) === 'checkout'
+    try {
+      const result = await api.googleLogin(credential)
+      setUser(result.user)
+      if (result.user.role !== 'USER') {
+        sessionStorage.removeItem(CHECKOUT_INTENT_KEY)
+        setCart(emptyCart())
+        notify(pick(langRef.current, 'Tài khoản quản trị không thể thanh toán.', 'Admin accounts cannot checkout.'))
+        await waitForStateCommit()
+        navigate('/admin', { replace: true })
+        return
+      }
+      const merged = await mergeStoredCart()
+      setCart(merged.cart)
+      if (merged.failed) {
+        notify(pick(langRef.current, 'Chưa thể đồng bộ toàn bộ giỏ hàng. Giỏ tạm vẫn được giữ để bạn thử lại.', 'The cart could not be fully merged. Your guest cart is preserved for retry.'))
+        return
+      }
+      notify(pick(langRef.current, 'Đăng nhập thành công.', 'Signed in successfully.'))
+      if (checkoutIntent && merged.cart.items.length) {
+        sessionStorage.removeItem(CHECKOUT_INTENT_KEY)
+        await waitForStateCommit()
+        navigate('/checkout')
+      }
+    } catch (error) {
+      notify(error.message)
+    } finally {
+      googleLoginInFlightRef.current = false
+    }
+  }
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+    if (!clientId) return
+    const initialize = () => {
+      window.google.accounts.id.initialize({ client_id: clientId, callback: response => googleCallbackRef.current(response.credential), auto_select: false, cancel_on_tap_outside: false })
+      setGoogleReady(true)
+    }
+    if (window.google?.accounts?.id) initialize()
+    else {
+      let script = document.querySelector('script[data-google-identity]')
+      if (!script) { script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.dataset.googleIdentity = 'true'; document.head.appendChild(script) }
+      script.addEventListener('load', initialize)
+      return () => script.removeEventListener('load', initialize)
+    }
+  }, [])
+  const prepareCheckoutLogin = useCallback(() => {
+    if (!cart.items.length) {
+      notify(pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.'))
+      return false
+    }
+    sessionStorage.setItem(CHECKOUT_INTENT_KEY, 'checkout')
+    return true
+  }, [cart.items.length, lang, notify])
+  function startGoogleLogin(forCheckout = false) {
+    if (forCheckout) {
+      if (!prepareCheckoutLogin()) return
+    } else sessionStorage.removeItem(CHECKOUT_INTENT_KEY)
+    if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) return notify(pick(lang, 'Chưa cấu hình Google Client ID.', 'Google Client ID is not configured.'))
+    if (!googleReady) return notify(pick(lang, 'Google đang tải, vui lòng thử lại.', 'Google is loading, please try again.'))
+    window.google.accounts.id.prompt(notification => {
+      if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) notify(pick(lang, 'Google không thể mở hộp đăng nhập. Bạn có thể dùng nút Google bên dưới.', 'Google could not open sign-in. Use the Google button below instead.'))
+    })
+  }
   async function add(product) {
     const productId = product.id
     if (!user) {
@@ -91,7 +184,7 @@ function StoreProvider({ children }) {
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
     try { setCart(await api.addCart(productId)); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
   }
-  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, catalogLoading, authLoading, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
+  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, homepage: homepageQuery.data, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
 const useStore = () => useContext(Store)
 
@@ -110,54 +203,25 @@ function Layout({ children }) {
 }
 
 function DirectGoogleLogin() {
-  const { lang, setUser, setCart, notify } = useStore()
-  const navigate = useNavigate()
-  const [ready, setReady] = useState(Boolean(window.google?.accounts?.id))
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
-  const callbackRef = useRef(null)
-  callbackRef.current = async credential => {
-    try {
-      const result = await api.googleLogin(credential)
-      setUser(result.user)
-      if (result.user.role === 'USER') {
-        try {
-          const merged = await mergeStoredCart()
-          setCart(merged.cart)
-          if (merged.failed) notify(pick(lang, 'Một số sản phẩm trong giỏ tạm chưa thể hợp nhất do giá hoặc tồn kho đã thay đổi.', 'Some guest-cart items could not be merged because price or inventory changed.'))
-        } catch {
-          setCart(await api.cart())
-        }
-      }
-      notify(pick(lang, 'Đăng nhập thành công.', 'Signed in successfully.'))
-      if (result.user.role === 'ADMIN') navigate('/admin', { replace: true })
-    } catch (error) { notify(error.message) }
-  }
+  const { lang, startGoogleLogin } = useStore()
+  return <button className="icon-btn direct-login" type="button" onClick={() => startGoogleLogin(false)}>{pick(lang, 'Đăng nhập', 'Sign in')}</button>
+}
+
+function GoogleCheckoutButton() {
+  const { googleReady, prepareCheckoutLogin } = useStore()
+  const ref = useRef(null)
   useEffect(() => {
-    if (!clientId) return
-    const initialize = () => {
-      window.google.accounts.id.initialize({ client_id: clientId, callback: response => callbackRef.current(response.credential), auto_select: false, cancel_on_tap_outside: false })
-      setReady(true)
-    }
-    if (window.google?.accounts?.id) initialize()
-    else {
-      let script = document.querySelector('script[data-google-identity]')
-      if (!script) { script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.dataset.googleIdentity = 'true'; document.head.appendChild(script) }
-      script.addEventListener('load', initialize)
-      return () => script.removeEventListener('load', initialize)
-    }
-  }, [clientId])
-  function openGoogle() {
-    if (!clientId) return notify(pick(lang, 'Chưa cấu hình Google Client ID.', 'Google Client ID is not configured.'))
-    if (!ready) return notify(pick(lang, 'Google đang tải, vui lòng thử lại.', 'Google is loading, please try again.'))
-    window.google.accounts.id.prompt(notification => {
-      if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) notify(pick(lang, 'Google không thể mở hộp đăng nhập. Hãy cho phép cookie và popup rồi thử lại.', 'Google could not open sign-in. Allow cookies and popups, then try again.'))
-    })
-  }
-  return <button className="icon-btn direct-login" type="button" onClick={openGoogle}>{pick(lang, 'Đăng nhập', 'Sign in')}</button>
+    if (!googleReady || !ref.current || !window.google?.accounts?.id) return
+    ref.current.replaceChildren()
+    window.google.accounts.id.renderButton(ref.current, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: Math.min(320, ref.current.clientWidth || 320), click_listener: prepareCheckoutLogin })
+  }, [googleReady, prepareCheckoutLogin])
+  if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) return null
+  return <div className="google-checkout-login" ref={ref} aria-label="Google Sign-In" />
 }
 function BilingualFooter() {
-  const { lang, support } = useStore()
-  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">Đàng Xem</Link><p className="footer-slogan">{pick(lang, 'Tinh hoa gốm Chăm - Gìn giữ hồn di sản', 'The essence of Cham pottery - preserving heritage soul')}</p><p>{pick(lang, 'Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.')}</p></div><div className="footer-col"><h3>{pick(lang, 'Liên kết', 'Links')}</h3><Link to="/products">{pick(lang, 'Sản phẩm', 'Products')}</Link><Link to="/workshop">Workshop</Link><Link to="/cart">{pick(lang, 'Giỏ hàng', 'Cart')}</Link><Link to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</Link><Link to="/ve-chung-toi">{pick(lang, 'Về chúng tôi', 'About us')}</Link><Link to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</Link><Link to="/faq">FAQ</Link><Link to="/policy">{pick(lang, 'Chính sách', 'Policy')}</Link></div><div className="footer-col"><h3>{pick(lang, 'Liên hệ', 'Contact')}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
+  const { lang, support, homepage } = useStore()
+  const slogan = pick(lang, homepage?.sloganVi || 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản', homepage?.sloganEn || 'The essence of Cham pottery – preserving the soul of heritage')
+  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">Đàng Xem</Link><p className="footer-slogan">{slogan}</p><p>{pick(lang, 'Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.')}</p></div><div className="footer-col"><h3>{pick(lang, 'Liên kết', 'Links')}</h3><Link to="/products">{pick(lang, 'Sản phẩm', 'Products')}</Link><Link to="/workshop">Workshop</Link><Link to="/cart">{pick(lang, 'Giỏ hàng', 'Cart')}</Link><Link to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</Link><Link to="/ve-chung-toi">{pick(lang, 'Về chúng tôi', 'About us')}</Link><Link to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</Link><Link to="/faq">FAQ</Link><Link to="/policy">{pick(lang, 'Chính sách', 'Policy')}</Link></div><div className="footer-col"><h3>{pick(lang, 'Liên hệ', 'Contact')}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
 }
 function Loading({ text = 'Đang tải dữ liệu...' }) { return <div className="state-box">{text}</div> }
 function Empty({ children }) { return <div className="state-box">{children}</div> }
@@ -176,9 +240,8 @@ function CatalogCard({ product }) {
   </article>
 }
 function Home() {
-  const { products } = useStore()
-  const homepage = useQuery({ queryKey: ['home'], queryFn: api.home })
-  return <Layout><div className="reference-page"><ReferenceHome home={homepage.data} fallbackProducts={products} /></div></Layout>
+  const { products, homepage } = useStore()
+  return <Layout><div className="reference-page"><ReferenceHome home={homepage} fallbackProducts={products} /></div></Layout>
 }
 function Products() {
   const { collections, lang } = useStore(); const [searchParams] = useSearchParams(); const [filters, setFilters] = useState(() => ({ keyword: searchParams.get('keyword') || '', collectionId: searchParams.get('collectionId') || '', minPrice: searchParams.get('minPrice') || '', maxPrice: searchParams.get('maxPrice') || '', page: Number(searchParams.get('page') || 0), size: 20, sort: searchParams.get('sort') || 'createdAt,desc' }))
@@ -218,7 +281,7 @@ function ProductDetail() {
   return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div></main></Layout>
 }
 function Cart() {
-  const { cart, setCart, user, notify, lang, authLoading } = useStore()
+  const { cart, setCart, user, notify, lang, authLoading, startGoogleLogin } = useStore()
   async function change(item, quantity) {
     if (!user) {
       const entries = setGuestQuantity(readGuestCart(), item.productId, quantity)
@@ -228,7 +291,7 @@ function Cart() {
     }
     try { setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)) } catch (error) { notify(error.message) }
   }
-  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : user?.role === 'ADMIN' ? <Empty>{pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')}</Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{user && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div><Link className="button dark full" to="/checkout">{pick(lang, user ? 'Tiếp tục thanh toán' : 'Đăng nhập để thanh toán', user ? 'Continue to checkout' : 'Sign in to checkout')}</Link>{!user && <small className="cart-signin-note">{pick(lang, 'Giỏ hàng đang được lưu tạm trên thiết bị này. Giá và tồn kho sẽ được kiểm tra khi đăng nhập.', 'This cart is saved on this device. Price and inventory will be checked after sign-in.')}</small>}</section></div>}</main></Layout>
+  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : user?.role === 'ADMIN' ? <Empty>{pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')}</Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{user && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div>{user ? <Link className="button dark full" to="/checkout">{pick(lang, 'Tiếp tục thanh toán', 'Continue to checkout')}</Link> : <><button className="button dark full" type="button" onClick={() => startGoogleLogin(true)}>{pick(lang, 'Đăng nhập để thanh toán', 'Sign in to checkout')}</button><GoogleCheckoutButton /><small className="cart-signin-note">{pick(lang, 'Giỏ hàng đang được lưu tạm trên thiết bị này. Giá và tồn kho sẽ được kiểm tra khi đăng nhập.', 'This cart is saved on this device. Price and inventory will be checked after sign-in.')}</small></>}</section></div>}</main></Layout>
 }
 function Checkout() {
   const { cart, setCart, user, notify, lang, authLoading } = useStore(); const [errors, setErrors] = useState({}); const [submitError, setSubmitError] = useState(''); const navigate = useNavigate(); const checkout = useCheckout()

@@ -8,6 +8,8 @@ import com.bautruc.ecommerce.sitecontent.domain.SiteMediaSlot;
 public record HomepageResponse(
         String heroImageUrl,
         String storyImageUrl,
+        String sloganVi,
+        String sloganEn,
         List<HomepageMediaResponse> socialImages,
         List<HomepageFeaturedProductResponse> featuredProducts
 ) {
@@ -15,6 +17,8 @@ public record HomepageResponse(
         return new HomepageResponse(
                 url(snapshot, SiteMediaSlot.HOME_HERO),
                 url(snapshot, SiteMediaSlot.HOME_STORY),
+                snapshot.slogan().vi(),
+                snapshot.slogan().en(),
                 snapshot.media().stream()
                         .filter(item -> item.slot().name().startsWith("HOME_SOCIAL_"))
                         .map(HomepageMediaResponse::from)

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   GUEST_CART_KEY,
+  GUEST_CART_MERGE_KEY,
   addGuestQuantity,
   guestCartFromProducts,
   mergeGuestCart,
@@ -40,9 +41,28 @@ describe('guest cart', () => {
       if (productId === 11) throw new Error('Insufficient inventory')
       return { items: [{ productId: 10, quantity: 2 }], totalAmount: 420000 }
     })
-    const result = await mergeGuestCart({ loadCart: async () => ({ items: [], totalAmount: 0 }), addItem, storage })
+    const result = await mergeGuestCart({ loadCart: async () => ({ items: [], totalAmount: 0 }), addItem, storage, planStorage: memoryStorage() })
     expect(result).toMatchObject({ merged: 1, failed: 1 })
     expect(readGuestCart(storage)).toEqual([{ productId: 11, quantity: 1 }])
     expect(addItem).toHaveBeenCalledWith(10, 2)
+  })
+
+  it('uses a persisted target quantity so a retry cannot add the guest quantity twice', async () => {
+    const storage = memoryStorage()
+    const planStorage = memoryStorage()
+    writeGuestCart([{ productId: 10, quantity: 2 }], storage)
+    let serverCart = { items: [{ productId: 10, quantity: 1 }], totalAmount: 100 }
+    const addItem = vi.fn(async (productId, quantity) => {
+      serverCart = { items: [{ productId, quantity: serverCart.items[0].quantity + quantity }], totalAmount: 300 }
+      throw new Error('Response lost after server commit')
+    })
+
+    const result = await mergeGuestCart({ loadCart: async () => serverCart, addItem, storage, planStorage })
+
+    expect(result).toMatchObject({ merged: 1, failed: 0 })
+    expect(serverCart.items[0].quantity).toBe(3)
+    expect(addItem).toHaveBeenCalledTimes(1)
+    expect(readGuestCart(storage)).toEqual([])
+    expect(planStorage.getItem(GUEST_CART_MERGE_KEY)).toBeNull()
   })
 })

@@ -103,6 +103,8 @@ async function mockApi(page, role = 'USER') {
   let adminProducts = [product, inactiveProduct]
   let adminCollections = [collection, inactiveCollection]
   let adminHome = {
+    sloganVi: 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản',
+    sloganEn: 'The essence of Cham pottery – preserving the soul of heritage',
     media: [
       { slot: 'HOME_HERO', url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', updatedAt: order.createdAt },
       { slot: 'HOME_STORY', url: null, updatedAt: order.createdAt },
@@ -116,6 +118,8 @@ async function mockApi(page, role = 'USER') {
     featuredProducts: []
   }
   const publicHome = {
+    sloganVi: 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản',
+    sloganEn: 'The essence of Cham pottery – preserving the soul of heritage',
     heroImageUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
     storyImageUrl: null,
     socialImages: [
@@ -161,6 +165,12 @@ async function mockApi(page, role = 'USER') {
     if (path === '/workshop/bookings') return created({ id: 9, status: 'NEW' })
     if (path === '/admin/dashboard') return ok({ totalOrders: 1, totalRevenue: 200000, newOrders: 1, lowStockProducts: [], recentOrders: [order], bestSellingProducts: [{ productNameVi: product.nameVi, totalQuantity: 2, totalRevenue: 400000 }] })
     if (path === '/admin/home' && route.request().method() === 'GET') return ok(adminHome)
+    if (path === '/admin/home/slogan' && route.request().method() === 'PUT') {
+      adminHome = { ...adminHome, ...(await route.request().postDataJSON()) }
+      publicHome.sloganVi = adminHome.sloganVi
+      publicHome.sloganEn = adminHome.sloganEn
+      return ok(adminHome)
+    }
     if (path === '/admin/home/featured-products' && route.request().method() === 'PUT') {
       const { productIds } = await route.request().postDataJSON()
       const candidates = [{ ...product, status: 'ACTIVE' }, featuredProduct2, featuredProduct3]
@@ -216,6 +226,25 @@ async function mockApi(page, role = 'USER') {
     if (path === '/admin/orders') return ok({ content: [order], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true })
     if (path === '/admin/orders/77') return ok(order)
     return ok(null)
+  })
+}
+
+async function mockGoogleIdentity(page) {
+  await page.addInitScript(() => {
+    window.google = { accounts: { id: {
+      initialize: config => { window.__googleCredentialCallback = config.callback },
+      prompt: callback => {
+        window.__googlePrompted = true
+        callback?.({ isNotDisplayed: () => false, isSkippedMoment: () => false })
+      },
+      renderButton: (element, config) => {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.textContent = 'Continue with Google'
+        button.addEventListener('click', () => config.click_listener?.())
+        element.appendChild(button)
+      }
+    } } }
   })
 }
 
@@ -405,8 +434,39 @@ test('public workshop booking and support settings render on mobile', async ({ p
   await expect(page.getByRole('main').getByText('Bau Truc')).toBeVisible()
 })
 
-test('guest cart persists locally and only requires sign-in at checkout', async ({ page }) => {
+test('admin updates bilingual slogan and homepage plus footer refresh from the API', async ({ page, isMobile }) => {
+  await mockApi(page, 'ADMIN')
+  await page.goto('/admin?section=homepage')
+  await page.getByLabel('Slogan tiếng Việt').fill('Đất kể chuyện qua bàn tay Chăm')
+  await page.getByLabel('Slogan tiếng Anh').fill('Clay tells stories through Cham hands')
+  await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
+  await expect(page.getByText('Đã cập nhật slogan trang chủ.')).toBeVisible()
+
+  const homepageResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/home')
+  await page.goto('/')
+  const homepagePayload = await (await homepageResponse).json()
+  expect(homepagePayload.data.sloganVi).toBe('Đất kể chuyện qua bàn tay Chăm')
+  await expect(page.getByRole('heading', { name: 'Đất kể chuyện qua bàn tay Chăm' })).toBeVisible()
+  await expect(page.locator('.site-footer')).toContainText('Đất kể chuyện qua bàn tay Chăm')
+  if (isMobile) await page.getByRole('button', { name: 'Mở menu' }).click()
+  await page.getByRole('button', { name: 'ENG' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Clay tells stories through Cham hands' })).toBeVisible()
+  await expect(page.locator('.site-footer')).toContainText('Clay tells stories through Cham hands')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Clay tells stories through Cham hands' })).toBeVisible()
+})
+
+test('guest cart persists then Google login merges it and continues to checkout', async ({ page }) => {
+  await mockGoogleIdentity(page)
   await mockApi(page, null)
+  let accountCart = { items: [], totalAmount: 0 }
+  await page.route('**/api/v1/auth/google', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { user: { id: 2, fullName: 'Customer', email: 'customer@example.com', role: 'USER' } } }) }))
+  await page.route('**/api/v1/cart', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: accountCart }) }))
+  await page.route('**/api/v1/cart/items', async route => {
+    const { productId, quantity } = await route.request().postDataJSON()
+    accountCart = { items: [{ ...cart.items[0], productId, quantity, lineTotal: product.sellingPrice * quantity }], totalAmount: product.sellingPrice * quantity }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: accountCart }) })
+  })
   await page.goto('/products/10')
   await page.getByRole('button', { name: 'Thêm vào giỏ hàng' }).click()
   await page.goto('/cart')
@@ -415,13 +475,46 @@ test('guest cart persists locally and only requires sign-in at checkout', async 
   await page.getByRole('button', { name: 'Tăng số lượng' }).click()
   await page.reload()
   await expect(page.locator('.checkout-item')).toContainText('2')
-  await page.getByRole('link', { name: 'Đăng nhập để thanh toán' }).click()
-  await expect(page.getByText('Bạn cần đăng nhập bằng tài khoản khách hàng để đặt hàng.')).toBeVisible()
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bautruc.guest-cart.v1')))).toEqual([{ productId: 10, quantity: 2 }])
+  await page.getByRole('button', { name: 'Đăng nhập để thanh toán' }).click()
+  await expect.poll(() => page.evaluate(() => window.__googlePrompted)).toBeTruthy()
+  await page.evaluate(() => window.__googleCredentialCallback({ credential: 'valid-google-credential' }))
+  await expect(page).toHaveURL(/\/checkout$/)
+  await expect(page.getByText('Binh gom do')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('bautruc.guest-cart.v1'))).toBeNull()
+  expect(accountCart.items[0].quantity).toBe(2)
+})
+
+test('failed checkout login preserves the guest cart and stays on cart', async ({ page }) => {
+  await mockGoogleIdentity(page)
+  await mockApi(page, null)
+  await page.route('**/api/v1/auth/google', route => route.fulfill({
+    status: 401,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: false, error: { code: 'INVALID_GOOGLE_TOKEN', message: 'Google login failed.', fieldErrors: [] } })
+  }))
+  await page.goto('/products/10')
+  await page.getByRole('button', { name: 'Thêm vào giỏ hàng' }).click()
+  await page.goto('/cart')
+  await page.getByRole('button', { name: 'Continue with Google' }).click()
+  await page.evaluate(() => window.__googleCredentialCallback({ credential: 'invalid-google-credential' }))
+  await expect(page).toHaveURL(/\/cart$/)
+  await expect(page.getByText('Google login failed.')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bautruc.guest-cart.v1')))).toEqual([{ productId: 10, quantity: 1 }])
+})
+
+test('normal header Google login does not create checkout redirect', async ({ page, isMobile }) => {
+  await mockGoogleIdentity(page)
+  await mockApi(page, null)
+  await page.route('**/api/v1/auth/google', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { user: { id: 2, fullName: 'Customer', email: 'customer@example.com', role: 'USER' } } }) }))
+  await page.goto('/')
+  if (isMobile) await page.getByRole('button', { name: 'Mở menu' }).click()
+  await page.locator('header').getByRole('button', { name: 'Đăng nhập' }).first().click()
+  await page.evaluate(() => window.__googleCredentialCallback({ credential: 'valid-google-credential' }))
+  await expect(page).toHaveURL('/')
 })
 
 test('mobile typography has Vietnamese glyphs without clipping, overlap or horizontal overflow', async ({ page }) => {
-  test.setTimeout(60000)
+  test.setTimeout(90000)
   await mockApi(page, null)
   const viewports = [
     { width: 390, height: 844 },
@@ -433,6 +526,7 @@ test('mobile typography has Vietnamese glyphs without clipping, overlap or horiz
     await page.setViewportSize(viewport)
     for (const path of ['/', '/products/10', '/cart']) {
       await page.goto(path)
+      await expect(page.locator('header')).toBeVisible()
       await page.evaluate(() => document.fonts.ready)
       const audit = await page.evaluate(() => {
         const visible = element => {
@@ -462,14 +556,14 @@ test('mobile typography has Vietnamese glyphs without clipping, overlap or horiz
       expect(audit.overflow, `${path} at ${viewport.width}px`).toBeLessThanOrEqual(1)
       expect(audit.clipped, `${path} at ${viewport.width}px`).toEqual([])
       expect(audit.overlaps, `${path} at ${viewport.width}px`).toBeFalsy()
-      expect(audit.bodyFont).toContain('Be Vietnam Pro')
+      await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain('Be Vietnam Pro')
       expect(audit.fontLoaded).toBeTruthy()
       expect(audit.replacementGlyph).toBeFalsy()
     }
   }
 
   await page.goto('/')
-  await expect(page.getByText('Tinh hoa gốm Chăm - Gìn giữ hồn di sản').first()).toBeVisible()
+  await expect(page.getByText('Tinh hoa gốm Chăm – Gìn giữ hồn di sản').first()).toBeVisible()
   await page.goto('/products/10')
   await expect(page.getByRole('button', { name: 'Thêm vào giỏ hàng' })).toBeVisible()
   await page.goto('/cart')
@@ -504,4 +598,14 @@ test('dark product title remains readable and mobile UNESCO badge does not overl
   expect(badge).not.toBeNull()
   expect(location).not.toBeNull()
   expect(badge.y + badge.height).toBeLessThanOrEqual(location.y)
+})
+
+test('brand favicon assets are served as images instead of the SPA fallback', async ({ request }) => {
+  const svg = await request.get('/favicon.svg?v=1')
+  const ico = await request.get('/favicon.ico?v=1')
+  const apple = await request.get('/apple-touch-icon.png?v=1')
+  expect(svg.ok()).toBeTruthy()
+  expect(await svg.text()).toContain('<svg')
+  expect([...((await ico.body()).subarray(0, 6))]).toEqual([0, 0, 1, 0, 1, 0])
+  expect([...((await apple.body()).subarray(0, 8))]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
 })

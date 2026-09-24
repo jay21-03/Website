@@ -115,4 +115,18 @@ describe('API client security', () => {
     }))
   })
 
+  it('updates bilingual homepage slogan with CSRF protection', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ data: { token: 'slogan-token' } })).mockResolvedValueOnce(response({ success: true, data: { sloganVi: 'Đất kể chuyện', sloganEn: 'Clay tells stories' } }))
+
+    await api.updateHomeSlogan({ sloganVi: 'Đất kể chuyện', sloganEn: 'Clay tells stories' })
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/home/slogan', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'include',
+      body: JSON.stringify({ sloganVi: 'Đất kể chuyện', sloganEn: 'Clay tells stories' }),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-XSRF-TOKEN': 'slogan-token' })
+    }))
+  })
+
 })

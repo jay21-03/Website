@@ -109,6 +109,7 @@ export const api = {
   order: id => request(`/me/orders/${id}`),
   adminDashboard: () => request('/admin/dashboard'),
   adminHome: () => request('/admin/home'),
+  updateHomeSlogan: values => request('/admin/home/slogan', { method: 'PUT', body: JSON.stringify(values) }),
   uploadHomeMedia: (slot, file) => {
     const body = new FormData()
     body.append('file', file)

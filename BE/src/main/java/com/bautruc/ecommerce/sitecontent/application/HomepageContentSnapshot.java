@@ -4,6 +4,7 @@ import java.util.List;
 
 public record HomepageContentSnapshot(
         List<SiteMediaView> media,
-        List<FeaturedProductItem> featuredProducts
+        List<FeaturedProductItem> featuredProducts,
+        HomepageSloganView slogan
 ) {
 }

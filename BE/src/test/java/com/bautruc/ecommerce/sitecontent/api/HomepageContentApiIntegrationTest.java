@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 
 import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
+import com.bautruc.ecommerce.sitecontent.application.HomepageContentService;
 import com.bautruc.ecommerce.common.security.JwtAuthenticationFilter;
 import com.bautruc.ecommerce.common.security.JwtTokenService;
 import com.bautruc.ecommerce.identity.domain.User;
@@ -75,6 +76,8 @@ class HomepageContentApiIntegrationTest {
     void clean() {
         jdbc.execute("TRUNCATE TABLE homepage_featured_products, product_images, products, collections, users CASCADE");
         jdbc.update("UPDATE site_media SET object_key = NULL, content_type = NULL, file_size_bytes = NULL, updated_at = now()");
+        jdbc.update("UPDATE homepage_settings SET slogan_vi = ?, slogan_en = ?, updated_at = now() WHERE id = 1",
+                HomepageContentService.DEFAULT_SLOGAN_VI, HomepageContentService.DEFAULT_SLOGAN_EN);
         when(storage.publicUrl(anyString())).thenAnswer(invocation -> "https://cdn.example/" + invocation.getArgument(0));
     }
 
@@ -84,6 +87,8 @@ class HomepageContentApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.socialImages.length()").value(6))
+                .andExpect(jsonPath("$.data.sloganVi").value(HomepageContentService.DEFAULT_SLOGAN_VI))
+                .andExpect(jsonPath("$.data.sloganEn").value(HomepageContentService.DEFAULT_SLOGAN_EN))
                 .andExpect(jsonPath("$.data.featuredProducts.length()").value(0));
     }
 
@@ -113,6 +118,69 @@ class HomepageContentApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body(first, second, third)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void sloganWriteRequiresAdminAndCsrf() throws Exception {
+        String body = "{\"sloganVi\":\"Slogan mới\",\"sloganEn\":\"New slogan\"}";
+
+        mvc.perform(put("/api/v1/admin/home/slogan")
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isUnauthorized());
+
+        mvc.perform(put("/api/v1/admin/home/slogan")
+                        .cookie(access(saveUser()))
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(put("/api/v1/admin/home/slogan")
+                        .cookie(access(saveAdmin()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCanUpdateSloganAndPublicHomeReturnsPersistedValues() throws Exception {
+        Cookie admin = access(saveAdmin());
+
+        mvc.perform(put("/api/v1/admin/home/slogan")
+                        .cookie(admin)
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sloganVi\":\"  Đất kể chuyện  \",\"sloganEn\":\"  Clay tells stories  \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sloganVi").value("Đất kể chuyện"))
+                .andExpect(jsonPath("$.data.sloganEn").value("Clay tells stories"));
+
+        mvc.perform(get("/api/v1/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sloganVi").value("Đất kể chuyện"))
+                .andExpect(jsonPath("$.data.sloganEn").value("Clay tells stories"));
+    }
+
+    @Test
+    void sloganValidationRejectsBlankOrOversizedValues() throws Exception {
+        Cookie admin = access(saveAdmin());
+        String oversized = "x".repeat(201);
+
+        mvc.perform(put("/api/v1/admin/home/slogan")
+                        .cookie(admin)
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sloganVi\":\"   \",\"sloganEn\":\"English\"}"))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(put("/api/v1/admin/home/slogan")
+                        .cookie(admin)
+                        .with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sloganVi\":\"Việt\",\"sloganEn\":\"" + oversized + "\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

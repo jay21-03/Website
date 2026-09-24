@@ -43,7 +43,7 @@ class BautrucEcommerceApplicationTest {
     @Test
     void contextLoadsWithPostgreSqlAndFlyway() {
         assertThat(dataSource).isNotNull();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("12");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("13");
         List<String> appliedVersions = jdbcTemplate.queryForList(
                 """
                 select version
@@ -53,7 +53,7 @@ class BautrucEcommerceApplicationTest {
                 """,
                 String.class
         );
-        assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
+        assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13");
         Long sequenceCount = jdbcTemplate.queryForObject(
                 "select count(*) from pg_class where relkind = 'S' and relname = 'app_global_id_seq'",
                 Long.class

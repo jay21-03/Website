@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import { businessDateTimeLocal, businessLocalDateTimeToOffset, formatBusinessDateTime, localBusinessDate, monthStartBusinessDate } from './utils/businessDate'
@@ -653,6 +654,7 @@ const featuredIdsFromHome = home => {
 }
 
 function HomepageContent({ notify, lang = 'vi' }) {
+  const queryClient = useQueryClient()
   const [home, setHome] = useState(null)
   const [products, setProducts] = useState([])
   const [featuredIds, setFeaturedIds] = useState(['', '', ''])
@@ -660,6 +662,8 @@ function HomepageContent({ notify, lang = 'vi' }) {
   const [error, setError] = useState('')
   const [busySlot, setBusySlot] = useState('')
   const [savingFeatured, setSavingFeatured] = useState(false)
+  const [slogan, setSlogan] = useState({ sloganVi: '', sloganEn: '' })
+  const [savingSlogan, setSavingSlogan] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -669,6 +673,7 @@ function HomepageContent({ notify, lang = 'vi' }) {
       setHome(homepage)
       setProducts(activeProducts)
       setFeaturedIds(featuredIdsFromHome(homepage))
+      setSlogan({ sloganVi: homepage.sloganVi || '', sloganEn: homepage.sloganEn || '' })
     } catch (e) {
       setError(e.message)
     } finally {
@@ -742,6 +747,22 @@ function HomepageContent({ notify, lang = 'vi' }) {
     }
   }
 
+  async function saveSlogan(event) {
+    event.preventDefault()
+    setSavingSlogan(true)
+    try {
+      const updated = await api.updateHomeSlogan(slogan)
+      setHome(updated)
+      setSlogan({ sloganVi: updated.sloganVi, sloganEn: updated.sloganEn })
+      await queryClient.invalidateQueries({ queryKey: ['home'] })
+      notify(adminText(lang, 'Đã cập nhật slogan trang chủ.', 'Homepage slogan updated.'))
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setSavingSlogan(false)
+    }
+  }
+
   const mediaBySlot = new Map((home?.media || []).map(item => [item.slot, item]))
   const primary = homepageMediaConfig.slice(0, 2)
   const social = homepageMediaConfig.slice(2)
@@ -752,6 +773,17 @@ function HomepageContent({ notify, lang = 'vi' }) {
   >
     <p className="homepage-admin-intro">{adminText(lang, 'Ảnh được tải lên sẽ được sử dụng cho các vị trí tương ứng trên trang chủ. Nếu chưa tải ảnh hoặc đặt lại, website dùng ảnh mặc định hiện có.', 'Uploaded images are managed for the homepage. When no managed image exists, the website uses its current default image.')}</p>
     <LoadState loading={loading} error={error} lang={lang}>
+      <section className="homepage-slogan-section">
+        <div className="homepage-media-section-head homepage-featured-head">
+          <h3>{adminText(lang, 'Quản lý slogan', 'Slogan management')}</h3>
+          <p>{adminText(lang, 'Nội dung này được dùng đồng thời tại trang chủ và chân trang.', 'This content is shared by the homepage and footer.')}</p>
+        </div>
+        <form className="homepage-slogan-form" onSubmit={saveSlogan}>
+          <label>{adminText(lang, 'Slogan tiếng Việt', 'Vietnamese slogan')}<input value={slogan.sloganVi} onChange={event => setSlogan(value => ({ ...value, sloganVi: event.target.value }))} maxLength="200" required /></label>
+          <label>{adminText(lang, 'Slogan tiếng Anh', 'English slogan')}<input value={slogan.sloganEn} onChange={event => setSlogan(value => ({ ...value, sloganEn: event.target.value }))} maxLength="200" required /></label>
+          <button className="admin-primary" disabled={savingSlogan}>{savingSlogan ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu thay đổi', 'Save changes')}</button>
+        </form>
+      </section>
       <section className="homepage-featured-section">
         <div className="homepage-media-section-head homepage-featured-head">
           <h3>{adminText(lang, 'Sản phẩm nổi bật', 'Featured products')}</h3>
