@@ -150,6 +150,34 @@ class CatalogProductQueryIntegrationTest {
                 .isEqualTo(1000);
     }
 
+    @Test
+    void productSpecificationsCanBeUpdatedReadAndValidated() throws Exception {
+        long collectionId = collection("Gom", "Pottery");
+        long productId = product("Binh gom", "Pottery vase", 1000, "ACTIVE", collectionId);
+        Cookie admin = access(saveAdmin());
+        String payload = """
+                {"nameVi":"Binh gom","nameEn":"Pottery vase",
+                 "descriptionVi":"Mo ta chi tiet","descriptionEn":"Detailed description",
+                 "basePrice":1000,"collectionId":%d,"status":"ACTIVE",
+                 "sizeCm":"20 x 15 x 10","weightGrams":1200}
+                """.formatted(collectionId);
+
+        mvc.perform(put("/api/v1/admin/products/{id}", productId).cookie(admin).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sizeCm").value("20 x 15 x 10"))
+                .andExpect(jsonPath("$.data.weightGrams").value(1200));
+        mvc.perform(get("/api/v1/products/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.descriptionEn").value("Detailed description"))
+                .andExpect(jsonPath("$.data.sizeCm").value("20 x 15 x 10"))
+                .andExpect(jsonPath("$.data.weightGrams").value(1200));
+        mvc.perform(put("/api/v1/admin/products/{id}", productId).cookie(admin).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON).content(payload.replace("\"weightGrams\":1200", "\"weightGrams\":0")))
+                .andExpect(status().isBadRequest());
+        assertThat(jdbc.queryForObject("SELECT weight_grams FROM products WHERE id = ?", Long.class, productId)).isEqualTo(1200L);
+    }
+
     private long collection(String nameVi, String nameEn) {
         return jdbc.queryForObject("""
                 INSERT INTO collections(name_vi,name_en,status,created_at,updated_at)

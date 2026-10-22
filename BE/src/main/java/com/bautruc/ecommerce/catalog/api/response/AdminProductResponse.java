@@ -11,6 +11,8 @@ public record AdminProductResponse(
         String nameEn,
         String descriptionVi,
         String descriptionEn,
+        String sizeCm,
+        Long weightGrams,
         long basePrice,
         long sellingPrice,
         ProductStatus status,
