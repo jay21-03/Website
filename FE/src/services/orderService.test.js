@@ -40,4 +40,20 @@ describe('order service contracts', () => {
     expect(request).toHaveBeenCalledWith('/me/orders?page=2&size=20')
     expect(request).toHaveBeenCalledWith('/me/orders/9')
   })
+
+  it('isolates Buy Now idempotency from cart checkout', async () => {
+    crypto.randomUUID.mockReturnValueOnce('cart-key').mockReturnValueOnce('buy-key').mockReturnValueOnce('next-buy-key')
+    const customer = { receiverName: 'An', phone: '0901234567', email: '', address: 'Bàu Trúc', note: '' }
+    const buyNow = { ...customer, productId: 12, quantity: 1 }
+    await checkoutOrder(customer)
+    await checkoutOrder(buyNow)
+    await checkoutOrder(buyNow)
+    expect(request).toHaveBeenNthCalledWith(1, '/checkout', expect.objectContaining({ headers: { 'Idempotency-Key': 'cart-key' } }))
+    expect(request).toHaveBeenNthCalledWith(2, '/checkout', expect.objectContaining({ body: JSON.stringify(buyNow), headers: { 'Idempotency-Key': 'buy-key' } }))
+    expect(request).toHaveBeenNthCalledWith(3, '/checkout', expect.objectContaining({ headers: { 'Idempotency-Key': 'buy-key' } }))
+    completeCheckoutAttempt(buyNow)
+    expect(sessionStorage.getItem(CHECKOUT_IDEMPOTENCY_KEY)).toBe('cart-key')
+    await checkoutOrder(buyNow)
+    expect(crypto.randomUUID).toHaveBeenCalledTimes(3)
+  })
 })

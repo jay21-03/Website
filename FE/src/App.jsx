@@ -274,7 +274,7 @@ function CollectionsPage() {
 }
 
 function ProductDetail() {
-  const { id } = useParams(); const { add, lang } = useStore(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
+  const { id } = useParams(); const { add, lang } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
   const relatedQuery = useQuery({ queryKey: ['related-products', product?.collectionId], queryFn: () => api.products({ collectionId: product.collectionId, page: 0, size: 5, sort: 'createdAt,desc' }), enabled: Boolean(product?.collectionId) })
   useEffect(() => { setSelected(0); setZoom(1); setTouchStart(null); setActiveTab('description') }, [id])
   const images = product?.images?.length ? product.images : [{ id: 'fallback', url: product?.thumbnailUrl || fallbackImage, thumbnail: true }]
@@ -300,7 +300,7 @@ function ProductDetail() {
   const name = lang === 'vi' ? product.nameVi : product.nameEn
   const description = lang === 'vi' ? product.descriptionVi : product.descriptionEn
   const relatedProducts = (relatedQuery.data?.content || []).filter(item => item.id !== product.id).slice(0, 4)
-  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div>
+  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><button type="button" className="button light full" onClick={() => navigate(`/checkout?buyNow=${product.id}`)}>{pick(lang, 'Mua ngay', 'Buy Now')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div>
     <section className="product-detail-extra">
       <div className="product-detail-tabs" role="tablist" aria-label={pick(lang, 'Thông tin sản phẩm', 'Product information')} onKeyDown={handleTabKeyDown}>
         <button id="product-description-tab" type="button" role="tab" aria-selected={activeTab === 'description'} aria-controls="product-detail-panel" tabIndex={activeTab === 'description' ? 0 : -1} className={activeTab === 'description' ? 'active' : ''} onClick={() => setActiveTab('description')}>{pick(lang, 'Mô tả sản phẩm', 'Description')}</button>
@@ -328,16 +328,440 @@ function Cart() {
   return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : user?.role === 'ADMIN' ? <Empty>{pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')}</Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{user && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div>{user ? <Link className="button dark full" to="/checkout">{pick(lang, 'Tiếp tục thanh toán', 'Continue to checkout')}</Link> : <><button className="button dark full" type="button" onClick={() => startGoogleLogin(true)}>{pick(lang, 'Đăng nhập để thanh toán', 'Sign in to checkout')}</button><small className="cart-signin-note">{pick(lang, 'Giỏ hàng đang được lưu tạm trên thiết bị này. Giá và tồn kho sẽ được kiểm tra khi đăng nhập.', 'This cart is saved on this device. Price and inventory will be checked after sign-in.')}</small></>}</section></div>}</main></Layout>
 }
 function Checkout() {
-  const { cart, setCart, user, notify, lang, authLoading } = useStore(); const [errors, setErrors] = useState({}); const [submitError, setSubmitError] = useState(''); const navigate = useNavigate(); const checkout = useCheckout()
-  async function change(item, quantity) { try { setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)) } catch (error) { notify(error.message) } }
-  async function submit(event) { event.preventDefault(); if (!user) return navigate('/account'); if (checkout.isPending) return; const result = validateCheckout(
-  Object.fromEntries(
-    new FormData(event.currentTarget)
-  ),
-  lang
-); setErrors(result.errors); setSubmitError(''); if (!result.data) return; try { const created = await checkout.mutateAsync(result.data); setCart({ items: [], totalAmount: 0 }); navigate(`/orders/${created.orderId}`, { replace: true }) } catch (error) { setSubmitError(error.message); if ([400, 409].includes(error.status)) { try { setCart(await api.cart()) } catch { /* preserve the checkout error */ } } } }
-  const field = (name, label, control) => <label className={['email', 'address', 'note'].includes(name) ? 'wide' : ''}>{label}{control}{errors[name] && <small className="field-error" role="alert">{errors[name]}</small>}</label>
-  return <Layout><main className="page checkout-page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Thông tin đặt hàng', 'Checkout details')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Bạn cần đăng nhập bằng tài khoản khách hàng để đặt hàng.', 'Sign in with a customer account to checkout.')}</Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><form className="checkout-form" onSubmit={submit} noValidate><h3>{pick(lang, 'Thông tin nhận hàng', 'Recipient information')}</h3>{submitError && <div className="form-error" role="alert">{submitError}</div>}<div className="form-grid">{field('receiverName', pick(lang, 'Họ và tên', 'Full name'), <input name="receiverName" defaultValue={user.fullName} maxLength="255" aria-invalid={Boolean(errors.receiverName)} />)}{field('phone', pick(lang, 'Số điện thoại', 'Phone number'), <input name="phone" maxLength="32" aria-invalid={Boolean(errors.phone)} />)}{field('email', 'Email', <input name="email" type="email" defaultValue={user.email} maxLength="320" aria-invalid={Boolean(errors.email)} />)}{field('address', pick(lang, 'Địa chỉ', 'Address'), <input name="address" maxLength="500" aria-invalid={Boolean(errors.address)} />)}{field('note', pick(lang, 'Ghi chú', 'Note'), <textarea name="note" maxLength="1000" aria-invalid={Boolean(errors.note)} />)}</div><button className="button dark full" disabled={checkout.isPending}>{checkout.isPending ? pick(lang, 'Đang tạo đơn hàng...', 'Creating order...') : `${pick(lang, 'Đặt hàng', 'Place order')} ${money(cart.totalAmount, lang)}`}</button></form><aside className="order-summary"><h3>{pick(lang, 'Đơn hàng của bạn', 'Your order')}</h3>{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b><span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} disabled={checkout.isPending} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={checkout.isPending || item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" disabled={checkout.isPending} onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div></aside></div>}</main></Layout>
+  const {
+    cart,
+    setCart,
+    user,
+    notify,
+    lang,
+    authLoading,
+    startGoogleLogin
+  } = useStore()
+
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const checkout = useCheckout()
+
+  const [errors, setErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
+
+  const buyNowId = searchParams.get('buyNow')
+  const isBuyNow = buyNowId !== null
+  const validBuyNowId =
+    isBuyNow && /^[1-9]\d*$/.test(buyNowId)
+
+  const buyNowQuery = useQuery({
+    queryKey: ['buy-now-product', buyNowId],
+    queryFn: () => api.product(buyNowId),
+    enabled: Boolean(validBuyNowId && user?.role === 'USER')
+  })
+
+  const buyNowProduct = buyNowQuery.data
+
+  const buyNowItem = buyNowProduct
+    ? {
+        id: `buy-now-${buyNowProduct.id}`,
+        productId: buyNowProduct.id,
+        nameVi: buyNowProduct.nameVi,
+        nameEn: buyNowProduct.nameEn,
+        thumbnailUrl: buyNowProduct.thumbnailUrl,
+        quantity: 1,
+        sellingPrice: buyNowProduct.sellingPrice,
+        lineTotal: buyNowProduct.sellingPrice
+      }
+    : null
+
+  const items = isBuyNow
+    ? (buyNowItem ? [buyNowItem] : [])
+    : cart.items
+
+  const total = isBuyNow
+    ? (buyNowItem?.lineTotal ?? 0)
+    : cart.totalAmount
+
+  async function change(item, quantity) {
+    if (isBuyNow) return
+
+    try {
+      const updated = quantity < 1
+        ? await api.removeCart(item.id)
+        : await api.updateCart(item.id, quantity)
+
+      setCart(updated)
+    } catch (error) {
+      notify(error.message)
+    }
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+
+    if (user?.role !== 'USER') {
+      return navigate('/account')
+    }
+
+    if (checkout.isPending) return
+    if (isBuyNow && !buyNowProduct) return
+
+    const values = Object.fromEntries(
+      new FormData(event.currentTarget)
+    )
+
+    const result = validateCheckout(values, lang)
+
+    setErrors(result.errors)
+    setSubmitError('')
+
+    if (!result.data) return
+
+    const payload = isBuyNow
+      ? {
+          ...result.data,
+          productId: buyNowProduct.id,
+          quantity: 1
+        }
+      : result.data
+
+    try {
+      const created = await checkout.mutateAsync(payload)
+
+      if (!isBuyNow) {
+        setCart({ items: [], totalAmount: 0 })
+      }
+
+      navigate(`/orders/${created.orderId}`, {
+        replace: true
+      })
+    } catch (error) {
+      setSubmitError(error.message)
+
+      if (!isBuyNow && [400, 409].includes(error.status)) {
+        try {
+          setCart(await api.cart())
+        } catch {
+          // Keep the original checkout error.
+        }
+      }
+    }
+  }
+
+  const field = (name, label, control) => (
+    <label className={
+      ['email', 'address', 'note'].includes(name) ? 'wide' : ''
+    }>
+      {label}
+      {control}
+      {errors[name] && (
+        <small className="field-error" role="alert">
+          {errors[name]}
+        </small>
+      )}
+    </label>
+  )
+
+  let content
+
+  if (authLoading) {
+    content = (
+      <Loading
+        text={pick(
+          lang,
+          'Đang kiểm tra tài khoản...',
+          'Checking account...'
+        )}
+      />
+    )
+  } else if (user?.role !== 'USER') {
+    content = (
+      <Empty>
+        <p>
+          {pick(
+            lang,
+            'Bạn cần đăng nhập bằng tài khoản khách hàng để đặt hàng.',
+            'Sign in with a customer account to checkout.'
+          )}
+        </p>
+
+        {!user && (
+          <button
+            type="button"
+            className="button dark"
+            onClick={() => startGoogleLogin(false)}
+          >
+            {pick(lang, 'Đăng nhập Google', 'Sign in with Google')}
+          </button>
+        )}
+      </Empty>
+    )
+  } else if (isBuyNow && !validBuyNowId) {
+    content = (
+      <Empty>
+        {pick(
+          lang,
+          'Đường dẫn sản phẩm không hợp lệ.',
+          'Invalid product link.'
+        )}
+      </Empty>
+    )
+  } else if (isBuyNow && buyNowQuery.isLoading) {
+    content = (
+      <Loading
+        text={pick(
+          lang,
+          'Đang tải sản phẩm...',
+          'Loading product...'
+        )}
+      />
+    )
+  } else if (isBuyNow && buyNowQuery.isError) {
+    content = (
+      <div className="state-box error" role="alert">
+        <p>{buyNowQuery.error.message}</p>
+        <button
+          type="button"
+          onClick={() => buyNowQuery.refetch()}
+        >
+          {pick(lang, 'Thử lại', 'Retry')}
+        </button>
+      </div>
+    )
+  } else if (!items.length) {
+    content = (
+      <Empty>
+        {pick(
+          lang,
+          isBuyNow
+            ? 'Không tìm thấy sản phẩm.'
+            : 'Giỏ hàng đang trống.',
+          isBuyNow
+            ? 'Product not found.'
+            : 'Your cart is empty.'
+        )}
+        {' '}
+        <Link to="/products">
+          {pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}
+        </Link>
+      </Empty>
+    )
+  } else {
+    content = (
+      <div className="checkout-grid">
+        <form
+          className="checkout-form"
+          onSubmit={submit}
+          noValidate
+        >
+          <h3>
+            {pick(lang, 'Thông tin nhận hàng', 'Recipient information')}
+          </h3>
+
+          {submitError && (
+            <div className="form-error" role="alert">
+              {submitError}
+            </div>
+          )}
+
+          <div className="form-grid">
+            {field(
+              'receiverName',
+              pick(lang, 'Họ và tên', 'Full name'),
+              <input
+                name="receiverName"
+                defaultValue={user.fullName}
+                maxLength="255"
+                aria-invalid={Boolean(errors.receiverName)}
+              />
+            )}
+
+            {field(
+              'phone',
+              pick(lang, 'Số điện thoại', 'Phone number'),
+              <input
+                name="phone"
+                maxLength="32"
+                aria-invalid={Boolean(errors.phone)}
+              />
+            )}
+
+            {field(
+              'email',
+              'Email',
+              <input
+                name="email"
+                type="email"
+                defaultValue={user.email}
+                maxLength="320"
+                aria-invalid={Boolean(errors.email)}
+              />
+            )}
+
+            {field(
+              'address',
+              pick(lang, 'Địa chỉ', 'Address'),
+              <input
+                name="address"
+                maxLength="500"
+                aria-invalid={Boolean(errors.address)}
+              />
+            )}
+
+            {field(
+              'note',
+              pick(lang, 'Ghi chú', 'Note'),
+              <textarea
+                name="note"
+                maxLength="1000"
+                aria-invalid={Boolean(errors.note)}
+              />
+            )}
+          </div>
+
+          {isBuyNow && (
+            <p className="cart-signin-note">
+              {pick(
+                lang,
+                'Mua ngay không thay đổi giỏ hàng hiện có. Giá và tồn kho được kiểm tra lại khi đặt hàng.',
+                'Buy Now does not change your cart. Price and stock are revalidated when placing the order.'
+              )}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="button dark full"
+            disabled={checkout.isPending}
+          >
+            {checkout.isPending
+              ? pick(lang, 'Đang tạo đơn hàng...', 'Creating order...')
+              : `${pick(lang, 'Đặt hàng', 'Place order')} ${money(total, lang)}`}
+          </button>
+        </form>
+
+        <aside className="order-summary">
+          <h3>
+            {pick(
+              lang,
+              isBuyNow ? 'Mua ngay' : 'Đơn hàng của bạn',
+              isBuyNow ? 'Buy Now' : 'Your order'
+            )}
+          </h3>
+
+          {items.map(item => (
+            <div
+              className="checkout-item"
+              key={item.id}
+            >
+              <img
+                src={item.thumbnailUrl || fallbackImage}
+                alt=""
+              />
+
+              <div>
+                <b>
+                  {lang === 'vi'
+                    ? item.nameVi
+                    : item.nameEn}
+                </b>
+
+                {isBuyNow ? (
+                  <span>
+                    {pick(lang, 'Số lượng', 'Quantity')}: 1
+                  </span>
+                ) : (
+                  <>
+                    <span>
+                      <button
+                        type="button"
+                        aria-label={pick(
+                          lang,
+                          'Giảm số lượng',
+                          'Decrease quantity'
+                        )}
+                        disabled={checkout.isPending}
+                        onClick={() =>
+                          change(item, item.quantity - 1)
+                        }
+                      >
+                        −
+                      </button>
+
+                      {' '}{item.quantity}{' '}
+
+                      <button
+                        type="button"
+                        aria-label={pick(
+                          lang,
+                          'Tăng số lượng',
+                          'Increase quantity'
+                        )}
+                        disabled={
+                          checkout.isPending ||
+                          item.quantity >= item.availableQuantity
+                        }
+                        onClick={() =>
+                          change(item, item.quantity + 1)
+                        }
+                      >
+                        +
+                      </button>
+                    </span>
+
+                    <button
+                      type="button"
+                      className="link-danger"
+                      disabled={checkout.isPending}
+                      onClick={() => change(item, 0)}
+                    >
+                      {pick(lang, 'Xóa', 'Remove')}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div>
+                <small>
+                  {money(item.sellingPrice, lang)}
+                  {' × '}{item.quantity}
+                </small>
+                <b>{money(item.lineTotal, lang)}</b>
+              </div>
+            </div>
+          ))}
+
+          <div className="summary-line total">
+            <span>{pick(lang, 'Tổng cộng', 'Total')}</span>
+            <b>{money(total, lang)}</b>
+          </div>
+        </aside>
+      </div>
+    )
+  }
+
+  return (
+    <Layout>
+      <main className="page checkout-page">
+        <div className="page-title">
+          <span className="kicker">
+            {pick(
+              lang,
+              isBuyNow ? 'Mua ngay' : 'Giỏ hàng',
+              isBuyNow ? 'Buy Now' : 'Cart'
+            )}
+          </span>
+
+          <h1>
+            {pick(
+              lang,
+              'Thông tin đặt hàng',
+              'Checkout details'
+            )}
+          </h1>
+        </div>
+
+        {content}
+      </main>
+    </Layout>
+  )
 }
 function Orders() {
   const { user, lang, authLoading } = useStore(); const [pageNumber, setPageNumber] = useState(0); const orders = useMyOrders(pageNumber, user?.role === 'USER'); const page = orders.data

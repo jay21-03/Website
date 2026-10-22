@@ -1,15 +1,18 @@
 export const CHECKOUT_IDEMPOTENCY_KEY = 'bautruc.checkout.idempotency-key'
+export const checkoutIdempotencyStorageKey = values => values?.productId != null
+  ? `${CHECKOUT_IDEMPOTENCY_KEY}.buy-now.${values.productId}.${values.quantity}`
+  : CHECKOUT_IDEMPOTENCY_KEY
 
-export function getCheckoutIdempotencyKey(storage = window.sessionStorage) {
-  const existing = storage.getItem(CHECKOUT_IDEMPOTENCY_KEY)
+export function getCheckoutIdempotencyKey(storage = window.sessionStorage, key = CHECKOUT_IDEMPOTENCY_KEY) {
+  const existing = storage.getItem(key)
   if (existing) return existing
   const created = crypto.randomUUID()
-  storage.setItem(CHECKOUT_IDEMPOTENCY_KEY, created)
+  storage.setItem(key, created)
   return created
 }
 
-export function clearCheckoutIdempotencyKey(storage = window.sessionStorage) {
-  storage.removeItem(CHECKOUT_IDEMPOTENCY_KEY)
+export function clearCheckoutIdempotencyKey(storage = window.sessionStorage, key = CHECKOUT_IDEMPOTENCY_KEY) {
+  storage.removeItem(key)
 }
 
 const terminalCheckoutFailureCodes = new Set(['PAYOS_REQUEST_FAILED'])
