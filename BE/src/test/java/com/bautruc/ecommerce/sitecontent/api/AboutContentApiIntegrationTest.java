@@ -65,7 +65,8 @@ class AboutContentApiIntegrationTest {
                     content_type = NULL,
                     file_size_bytes = NULL,
                     updated_at = now()
-WHERE slot LIKE 'ABOUT_%' OR slot IN ('CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_HERO', 'CHECKOUT_HERO', 'SITE_LOGO')
+WHERE slot LIKE 'ABOUT_%' OR slot IN ('CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_HERO', 'CHECKOUT_HERO', 'SITE_LOGO',
+    'CATALOG_HERO_DARK', 'WORKSHOP_HERO_DARK', 'SUPPORT_HERO_DARK', 'CHECKOUT_HERO_DARK', 'SITE_LOGO_DARK')
                 """);
 
         when(storage.publicUrl(anyString()))
@@ -276,6 +277,31 @@ WHERE slot LIKE 'ABOUT_%' OR slot IN ('CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_
         mvc.perform(get("/api/v1/site/presentation"))
                 .andExpect(jsonPath("$.data.content.pages.checkout.title.font").value("vietnamese"))
                 .andExpect(jsonPath("$.data.content.pages.checkout.title.color").value("#563820"));
+        String themed = """
+                {"pages":{"brand":{"name":{"vi":"Tên sáng","en":"Light name"}}},
+                 "checkout":{"fieldOrder":["receiverName","phone","email","address","note"],
+                             "sectionOrder":["form","summary"],"showNote":true,"showEmail":true},
+                 "colorPreset":"clay","fontPreset":"heritage",
+                 "colors":{"background":"#FBF6EC","card":"#F1E4D2","primary":"#9D4B2F",
+                           "text":"#2C1A0E","secondary":"#704126","accent":"#C69A56"},
+                 "dark":{"pages":{"brand":{"name":{"vi":"Tên tối","en":"Dark name"}}},
+                         "checkout":{"fieldOrder":["receiverName","phone","email","address","note"],
+                                     "sectionOrder":["summary","form"],"showNote":false,"showEmail":true},
+                         "colorPreset":"night","fontPreset":"editorial",
+                         "colors":{"background":"#1D1713","card":"#30251E","primary":"#D18B5A",
+                                   "text":"#F5E9DB","secondary":"#AE8A72","accent":"#E2B976"}}}
+                """;
+        mvc.perform(put("/api/v1/admin/site/presentation")
+                        .cookie(admin).with(csrf().asHeader()).contentType(MediaType.APPLICATION_JSON).content(themed))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/site/presentation"))
+                .andExpect(jsonPath("$.data.content.pages.brand.name.vi").value("Tên sáng"))
+                .andExpect(jsonPath("$.data.content.dark.pages.brand.name.vi").value("Tên tối"))
+                .andExpect(jsonPath("$.data.content.dark.colors.background").value("#1D1713"));
+        mvc.perform(put("/api/v1/admin/site/presentation")
+                        .cookie(admin).with(csrf().asHeader()).contentType(MediaType.APPLICATION_JSON)
+                        .content(themed.replace("#F5E9DB", "invalid")))
+                .andExpect(status().isBadRequest());
 
         mvc.perform(put("/api/v1/admin/site/presentation")
                         .cookie(admin).with(csrf().asHeader()).contentType(MediaType.APPLICATION_JSON)
@@ -321,6 +347,12 @@ WHERE slot LIKE 'ABOUT_%' OR slot IN ('CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_
                 .andExpect(status().isOk());
         mvc.perform(get("/api/v1/site/presentation"))
                 .andExpect(jsonPath("$.data.media.CATALOG_HERO").isNotEmpty());
+        mvc.perform(multipart("/api/v1/admin/site/media/SITE_LOGO_DARK")
+                        .file(file).cookie(admin).with(csrf().asHeader())
+                        .with(request -> { request.setMethod("PUT"); return request; }))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/site/presentation"))
+                .andExpect(jsonPath("$.data.media.SITE_LOGO_DARK").isNotEmpty());
     }
 
     private User user(String key, UserRole role) {

@@ -152,6 +152,22 @@ export const colorPresets = {
   night: { name: 'Night Kiln', colors: ['#1D1713', '#30251E', '#D18B5A', '#F5E9DB', '#AE8A72', '#E2B976'] }
 }
 
+export const colorNames = ['background', 'card', 'primary', 'text', 'secondary', 'accent']
+export const presetColors = name => Object.fromEntries(colorNames.map((key, index) => [key, (colorPresets[name] || colorPresets.clay).colors[index]]))
+export const presentationMode = (content, mode) => mode === 'dark'
+  ? content?.dark
+    ? { ...content, ...content.dark, pages: { ...content.pages, ...content.dark.pages } }
+    : { ...content, colorPreset: 'night', colors: presetColors('night') }
+  : content
+
+export const presentationPalette = content => content?.colors || presetColors(content?.colorPreset || 'clay')
+
+export const contrastText = hex => {
+  const channels = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255)
+  const luminance = channels.reduce((sum, channel, index) => sum + (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4) * [0.2126, 0.7152, 0.0722][index], 0)
+  return luminance > 0.179 ? '#1D1713' : '#FFFFFF'
+}
+
 export const fontPresets = {
   heritage: { name: 'Heritage Classic', heading: 'Playfair Display', body: 'Be Vietnam Pro' },
   vietnamese: { name: 'Vietnamese Heritage', heading: 'Noto Serif', body: 'Be Vietnam Pro' },

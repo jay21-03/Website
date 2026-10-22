@@ -11,7 +11,9 @@ public record SitePresentationRequest(
         @NotNull Map<String, @Valid Map<String, @NotNull @Valid TextPair>> pages,
         @NotNull @Valid CheckoutLayout checkout,
         @NotBlank String colorPreset,
-        @NotBlank String fontPreset
+        @NotBlank String fontPreset,
+        Map<String, String> colors,
+        @Valid DarkSettings dark
 ) {
     public record TextPair(
             @NotBlank @Size(max = 5000) String vi,
@@ -25,5 +27,13 @@ public record SitePresentationRequest(
             @NotNull List<String> sectionOrder,
             boolean showNote,
             boolean showEmail
+    ) {}
+
+    public record DarkSettings(
+            @NotNull Map<String, @Valid Map<String, @NotNull @Valid TextPair>> pages,
+            @NotNull @Valid CheckoutLayout checkout,
+            @NotBlank String colorPreset,
+            @NotBlank String fontPreset,
+            @NotNull Map<String, String> colors
     ) {}
 }

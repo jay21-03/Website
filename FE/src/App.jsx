@@ -1,4 +1,4 @@
-import { Fragment, createContext, useContext, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell } from 'lucide-react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -10,7 +10,7 @@ import About from './design/About'
 import { SiteHeader } from './design/SiteHeader'
 import { MobileActionBar } from './design/MobileActionBar'
 import { PageHero } from './design/PageHero'
-import { ThemeProvider } from './design/theme'
+import { ThemeProvider, useTheme } from './design/theme'
 import { DesignContext } from './design/i18n'
 import { validateCheckout } from './domain/checkout'
 import { useCheckout, useMyOrder, useMyOrders } from './hooks/useOrders'
@@ -19,7 +19,7 @@ import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
 import { formatNotification } from './utils/notifications'
-import { presentationNode, presentationDefaults, visibleCheckoutFields } from './design/sitePresentation'
+import { presentationNode, presentationDefaults, presentationMode, presentationPalette, fontPresets, contrastText, visibleCheckoutFields } from './design/sitePresentation'
 
 const Store = createContext(null)
 const fallbackImage = '/assets/images/vase.jpg'
@@ -47,12 +47,35 @@ const CHECKOUT_INTENT_KEY = 'bautruc.checkout-intent'
 const waitForStateCommit = () => new Promise(resolve => window.setTimeout(resolve, 0))
 
 function StoreProvider({ children }) {
+  const preview = new URLSearchParams(window.location.search).get('presentationPreview') === '1'
+  const { theme } = useTheme()
   const navigate = useNavigate()
   const navigateRef = useRef(navigate)
   navigateRef.current = navigate
   const homepageQuery = useQuery({ queryKey: ['home'], queryFn: api.home })
   const presentationQuery = useQuery({ queryKey: ['site-presentation'], queryFn: api.sitePresentation })
-  const [lang, setLang] = useState(() => localStorage.getItem('dxLang') || 'vi')
+  const [draftPresentation, setDraftPresentation] = useState(null)
+  const [lang, setLang] = useState(() => preview ? new URLSearchParams(window.location.search).get('lang') || 'vi' : localStorage.getItem('dxLang') || 'vi')
+  const rawPresentation = draftPresentation || presentationQuery.data
+  const activeContent = useMemo(() => presentationMode(rawPresentation?.content || presentationDefaults, theme), [rawPresentation, theme])
+  const presentation = useMemo(() => {
+    const media = { ...rawPresentation?.media }
+    if (theme === 'dark') ['SITE_LOGO', 'CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_HERO', 'CHECKOUT_HERO'].forEach(slot => {
+      media[slot] = media[`${slot}_DARK`] || media[slot]
+    })
+    return { ...rawPresentation, content: activeContent, media }
+  }, [rawPresentation, activeContent, theme])
+  useEffect(() => {
+    if (!preview) return undefined
+    const receive = event => {
+      if (event.origin === window.location.origin && event.source === window.parent && event.data?.type === 'site-presentation-preview') {
+        setDraftPresentation({ content: event.data.content, media: event.data.media })
+      }
+    }
+    window.addEventListener('message', receive)
+    window.parent.postMessage({ type: 'site-presentation-preview-ready' }, window.location.origin)
+    return () => window.removeEventListener('message', receive)
+  }, [preview])
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
   const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
   const [support, setSupport] = useState(contact)
@@ -109,11 +132,31 @@ function StoreProvider({ children }) {
     initializeCart()
     return () => { active = false }
   }, [notify])
-  useEffect(() => { localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang])
+  useEffect(() => { if (!preview) localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang, preview])
   useEffect(() => {
-    document.documentElement.dataset.colorPreset = presentationQuery.data?.content?.colorPreset || 'clay'
-    document.documentElement.dataset.fontPreset = presentationQuery.data?.content?.fontPreset || 'heritage'
-  }, [presentationQuery.data])
+    const root = document.documentElement
+    const colors = presentationPalette(activeContent)
+    const font = fontPresets[activeContent.fontPreset] || fontPresets.heritage
+    const values = {
+      '--background': colors.background, '--card': colors.card, '--primary': colors.primary,
+      '--foreground': colors.text, '--wood': colors.secondary, '--gold': colors.accent,
+      '--clay': colors.primary, '--accent': colors.accent, '--ring': colors.primary,
+      '--card-foreground': colors.text, '--popover': colors.card, '--popover-foreground': colors.text,
+      '--secondary': colors.card, '--secondary-foreground': colors.text, '--muted': colors.card,
+      '--muted-foreground': colors.secondary, '--border': `color-mix(in srgb, ${colors.secondary} 35%, ${colors.background})`,
+      '--input': `color-mix(in srgb, ${colors.secondary} 35%, ${colors.background})`,
+      '--primary-foreground': contrastText(colors.primary), '--accent-foreground': contrastText(colors.accent),
+      '--ink': colors.text, '--white': colors.background, '--soft': colors.card,
+      '--line': `color-mix(in srgb, ${colors.secondary} 35%, ${colors.background})`,
+      '--font-display': `"${font.heading}", "Be Vietnam Pro", sans-serif`,
+      '--font-sans': `"${font.body}", system-ui, sans-serif`,
+      '--font-serif': activeContent.fontPreset === 'heritage' ? '"Cormorant Garamond", "Be Vietnam Pro", serif' : `"${font.heading}", serif`
+    }
+    root.dataset.colorPreset = activeContent.colorPreset || 'clay'
+    root.dataset.fontPreset = activeContent.fontPreset || 'heritage'
+    Object.entries(values).forEach(([key, value]) => root.style.setProperty(key, value))
+    return () => Object.keys(values).forEach(key => root.style.removeProperty(key))
+  }, [activeContent])
   googleCallbackRef.current = async credential => {
     if (googleLoginInFlightRef.current) return
     googleLoginInFlightRef.current = true
@@ -192,7 +235,7 @@ function StoreProvider({ children }) {
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
     try { setCart(await api.addCart(productId)); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
   }
-  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, homepage: homepageQuery.data, presentation: presentationQuery.data, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
+  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, homepage: homepageQuery.data, presentation, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
 const useStore = () => useContext(Store)
 
@@ -781,4 +824,4 @@ function AdminPortal() {
   return <Admin user={store.user} notify={store.notify} onLogout={logout} lang={store.lang} />
 }
 
-export default function App() { return <StoreProvider><ThemeProvider><Routes><Route path="/san-pham" element={<Products />} /><Route path="/trai-nghiem" element={<Workshop />} /><Route path="/lien-he" element={<Support />} /><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/products/:id" element={<ProductDetail />} /><Route path="/collections" element={<CollectionsPage />} /><Route path="/workshop" element={<Workshop />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/notifications" element={<CustomerNotifications />} /><Route path="/cart" element={<Cart />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/ve-chung-toi" element={<AboutPage />} /><Route path="/about" element={<Navigate to="/ve-chung-toi" replace />} /><Route path="/support" element={<Support />} /><Route path="/faq" element={<Faq />} /><Route path="/policy" element={<Policy />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<Home />} /></Routes></ThemeProvider></StoreProvider> }
+export default function App() { return <ThemeProvider><StoreProvider><Routes><Route path="/san-pham" element={<Products />} /><Route path="/trai-nghiem" element={<Workshop />} /><Route path="/lien-he" element={<Support />} /><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/products/:id" element={<ProductDetail />} /><Route path="/collections" element={<CollectionsPage />} /><Route path="/workshop" element={<Workshop />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/notifications" element={<CustomerNotifications />} /><Route path="/cart" element={<Cart />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/ve-chung-toi" element={<AboutPage />} /><Route path="/about" element={<Navigate to="/ve-chung-toi" replace />} /><Route path="/support" element={<Support />} /><Route path="/faq" element={<Faq />} /><Route path="/policy" element={<Policy />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<Home />} /></Routes></StoreProvider></ThemeProvider> }

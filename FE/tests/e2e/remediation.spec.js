@@ -1,5 +1,39 @@
 import { expect, test } from '@playwright/test'
 
+test('draft preview uses the real storefront with separate light and dark settings', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  await page.goto('/?presentationPreview=1&mode=dark&lang=vi')
+  await page.evaluate(() => window.postMessage({
+    type: 'site-presentation-preview',
+    content: {
+      pages: { brand: { name: { vi: 'Tên sáng', en: 'Light name' } } },
+      colorPreset: 'clay', fontPreset: 'heritage',
+      dark: {
+        pages: { brand: { name: { vi: 'Tên tối', en: 'Dark name' } } },
+        colorPreset: 'night', fontPreset: 'editorial',
+        colors: { background: '#1D1713', card: '#30251E', primary: '#D18B5A', text: '#F5E9DB', secondary: '#AE8A72', accent: '#E2B976' }
+      }
+    }, media: {}
+  }, window.location.origin))
+  await expect(page.locator('header').getByText('Tên tối')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(29, 23, 19)')
+})
+
+test('appearance editor switches mode before editing and previews the unsaved dark text', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  await page.route('**/api/v1/admin/site/presentation', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ success: true, data: { content: null, media: {} } })
+  }))
+  await page.goto('/admin?section=presentation')
+  const modePicker = page.getByRole('group', { name: 'Chọn chế độ để chỉnh sửa' })
+  await modePicker.getByRole('button', { name: 'Chỉnh chế độ tối' }).click()
+  await page.locator('.presentation-editor fieldset').first().getByRole('textbox', { name: 'Tiếng Việt' }).fill('Tên tối bản nháp')
+  await expect(page.frameLocator('iframe[title="Trang khách xem trước"]').locator('header').getByText('Tên tối bản nháp')).toBeVisible()
+  await modePicker.getByRole('button', { name: 'Chỉnh chế độ sáng' }).click()
+  await expect(page.locator('.presentation-editor fieldset').first().getByRole('textbox', { name: 'Tiếng Việt' })).toHaveValue('Đàng Xem')
+})
+
 const product = {
   id: 10,
   nameVi: 'Binh gom do',

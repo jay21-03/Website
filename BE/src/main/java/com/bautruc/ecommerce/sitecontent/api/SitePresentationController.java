@@ -52,8 +52,11 @@ public class SitePresentationController {
     }
 
     private void requireSiteSlot(SiteMediaSlot slot) {
-        if (slot != SiteMediaSlot.CATALOG_HERO && slot != SiteMediaSlot.WORKSHOP_HERO && slot != SiteMediaSlot.SUPPORT_HERO &&
-                slot != SiteMediaSlot.CHECKOUT_HERO && slot != SiteMediaSlot.SITE_LOGO) {
+        if (slot != SiteMediaSlot.CATALOG_HERO && slot != SiteMediaSlot.CATALOG_HERO_DARK &&
+                slot != SiteMediaSlot.WORKSHOP_HERO && slot != SiteMediaSlot.WORKSHOP_HERO_DARK &&
+                slot != SiteMediaSlot.SUPPORT_HERO && slot != SiteMediaSlot.SUPPORT_HERO_DARK &&
+                slot != SiteMediaSlot.CHECKOUT_HERO && slot != SiteMediaSlot.CHECKOUT_HERO_DARK &&
+                slot != SiteMediaSlot.SITE_LOGO && slot != SiteMediaSlot.SITE_LOGO_DARK) {
             throw new BusinessException("SITE_MEDIA_SLOT_INVALID", "Invalid site media slot.");
         }
     }

@@ -27,6 +27,7 @@ public class SitePresentationService {
     private static final Set<String> SECTIONS = Set.of("form", "summary");
     private static final Set<String> COLORS = Set.of("clay", "royal", "minimal", "nature", "sunset", "night", "sage", "ocean");
     private static final Set<String> FONTS = Set.of("heritage", "vietnamese", "editorial", "commerce", "minimal", "modern");
+    private static final Set<String> COLOR_PARTS = Set.of("background", "card", "primary", "text", "secondary", "accent");
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -55,8 +56,11 @@ public class SitePresentationService {
                 throw new IllegalStateException("Stored site presentation is invalid.", exception);
             }
         }
-        Map<String, String> urls = Set.of(SiteMediaSlot.CATALOG_HERO, SiteMediaSlot.WORKSHOP_HERO, SiteMediaSlot.SUPPORT_HERO,
-                SiteMediaSlot.CHECKOUT_HERO, SiteMediaSlot.SITE_LOGO).stream().collect(Collectors.toMap(SiteMediaSlot::name,
+        Map<String, String> urls = Set.of(SiteMediaSlot.CATALOG_HERO, SiteMediaSlot.CATALOG_HERO_DARK,
+                SiteMediaSlot.WORKSHOP_HERO, SiteMediaSlot.WORKSHOP_HERO_DARK,
+                SiteMediaSlot.SUPPORT_HERO, SiteMediaSlot.SUPPORT_HERO_DARK,
+                SiteMediaSlot.CHECKOUT_HERO, SiteMediaSlot.CHECKOUT_HERO_DARK,
+                SiteMediaSlot.SITE_LOGO, SiteMediaSlot.SITE_LOGO_DARK).stream().collect(Collectors.toMap(SiteMediaSlot::name,
                 slot -> media.findBySlot(slot).map(item -> item.getObjectKey())
                         .filter(key -> key != null && !key.isBlank()).map(storage::publicUrl).orElse("")));
         return new SitePresentationResponse(content, urls);
@@ -79,18 +83,27 @@ public class SitePresentationService {
     }
 
     private void validate(SitePresentationRequest request) {
-        if (!PAGES.containsAll(request.pages().keySet()) || request.pages().values().stream().anyMatch(page ->
-                page == null || page.size() > 50 || page.keySet().stream().anyMatch(key ->
-                        !key.matches("[a-z][A-Za-z0-9]{0,63}"))) ||
-                request.pages().values().stream().mapToInt(Map::size).sum() > 200 ||
-                request.pages().values().stream().flatMap(page -> page.values().stream()).anyMatch(value ->
-                        value == null || (value.font() != null && !value.font().isBlank() && !FONTS.contains(value.font())) ||
-                        (value.color() != null && !value.color().isBlank() && !value.color().matches("#[0-9a-fA-F]{6}"))) ||
-                !COLORS.contains(request.colorPreset()) || !FONTS.contains(request.fontPreset()) ||
-                !isPermutation(request.checkout().fieldOrder(), FIELDS) ||
-                !isPermutation(request.checkout().sectionOrder(), SECTIONS)) {
+        if (!validMode(request.pages(), request.checkout(), request.colorPreset(), request.fontPreset(), request.colors()) ||
+                request.dark() != null && !validMode(request.dark().pages(), request.dark().checkout(),
+                        request.dark().colorPreset(), request.dark().fontPreset(), request.dark().colors())) {
             throw new BusinessException("SITE_PRESENTATION_INVALID", "Invalid site presentation settings.");
         }
+    }
+
+    private boolean validMode(Map<String, Map<String, SitePresentationRequest.TextPair>> pages,
+                              SitePresentationRequest.CheckoutLayout checkout, String colorPreset,
+                              String fontPreset, Map<String, String> colors) {
+        return pages != null && checkout != null && PAGES.containsAll(pages.keySet()) && pages.values().stream().noneMatch(page ->
+                page == null || page.size() > 50 || page.keySet().stream().anyMatch(key ->
+                        key == null || !key.matches("[a-z][A-Za-z0-9]{0,63}"))) &&
+                pages.values().stream().mapToInt(Map::size).sum() <= 200 &&
+                pages.values().stream().flatMap(page -> page.values().stream()).noneMatch(value ->
+                        value == null || (value.font() != null && !value.font().isBlank() && !FONTS.contains(value.font())) ||
+                        (value.color() != null && !value.color().isBlank() && !value.color().matches("#[0-9a-fA-F]{6}"))) &&
+                COLORS.contains(colorPreset) && FONTS.contains(fontPreset) &&
+                (colors == null || colors.keySet().equals(COLOR_PARTS) && colors.values().stream().allMatch(value ->
+                        value != null && value.matches("#[0-9a-fA-F]{6}"))) &&
+                isPermutation(checkout.fieldOrder(), FIELDS) && isPermutation(checkout.sectionOrder(), SECTIONS);
     }
 
     private boolean isPermutation(List<String> values, Set<String> expected) {

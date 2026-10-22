@@ -10,10 +10,13 @@ const ThemeContext = createContext<ThemeValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
+  const previewMode = new URLSearchParams(window.location.search).get("presentationPreview") === "1"
+    ? new URLSearchParams(window.location.search).get("mode") : null;
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const initial: Theme =
+      previewMode === "dark" || previewMode === "light" ? previewMode :
       stored === "dark" || stored === "light"
         ? stored
         : window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -21,13 +24,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           : "light";
     setThemeState(initial);
     document.documentElement.classList.toggle("dark", initial === "dark");
-  }, []);
+  }, [previewMode]);
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
-    window.localStorage.setItem(STORAGE_KEY, t);
+    if (!previewMode) window.localStorage.setItem(STORAGE_KEY, t);
     document.documentElement.classList.toggle("dark", t === "dark");
-  }, []);
+  }, [previewMode]);
 
   const value = useMemo<ThemeValue>(
     () => ({ theme, setTheme, toggle: () => setTheme(theme === "light" ? "dark" : "light") }),
