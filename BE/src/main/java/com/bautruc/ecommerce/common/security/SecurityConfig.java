@@ -99,6 +99,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/cart/**").hasRole("USER")
                         .requestMatchers("/api/v1/checkout").hasRole("USER")
                         .requestMatchers("/api/v1/me/orders/**").hasRole("USER")
+                        .requestMatchers("/api/v1/me/notifications/**").hasRole("USER")
                         .requestMatchers("/api/v1/payments/*").hasRole("USER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

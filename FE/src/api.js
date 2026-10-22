@@ -107,6 +107,8 @@ export const api = {
   checkout: values => request('/checkout', { method: 'POST', headers: { 'Idempotency-Key': getCheckoutIdempotencyKey() }, body: JSON.stringify(values) }),
   orders: (page = 0, size = 20) => request(`/me/orders?page=${page}&size=${size}`),
   order: id => request(`/me/orders/${id}`),
+  myNotifications: (page = 0, isRead = '') => request(`/me/notifications?page=${page}&size=20${isRead === '' ? '' : `&isRead=${isRead}`}`),
+  readMyNotification: id => request(`/me/notifications/${id}/read`, { method: 'PATCH' }),
   adminDashboard: () => request('/admin/dashboard'),
   adminHome: () => request('/admin/home'),
   updateHomeSlogan: values => request('/admin/home/slogan', { method: 'PUT', body: JSON.stringify(values) }),

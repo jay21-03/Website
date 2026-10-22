@@ -176,6 +176,30 @@ class Phase5BackendIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalRevenue").value(0));
     }
 
+    @Test void customerNotificationsArePrivateAndReadPerCustomer() throws Exception {
+        User buyer = user("customer-notify", UserRole.USER, UserStatus.ACTIVE);
+        User other = user("customer-other", UserRole.USER, UserStatus.ACTIVE);
+        User admin = user("customer-notify-admin", UserRole.ADMIN, UserStatus.ACTIVE);
+        notificationService.create(NotificationType.NEW_ORDER, "New order", "Order ORD-20261022-00000042 was created.",
+                "ORDER", 42L, null, "NEW_ORDER:ORDER:42", clock.now(), buyer.getId());
+        Long notificationId = jdbc.queryForObject("select id from notifications where dedup_key='NEW_ORDER:ORDER:42'", Long.class);
+
+        mockMvc.perform(get("/api/v1/me/notifications").with(authentication(auth(admin))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/me/notifications").with(authentication(auth(other))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        mockMvc.perform(patch("/api/v1/me/notifications/{id}/read", notificationId)
+                        .with(authentication(auth(other))).with(csrf().asHeader()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/me/notifications?isRead=false").with(authentication(auth(buyer))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+        mockMvc.perform(patch("/api/v1/me/notifications/{id}/read", notificationId)
+                        .with(authentication(auth(buyer))).with(csrf().asHeader()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.isRead").value(true));
+        mockMvc.perform(get("/api/v1/me/notifications?isRead=false").with(authentication(auth(buyer))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
     @Test void dashboardRevenueAndBestSellingUseOnlyCompletedPaidOrders() {
         user("report-admin", UserRole.ADMIN, UserStatus.ACTIVE);
         long completedProduct = product("completed", 20);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Bell } from 'lucide-react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import Admin from './Admin'
@@ -17,6 +18,7 @@ import { addGuestQuantity, guestCartFromProducts, hydrateGuestCart, mergeGuestCa
 import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
+import { formatNotification } from './utils/notifications'
 
 const Store = createContext(null)
 const fallbackImage = '/assets/images/vase.jpg'
@@ -192,7 +194,7 @@ function Layout({ children }) {
   const { cart, user, lang, setLang, support } = useStore()
   const { pathname } = useLocation()
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
-  const account = user ? <Link className="icon-btn" to={user.role === 'ADMIN' ? '/admin' : '/account'}>{user.fullName || pick(lang, 'Tài khoản', 'Account')}</Link> : <DirectGoogleLogin />
+  const account = user ? <>{user.role === 'USER' && <CustomerNotificationLink userId={user.id} lang={lang} />}<Link className="icon-btn" to={user.role === 'ADMIN' ? '/admin' : '/account'}>{user.fullName || pick(lang, 'Tài khoản', 'Account')}</Link></> : <DirectGoogleLogin />
   return <DesignContext.Provider value={{ lang, setLang, t: (vi, en) => pick(lang, vi, en), count: cart.items.reduce((sum, item) => sum + item.quantity, 0) }}>
     <SiteHeader account={account} phone={support.phones[0]} />
     {children}
@@ -200,6 +202,27 @@ function Layout({ children }) {
     <MobileActionBar phone={support.phones[0]} />
     <div className="floating-chat">{support.phones[0] && <a className="zalo" href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo">Z</a>}{support.facebook && <a className="facebook" href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook">f</a>}</div>
   </DesignContext.Provider>
+}
+function CustomerNotificationLink({ userId, lang }) {
+  // shortcut: the unread count can lag by 30 seconds, add customer push events if instant updates are needed.
+  const unread = useQuery({ queryKey: ['my-notifications', userId, 'unread'], queryFn: () => api.myNotifications(0, false), refetchInterval: 30000 })
+  const count = unread.data?.totalElements || 0
+  return <Link to="/notifications" aria-label={pick(lang, `Thông báo${count ? `, ${count} chưa đọc` : ''}`, `Notifications${count ? `, ${count} unread` : ''}`)} className="relative rounded-sm border border-border p-2.5 text-foreground/80 hover:border-primary hover:text-primary"><Bell className="h-4 w-4" />{count > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] text-primary-foreground">{count}</span>}</Link>
+}
+
+function CustomerNotifications() {
+  const { user, lang, authLoading, notify } = useStore()
+  const [pageNumber, setPageNumber] = useState(0)
+  const queryClient = useQueryClient()
+  const list = useQuery({ queryKey: ['my-notifications', user?.id, pageNumber], queryFn: () => api.myNotifications(pageNumber), enabled: user?.role === 'USER' })
+  async function markRead(id) {
+    try {
+      await api.readMyNotification(id)
+      queryClient.invalidateQueries({ queryKey: ['my-notifications', user.id] })
+    } catch (error) { notify(error.message) }
+  }
+  const page = list.data
+  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Tài khoản', 'Account')}</span><h1>{pick(lang, 'Thông báo của tôi', 'My notifications')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang tải...', 'Loading...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Vui lòng đăng nhập bằng tài khoản khách hàng.', 'Please sign in with a customer account.')}</Empty> : list.isLoading ? <Loading text={pick(lang, 'Đang tải thông báo...', 'Loading notifications...')} /> : list.isError ? <div className="state-box error" role="alert">{list.error.message}<button onClick={() => list.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !page?.content.length ? <Empty>{pick(lang, 'Bạn chưa có thông báo.', 'You have no notifications yet.')}</Empty> : <><div className="mx-auto grid max-w-3xl gap-3">{page.content.map(item => { const copy = formatNotification(item, lang); return <article key={item.id} className={`rounded-sm border border-border p-4 ${item.isRead ? '' : 'bg-primary/5'}`}><b>{copy.title}</b><p>{copy.message}</p><small>{date(item.createdAt, lang)}</small><div className="mt-3 flex gap-4"><Link to={item.referenceType === 'ORDER' ? `/orders/${item.referenceId}` : '/orders'}>{pick(lang, 'Xem đơn hàng', 'View orders')}</Link>{!item.isRead && <button type="button" onClick={() => markRead(item.id)}>{pick(lang, 'Đánh dấu đã đọc', 'Mark as read')}</button>}</div></article> })}</div>{page.totalPages > 1 && <nav className="pagination" aria-label={pick(lang, 'Phân trang thông báo', 'Notification pagination')}><button disabled={page.first} onClick={() => setPageNumber(value => value - 1)}>{pick(lang, 'Trang trước', 'Previous')}</button><span>{pick(lang, 'Trang', 'Page')} {page.page + 1}/{page.totalPages}</span><button disabled={page.last} onClick={() => setPageNumber(value => value + 1)}>{pick(lang, 'Trang sau', 'Next')}</button></nav>}</>}</main></Layout>
 }
 
 function DirectGoogleLogin() {
@@ -343,4 +366,4 @@ function AdminPortal() {
   return <Admin user={store.user} notify={store.notify} onLogout={logout} lang={store.lang} />
 }
 
-export default function App() { return <StoreProvider><ThemeProvider><Routes><Route path="/san-pham" element={<Products />} /><Route path="/trai-nghiem" element={<Workshop />} /><Route path="/lien-he" element={<Support />} /><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/products/:id" element={<ProductDetail />} /><Route path="/collections" element={<CollectionsPage />} /><Route path="/workshop" element={<Workshop />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/cart" element={<Cart />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/ve-chung-toi" element={<AboutPage />} /><Route path="/about" element={<Navigate to="/ve-chung-toi" replace />} /><Route path="/support" element={<Support />} /><Route path="/faq" element={<Faq />} /><Route path="/policy" element={<Policy />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<Home />} /></Routes></ThemeProvider></StoreProvider> }
+export default function App() { return <StoreProvider><ThemeProvider><Routes><Route path="/san-pham" element={<Products />} /><Route path="/trai-nghiem" element={<Workshop />} /><Route path="/lien-he" element={<Support />} /><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/products/:id" element={<ProductDetail />} /><Route path="/collections" element={<CollectionsPage />} /><Route path="/workshop" element={<Workshop />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/notifications" element={<CustomerNotifications />} /><Route path="/cart" element={<Cart />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/ve-chung-toi" element={<AboutPage />} /><Route path="/about" element={<Navigate to="/ve-chung-toi" replace />} /><Route path="/support" element={<Support />} /><Route path="/faq" element={<Faq />} /><Route path="/policy" element={<Policy />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<Home />} /></Routes></ThemeProvider></StoreProvider> }

@@ -24,15 +24,24 @@ public class NotificationQueryRepository {
 
     public PageResponse<NotificationResponse> findForAdmin(Long adminId, Boolean isRead, NotificationType type,
                                                            Integer requestedPage, Integer requestedSize, String sort) {
+        return findForRecipient("notification_recipients", "admin_id", adminId, isRead, type, requestedPage, requestedSize, sort);
+    }
+
+    public PageResponse<NotificationResponse> findForCustomer(Long userId, Boolean isRead, Integer page, Integer size) {
+        return findForRecipient("customer_notification_recipients", "user_id", userId, isRead, null, page, size, null);
+    }
+
+    private PageResponse<NotificationResponse> findForRecipient(String table, String userColumn, Long userId,
+            Boolean isRead, NotificationType type, Integer requestedPage, Integer requestedSize, String sort) {
         int page = requestedPage == null ? PageResponse.DEFAULT_PAGE : Math.max(0, requestedPage);
         int size = requestedSize == null ? PageResponse.DEFAULT_SIZE
                 : Math.min(Math.max(1, requestedSize), PageResponse.MAX_SIZE);
-        StringBuilder where = new StringBuilder(" WHERE nr.admin_id=?");
+        StringBuilder where = new StringBuilder(" WHERE nr." + userColumn + "=?");
         List<Object> arguments = new ArrayList<>();
-        arguments.add(adminId);
+        arguments.add(userId);
         if (isRead != null) { where.append(" AND nr.is_read=?"); arguments.add(isRead); }
         if (type != null) { where.append(" AND n.type=?"); arguments.add(type.name()); }
-        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM notification_recipients nr JOIN notifications n ON n.id=nr.notification_id" + where,
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " nr JOIN notifications n ON n.id=nr.notification_id" + where,
                 Long.class, arguments.toArray());
         String direction = sort != null && sort.equalsIgnoreCase("createdAt,asc") ? "ASC" : "DESC";
         List<Object> pageArguments = new ArrayList<>(arguments);
@@ -40,9 +49,9 @@ public class NotificationQueryRepository {
         List<NotificationResponse> content = jdbc.query("""
                 SELECT n.id,n.type,n.title,n.message,n.reference_type,n.reference_id,
                        n.metadata::text,nr.is_read,nr.read_at,n.created_at
-                FROM notification_recipients nr
+                FROM %s nr
                 JOIN notifications n ON n.id=nr.notification_id
-                """ + where + " ORDER BY n.created_at " + direction + ", n.id " + direction + " LIMIT ? OFFSET ?",
+                """.formatted(table) + where + " ORDER BY n.created_at " + direction + ", n.id " + direction + " LIMIT ? OFFSET ?",
                 this::map, pageArguments.toArray());
         long count = total == null ? 0 : total;
         int totalPages = count == 0 ? 0 : (int) Math.ceil((double) count / size);
@@ -50,21 +59,35 @@ public class NotificationQueryRepository {
     }
 
     public NotificationResponse findForAdmin(Long adminId, Long notificationId) {
+        return findForRecipient("notification_recipients", "admin_id", adminId, notificationId);
+    }
+
+    public NotificationResponse findForCustomer(Long userId, Long notificationId) {
+        return findForRecipient("customer_notification_recipients", "user_id", userId, notificationId);
+    }
+
+    private NotificationResponse findForRecipient(String table, String userColumn, Long userId, Long notificationId) {
         List<NotificationResponse> rows = jdbc.query("""
                 SELECT n.id,n.type,n.title,n.message,n.reference_type,n.reference_id,
                        n.metadata::text,nr.is_read,nr.read_at,n.created_at
-                FROM notification_recipients nr
+                FROM %s nr
                 JOIN notifications n ON n.id=nr.notification_id
-                WHERE nr.admin_id=? AND n.id=?
-                """, this::map, adminId, notificationId);
+                WHERE nr.%s=? AND n.id=?
+                """.formatted(table, userColumn), this::map, userId, notificationId);
         return rows.stream().findFirst().orElse(null);
     }
 
     public int markRead(Long adminId, Long notificationId, java.time.Instant now) {
-        return jdbc.update("""
-                UPDATE notification_recipients SET is_read=true,read_at=?
-                WHERE admin_id=? AND notification_id=? AND is_read=false
-                """, java.sql.Timestamp.from(now), adminId, notificationId);
+        return markRead("notification_recipients", "admin_id", adminId, notificationId, now);
+    }
+
+    public int markCustomerRead(Long userId, Long notificationId, java.time.Instant now) {
+        return markRead("customer_notification_recipients", "user_id", userId, notificationId, now);
+    }
+
+    private int markRead(String table, String userColumn, Long userId, Long notificationId, java.time.Instant now) {
+        return jdbc.update("UPDATE " + table + " SET is_read=true,read_at=? WHERE " + userColumn + "=? AND notification_id=? AND is_read=false",
+                java.sql.Timestamp.from(now), userId, notificationId);
     }
 
     private NotificationResponse map(ResultSet rs, int row) throws SQLException {
