@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, createContext, useContext, useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell } from 'lucide-react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -19,6 +19,7 @@ import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
 import { formatNotification } from './utils/notifications'
+import { presentationNode, presentationDefaults, visibleCheckoutFields } from './design/sitePresentation'
 
 const Store = createContext(null)
 const fallbackImage = '/assets/images/vase.jpg'
@@ -50,6 +51,7 @@ function StoreProvider({ children }) {
   const navigateRef = useRef(navigate)
   navigateRef.current = navigate
   const homepageQuery = useQuery({ queryKey: ['home'], queryFn: api.home })
+  const presentationQuery = useQuery({ queryKey: ['site-presentation'], queryFn: api.sitePresentation })
   const [lang, setLang] = useState(() => localStorage.getItem('dxLang') || 'vi')
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
   const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
@@ -108,6 +110,10 @@ function StoreProvider({ children }) {
     return () => { active = false }
   }, [notify])
   useEffect(() => { localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang])
+  useEffect(() => {
+    document.documentElement.dataset.colorPreset = presentationQuery.data?.content?.colorPreset || 'clay'
+    document.documentElement.dataset.fontPreset = presentationQuery.data?.content?.fontPreset || 'heritage'
+  }, [presentationQuery.data])
   googleCallbackRef.current = async credential => {
     if (googleLoginInFlightRef.current) return
     googleLoginInFlightRef.current = true
@@ -186,20 +192,20 @@ function StoreProvider({ children }) {
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
     try { setCart(await api.addCart(productId)); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
   }
-  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, homepage: homepageQuery.data, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
+  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, homepage: homepageQuery.data, presentation: presentationQuery.data, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
 const useStore = () => useContext(Store)
 
 function Layout({ children }) {
-  const { cart, user, lang, setLang, support } = useStore()
+  const { cart, user, lang, setLang, support, presentation } = useStore()
   const { pathname } = useLocation()
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
   const account = user ? <>{user.role === 'USER' && <CustomerNotificationLink userId={user.id} lang={lang} />}<Link className="icon-btn" to={user.role === 'ADMIN' ? '/admin' : '/account'}>{user.fullName || pick(lang, 'Tài khoản', 'Account')}</Link></> : <DirectGoogleLogin />
   return <DesignContext.Provider value={{ lang, setLang, t: (vi, en) => pick(lang, vi, en), count: cart.items.reduce((sum, item) => sum + item.quantity, 0) }}>
-    <SiteHeader account={account} phone={support.phones[0]} />
+    <SiteHeader account={account} phone={support.phones[0]} brandName={presentationNode(presentation?.content, 'brand', 'name', lang)} logoUrl={presentation?.media?.SITE_LOGO} menuLabels={{ booking: presentationNode(presentation?.content, 'brand', 'menuBooking', lang), call: presentationNode(presentation?.content, 'brand', 'menuCall', lang) }} navLabels={Object.fromEntries([['/', 'navHome'], ['/san-pham', 'navProducts'], ['/trai-nghiem', 'navExperience'], ['/ve-chung-toi', 'navAbout'], ['/lien-he', 'navContact']].map(([route, key]) => [route, presentationNode(presentation?.content, 'brand', key, lang)]))} />
     {children}
     <BilingualFooter />
-    <MobileActionBar phone={support.phones[0]} />
+    <MobileActionBar phone={support.phones[0]} presentation={presentation?.content} />
     <div className="floating-chat">{support.phones[0] && <a className="zalo" href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo">Z</a>}{support.facebook && <a className="facebook" href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook">f</a>}</div>
   </DesignContext.Provider>
 }
@@ -231,9 +237,9 @@ function DirectGoogleLogin() {
 }
 
 function BilingualFooter() {
-  const { lang, support, homepage } = useStore()
+  const { lang, support, homepage, presentation } = useStore()
   const slogan = pick(lang, homepage?.sloganVi || 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản', homepage?.sloganEn || 'The essence of Cham pottery – preserving the soul of heritage')
-  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">Đàng Xem</Link><p className="footer-slogan">{slogan}</p><p>{pick(lang, 'Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.')}</p></div><div className="footer-col"><h3>{pick(lang, 'Liên kết', 'Links')}</h3><Link to="/products">{pick(lang, 'Sản phẩm', 'Products')}</Link><Link to="/workshop">Workshop</Link><Link to="/cart">{pick(lang, 'Giỏ hàng', 'Cart')}</Link><Link to="/orders">{pick(lang, 'Đơn hàng', 'Orders')}</Link><Link to="/ve-chung-toi">{pick(lang, 'Về chúng tôi', 'About us')}</Link><Link to="/support">{pick(lang, 'Hỗ trợ', 'Support')}</Link><Link to="/faq">FAQ</Link><Link to="/policy">{pick(lang, 'Chính sách', 'Policy')}</Link></div><div className="footer-col"><h3>{pick(lang, 'Liên hệ', 'Contact')}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
+  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">{presentation?.media?.SITE_LOGO && <img src={presentation.media.SITE_LOGO} alt="" className="presentation-footer-logo" onError={event => { event.currentTarget.hidden = true }} />}{presentationNode(presentation?.content, 'brand', 'name', lang)}</Link><p className="footer-slogan">{slogan}</p><p>{presentationNode(presentation?.content, 'brand', 'footerDescription', lang)}</p></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerLinksTitle', lang)}</h3><Link to="/products">{presentationNode(presentation?.content, 'brand', 'navProducts', lang)}</Link><Link to="/workshop">{presentationNode(presentation?.content, 'brand', 'navExperience', lang)}</Link><Link to="/cart">{presentationNode(presentation?.content, 'brand', 'footerCart', lang)}</Link><Link to="/orders">{presentationNode(presentation?.content, 'brand', 'footerOrders', lang)}</Link><Link to="/ve-chung-toi">{presentationNode(presentation?.content, 'brand', 'navAbout', lang)}</Link><Link to="/support">{presentationNode(presentation?.content, 'brand', 'footerSupport', lang)}</Link><Link to="/faq">{presentationNode(presentation?.content, 'faq', 'title', lang)}</Link><Link to="/policy">{presentationNode(presentation?.content, 'brand', 'footerPolicy', lang)}</Link></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerContactTitle', lang)}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
 }
 function Loading({ text = 'Đang tải dữ liệu...' }) { return <div className="state-box">{text}</div> }
 function Empty({ children }) { return <div className="state-box">{children}</div> }
@@ -252,15 +258,16 @@ function CatalogCard({ product }) {
   </article>
 }
 function Home() {
-  const { products, homepage } = useStore()
-  return <Layout><div className="reference-page"><ReferenceHome home={homepage} fallbackProducts={products} /></div></Layout>
+  const { products, homepage, presentation } = useStore()
+  return <Layout><div className="reference-page"><ReferenceHome home={homepage} fallbackProducts={products} presentation={presentation?.content} /></div></Layout>
 }
 function Products() {
-  const { collections, lang } = useStore(); const [searchParams] = useSearchParams(); const [filters, setFilters] = useState(() => ({ keyword: searchParams.get('keyword') || '', collectionId: searchParams.get('collectionId') || '', minPrice: searchParams.get('minPrice') || '', maxPrice: searchParams.get('maxPrice') || '', page: Number(searchParams.get('page') || 0), size: 20, sort: searchParams.get('sort') || 'createdAt,desc' }))
+  const { collections, lang, presentation } = useStore(); const [searchParams] = useSearchParams(); const [filters, setFilters] = useState(() => ({ keyword: searchParams.get('keyword') || '', collectionId: searchParams.get('collectionId') || '', minPrice: searchParams.get('minPrice') || '', maxPrice: searchParams.get('maxPrice') || '', page: Number(searchParams.get('page') || 0), size: 20, sort: searchParams.get('sort') || 'createdAt,desc' }))
+  const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
   const updateFilter = changes => setFilters(value => ({ ...value, ...changes, page: changes.page ?? 0 }))
   const catalog = useQuery({ queryKey: ['products', filters], queryFn: () => api.products(filters), placeholderData: previous => previous })
   const page = catalog.data
-  return <Layout><main className="page catalog-page"><section className="catalog-hero"><div><h1>{pick(lang, 'Từng Sản Phẩm — Một Câu Chuyện', 'Every Piece — A Story')}</h1><p>{pick(lang, 'Gốm nặn tay, nung lộ thiên bằng rơm và củi. Không sản phẩm nào giống sản phẩm nào.', 'Hand-shaped pottery, fired in the open air with straw and wood. No two pieces are alike.')}</p></div></section><div className="catalog-content"><nav className="collection-tabs" aria-label={pick(lang, 'Lọc bộ sưu tập', 'Filter collections')}><button type="button" aria-pressed={!filters.collectionId} onClick={() => updateFilter({ collectionId: '' })}>{pick(lang, 'Tất Cả', 'All')}</button>{collections.map(item => <button type="button" key={item.id} aria-pressed={String(filters.collectionId) === String(item.id)} onClick={() => updateFilter({ collectionId: String(item.id) })}>{lang === 'vi' ? item.nameVi : item.nameEn}</button>)}</nav><section className="catalog-layout"><details className="catalog-advanced"><summary>{pick(lang, 'Tìm kiếm & bộ lọc', 'Search & filters')}</summary><aside className="filters open"><label>{pick(lang, 'Tìm kiếm', 'Search')}</label><input value={filters.keyword} onChange={event => updateFilter({ keyword: event.target.value })} placeholder={pick(lang, 'Tên sản phẩm...', 'Product name...')} /><label>{pick(lang, 'Bộ sưu tập', 'Collection')}</label><select value={filters.collectionId} onChange={event => updateFilter({ collectionId: event.target.value })}><option value="">{pick(lang, 'Tất cả', 'All')}</option>{collections.map(item => <option key={item.id} value={item.id}>{lang === 'vi' ? item.nameVi : item.nameEn}</option>)}</select><label>{pick(lang, 'Giá từ', 'Min price')}</label><input inputMode="numeric" value={filters.minPrice} onChange={event => updateFilter({ minPrice: event.target.value.replace(/\D/g, '') })} /><label>{pick(lang, 'Giá đến', 'Max price')}</label><input inputMode="numeric" value={filters.maxPrice} onChange={event => updateFilter({ maxPrice: event.target.value.replace(/\D/g, '') })} /><label>{pick(lang, 'Sắp xếp', 'Sort')}</label><select value={filters.sort} onChange={event => updateFilter({ sort: event.target.value })}><option value="createdAt,desc">{pick(lang, 'Mới nhất', 'Newest')}</option><option value="sellingPrice,asc">{pick(lang, 'Giá thấp → cao', 'Price low → high')}</option><option value="sellingPrice,desc">{pick(lang, 'Giá cao → thấp', 'Price high → low')}</option><option value="nameVi,asc">{pick(lang, 'Tên A → Z', 'Name A → Z')}</option></select></aside></details><div>{catalog.isLoading ? <Loading text={pick(lang, 'Đang tải dữ liệu...', 'Loading data...')} /> : catalog.isError ? <div className="state-box error" role="alert">{catalog.error.message}<button onClick={() => catalog.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !page?.content.length ? <Empty>{pick(lang, 'Không tìm thấy sản phẩm phù hợp.', 'No matching products found.')}</Empty> : <><div className="results-bar"><span>{page.totalElements} {pick(lang, 'sản phẩm', 'products')}</span>{catalog.isFetching && <span>{pick(lang, 'Đang cập nhật...', 'Refreshing...')}</span>}</div><div className="product-grid">{page.content.map(product => <CatalogCard key={product.id} product={product} />)}</div>{page.totalPages > 1 && <nav className="pagination" aria-label={pick(lang, 'Phân trang sản phẩm', 'Product pagination')}><button disabled={page.first || catalog.isFetching} onClick={() => updateFilter({ page: page.page - 1 })}>{pick(lang, 'Trang trước', 'Previous')}</button><span>{pick(lang, 'Trang', 'Page')} {page.page + 1}/{page.totalPages}</span><button disabled={page.last || catalog.isFetching} onClick={() => updateFilter({ page: page.page + 1 })}>{pick(lang, 'Trang sau', 'Next')}</button></nav>}</>}</div></section><div className="catalog-contact"><p>{pick(lang, 'Cần sản phẩm theo yêu cầu? Chúng tôi nhận đặt hàng độc bản.', 'Looking for a custom piece? We welcome bespoke orders.')}</p><Link className="button dark" to="/ve-chung-toi">{pick(lang, 'Liên Hệ Đặt Hàng →', 'Contact us →')}</Link></div></div></main></Layout>
+  return <Layout><main className="page catalog-page"><section className="catalog-hero" style={presentation?.media?.CATALOG_HERO ? { backgroundImage: `linear-gradient(rgba(251,246,236,.86), rgba(251,246,236,.86)), url("${presentation.media.CATALOG_HERO}")` } : undefined}><div><h1>{copy('title')}</h1><p>{copy('subtitle')}</p></div></section><div className="catalog-content"><nav className="collection-tabs" aria-label={pick(lang, 'Lọc bộ sưu tập', 'Filter collections')}><button type="button" aria-pressed={!filters.collectionId} onClick={() => updateFilter({ collectionId: '' })}>{pick(lang, 'Tất Cả', 'All')}</button>{collections.map(item => <button type="button" key={item.id} aria-pressed={String(filters.collectionId) === String(item.id)} onClick={() => updateFilter({ collectionId: String(item.id) })}>{lang === 'vi' ? item.nameVi : item.nameEn}</button>)}</nav><section className="catalog-layout"><details className="catalog-advanced"><summary>{pick(lang, 'Tìm kiếm & bộ lọc', 'Search & filters')}</summary><aside className="filters open"><label>{pick(lang, 'Tìm kiếm', 'Search')}</label><input value={filters.keyword} onChange={event => updateFilter({ keyword: event.target.value })} placeholder={pick(lang, 'Tên sản phẩm...', 'Product name...')} /><label>{pick(lang, 'Bộ sưu tập', 'Collection')}</label><select value={filters.collectionId} onChange={event => updateFilter({ collectionId: event.target.value })}><option value="">{pick(lang, 'Tất cả', 'All')}</option>{collections.map(item => <option key={item.id} value={item.id}>{lang === 'vi' ? item.nameVi : item.nameEn}</option>)}</select><label>{pick(lang, 'Giá từ', 'Min price')}</label><input inputMode="numeric" value={filters.minPrice} onChange={event => updateFilter({ minPrice: event.target.value.replace(/\D/g, '') })} /><label>{pick(lang, 'Giá đến', 'Max price')}</label><input inputMode="numeric" value={filters.maxPrice} onChange={event => updateFilter({ maxPrice: event.target.value.replace(/\D/g, '') })} /><label>{pick(lang, 'Sắp xếp', 'Sort')}</label><select value={filters.sort} onChange={event => updateFilter({ sort: event.target.value })}><option value="createdAt,desc">{pick(lang, 'Mới nhất', 'Newest')}</option><option value="sellingPrice,asc">{pick(lang, 'Giá thấp → cao', 'Price low → high')}</option><option value="sellingPrice,desc">{pick(lang, 'Giá cao → thấp', 'Price high → low')}</option><option value="nameVi,asc">{pick(lang, 'Tên A → Z', 'Name A → Z')}</option></select></aside></details><div>{catalog.isLoading ? <Loading text={pick(lang, 'Đang tải dữ liệu...', 'Loading data...')} /> : catalog.isError ? <div className="state-box error" role="alert">{catalog.error.message}<button onClick={() => catalog.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !page?.content.length ? <Empty>{pick(lang, 'Không tìm thấy sản phẩm phù hợp.', 'No matching products found.')}</Empty> : <><div className="results-bar"><span>{page.totalElements} {pick(lang, 'sản phẩm', 'products')}</span>{catalog.isFetching && <span>{pick(lang, 'Đang cập nhật...', 'Refreshing...')}</span>}</div><div className="product-grid">{page.content.map(product => <CatalogCard key={product.id} product={product} />)}</div>{page.totalPages > 1 && <nav className="pagination" aria-label={pick(lang, 'Phân trang sản phẩm', 'Product pagination')}><button disabled={page.first || catalog.isFetching} onClick={() => updateFilter({ page: page.page - 1 })}>{pick(lang, 'Trang trước', 'Previous')}</button><span>{pick(lang, 'Trang', 'Page')} {page.page + 1}/{page.totalPages}</span><button disabled={page.last || catalog.isFetching} onClick={() => updateFilter({ page: page.page + 1 })}>{pick(lang, 'Trang sau', 'Next')}</button></nav>}</>}</div></section><div className="catalog-contact"><p>{copy('contactBody')}</p><Link className="button dark" to="/ve-chung-toi">{copy('contactAction')}</Link></div></div></main></Layout>
 }
 function Account() {
   const { user, setUser, setCart, lang } = useStore(); const navigate = useNavigate()
@@ -274,7 +281,8 @@ function CollectionsPage() {
 }
 
 function ProductDetail() {
-  const { id } = useParams(); const { add, lang } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
+  const { id } = useParams(); const { add, lang, presentation } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
+  const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
   const relatedQuery = useQuery({ queryKey: ['related-products', product?.collectionId], queryFn: () => api.products({ collectionId: product.collectionId, page: 0, size: 5, sort: 'createdAt,desc' }), enabled: Boolean(product?.collectionId) })
   useEffect(() => { setSelected(0); setZoom(1); setTouchStart(null); setActiveTab('description') }, [id])
   const images = product?.images?.length ? product.images : [{ id: 'fallback', url: product?.thumbnailUrl || fallbackImage, thumbnail: true }]
@@ -300,11 +308,11 @@ function ProductDetail() {
   const name = lang === 'vi' ? product.nameVi : product.nameEn
   const description = lang === 'vi' ? product.descriptionVi : product.descriptionEn
   const relatedProducts = (relatedQuery.data?.content || []).filter(item => item.id !== product.id).slice(0, 4)
-  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{pick(lang, 'Thêm vào giỏ hàng', 'Add to cart')}</button><button type="button" className="button light full" onClick={() => navigate(`/checkout?buyNow=${product.id}`)}>{pick(lang, 'Mua ngay', 'Buy Now')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div>
+  return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{pick(lang, 'Chi tiết sản phẩm', 'Product detail')}</span><h1>{name}</h1><p>{description || pick(lang, 'Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{copy('addToCart')}</button><button type="button" className="button light full" onClick={() => navigate(`/checkout?buyNow=${product.id}`)}>{copy('buyNow')}</button><Link className="button light full" to="/products">{pick(lang, 'Quay lại danh sách', 'Back to products')}</Link></section></div>
     <section className="product-detail-extra">
       <div className="product-detail-tabs" role="tablist" aria-label={pick(lang, 'Thông tin sản phẩm', 'Product information')} onKeyDown={handleTabKeyDown}>
-        <button id="product-description-tab" type="button" role="tab" aria-selected={activeTab === 'description'} aria-controls="product-detail-panel" tabIndex={activeTab === 'description' ? 0 : -1} className={activeTab === 'description' ? 'active' : ''} onClick={() => setActiveTab('description')}>{pick(lang, 'Mô tả sản phẩm', 'Description')}</button>
-        <button id="product-specifications-tab" type="button" role="tab" aria-selected={activeTab === 'specifications'} aria-controls="product-detail-panel" tabIndex={activeTab === 'specifications' ? 0 : -1} className={activeTab === 'specifications' ? 'active' : ''} onClick={() => setActiveTab('specifications')}>{pick(lang, 'Thông số kỹ thuật', 'Specifications')}</button>
+        <button id="product-description-tab" type="button" role="tab" aria-selected={activeTab === 'description'} aria-controls="product-detail-panel" tabIndex={activeTab === 'description' ? 0 : -1} className={activeTab === 'description' ? 'active' : ''} onClick={() => setActiveTab('description')}>{copy('descriptionTab')}</button>
+        <button id="product-specifications-tab" type="button" role="tab" aria-selected={activeTab === 'specifications'} aria-controls="product-detail-panel" tabIndex={activeTab === 'specifications' ? 0 : -1} className={activeTab === 'specifications' ? 'active' : ''} onClick={() => setActiveTab('specifications')}>{copy('specificationsTab')}</button>
       </div>
       <div id="product-detail-panel" role="tabpanel" aria-labelledby={activeTab === 'description' ? 'product-description-tab' : 'product-specifications-tab'} className="product-detail-panel">
         {activeTab === 'description' ? <p className="product-long-description">{description || pick(lang, 'Mô tả chi tiết đang được cập nhật.', 'Detailed description is being updated.')}</p> : <dl className="product-specifications"><div><dt>{pick(lang, 'Kích thước', 'Size')}</dt><dd>{product.sizeCm ? `${product.sizeCm} cm` : pick(lang, 'Chưa cập nhật', 'Not available')}</dd></div><div><dt>{pick(lang, 'Cân nặng', 'Weight')}</dt><dd>{product.weightGrams != null ? `${product.weightGrams.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')} g` : pick(lang, 'Chưa cập nhật', 'Not available')}</dd></div></dl>}
@@ -315,7 +323,8 @@ function ProductDetail() {
     </section></main></Layout>
 }
 function Cart() {
-  const { cart, setCart, user, notify, lang, authLoading, startGoogleLogin } = useStore()
+  const { cart, setCart, user, notify, lang, authLoading, startGoogleLogin, presentation } = useStore()
+  const copy = key => presentationNode(presentation?.content, 'cart', key, lang)
   async function change(item, quantity) {
     if (!user) {
       const entries = setGuestQuantity(readGuestCart(), item.productId, quantity)
@@ -325,7 +334,7 @@ function Cart() {
     }
     try { setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)) } catch (error) { notify(error.message) }
   }
-  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{pick(lang, 'Giỏ hàng của bạn', 'Your cart')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : user?.role === 'ADMIN' ? <Empty>{pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')}</Empty> : !cart.items.length ? <Empty>{pick(lang, 'Giỏ hàng đang trống.', 'Your cart is empty.')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{user && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div>{user ? <Link className="button dark full" to="/checkout">{pick(lang, 'Tiếp tục thanh toán', 'Continue to checkout')}</Link> : <><button className="button dark full" type="button" onClick={() => startGoogleLogin(true)}>{pick(lang, 'Đăng nhập để thanh toán', 'Sign in to checkout')}</button><small className="cart-signin-note">{pick(lang, 'Giỏ hàng đang được lưu tạm trên thiết bị này. Giá và tồn kho sẽ được kiểm tra khi đăng nhập.', 'This cart is saved on this device. Price and inventory will be checked after sign-in.')}</small></>}</section></div>}</main></Layout>
+  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{copy('title')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : user?.role === 'ADMIN' ? <Empty>{pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')}</Empty> : !cart.items.length ? <Empty>{copy('empty')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{user && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div>{user ? <Link className="button dark full" to="/checkout">{copy('checkoutAction')}</Link> : <><button className="button dark full" type="button" onClick={() => startGoogleLogin(true)}>{pick(lang, 'Đăng nhập để thanh toán', 'Sign in to checkout')}</button><small className="cart-signin-note">{pick(lang, 'Giỏ hàng đang được lưu tạm trên thiết bị này. Giá và tồn kho sẽ được kiểm tra khi đăng nhập.', 'This cart is saved on this device. Price and inventory will be checked after sign-in.')}</small></>}</section></div>}</main></Layout>
 }
 function Checkout() {
   const {
@@ -335,12 +344,15 @@ function Checkout() {
     notify,
     lang,
     authLoading,
-    startGoogleLogin
+    startGoogleLogin,
+    presentation
   } = useStore()
 
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const checkout = useCheckout()
+  const siteCopy = (key) => presentationNode(presentation?.content, 'checkout', key, lang)
+  const checkoutLayout = presentation?.content?.checkout || presentationDefaults.checkout
 
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
@@ -403,9 +415,7 @@ function Checkout() {
     if (checkout.isPending) return
     if (isBuyNow && !buyNowProduct) return
 
-    const values = Object.fromEntries(
-      new FormData(event.currentTarget)
-    )
+    const values = { email: '', note: '', ...Object.fromEntries(new FormData(event.currentTarget)) }
 
     const result = validateCheckout(values, lang)
 
@@ -458,6 +468,14 @@ function Checkout() {
       )}
     </label>
   )
+
+  const checkoutFields = {
+    receiverName: field('receiverName', siteCopy('receiverName'), <input name="receiverName" defaultValue={user?.fullName} maxLength="255" aria-invalid={Boolean(errors.receiverName)} />),
+    phone: field('phone', siteCopy('phone'), <input name="phone" maxLength="32" aria-invalid={Boolean(errors.phone)} />),
+    email: field('email', siteCopy('email'), <input name="email" type="email" defaultValue={user?.email} maxLength="320" aria-invalid={Boolean(errors.email)} />),
+    address: field('address', siteCopy('address'), <input name="address" maxLength="500" aria-invalid={Boolean(errors.address)} />),
+    note: field('note', siteCopy('note'), <textarea name="note" maxLength="1000" aria-invalid={Boolean(errors.note)} />)
+  }
 
   let content
 
@@ -544,15 +562,14 @@ function Checkout() {
       </Empty>
     )
   } else {
-    content = (
-      <div className="checkout-grid">
+    const formPanel = (
         <form
           className="checkout-form"
           onSubmit={submit}
           noValidate
         >
           <h3>
-            {pick(lang, 'Thông tin nhận hàng', 'Recipient information')}
+            {siteCopy('formTitle')}
           </h3>
 
           {submitError && (
@@ -562,67 +579,12 @@ function Checkout() {
           )}
 
           <div className="form-grid">
-            {field(
-              'receiverName',
-              pick(lang, 'Họ và tên', 'Full name'),
-              <input
-                name="receiverName"
-                defaultValue={user.fullName}
-                maxLength="255"
-                aria-invalid={Boolean(errors.receiverName)}
-              />
-            )}
-
-            {field(
-              'phone',
-              pick(lang, 'Số điện thoại', 'Phone number'),
-              <input
-                name="phone"
-                maxLength="32"
-                aria-invalid={Boolean(errors.phone)}
-              />
-            )}
-
-            {field(
-              'email',
-              'Email',
-              <input
-                name="email"
-                type="email"
-                defaultValue={user.email}
-                maxLength="320"
-                aria-invalid={Boolean(errors.email)}
-              />
-            )}
-
-            {field(
-              'address',
-              pick(lang, 'Địa chỉ', 'Address'),
-              <input
-                name="address"
-                maxLength="500"
-                aria-invalid={Boolean(errors.address)}
-              />
-            )}
-
-            {field(
-              'note',
-              pick(lang, 'Ghi chú', 'Note'),
-              <textarea
-                name="note"
-                maxLength="1000"
-                aria-invalid={Boolean(errors.note)}
-              />
-            )}
+            {visibleCheckoutFields(checkoutLayout).map(name => <div key={name} className={['email', 'address', 'note'].includes(name) ? 'wide' : ''}>{checkoutFields[name]}</div>)}
           </div>
 
           {isBuyNow && (
             <p className="cart-signin-note">
-              {pick(
-                lang,
-                'Mua ngay không thay đổi giỏ hàng hiện có. Giá và tồn kho được kiểm tra lại khi đặt hàng.',
-                'Buy Now does not change your cart. Price and stock are revalidated when placing the order.'
-              )}
+              {siteCopy('buyNowNotice')}
             </p>
           )}
 
@@ -632,18 +594,15 @@ function Checkout() {
             disabled={checkout.isPending}
           >
             {checkout.isPending
-              ? pick(lang, 'Đang tạo đơn hàng...', 'Creating order...')
-              : `${pick(lang, 'Đặt hàng', 'Place order')} ${money(total, lang)}`}
+              ? siteCopy('submitting')
+              : `${siteCopy('submit')} ${money(total, lang)}`}
           </button>
         </form>
-
+    )
+    const summaryPanel = (
         <aside className="order-summary">
           <h3>
-            {pick(
-              lang,
-              isBuyNow ? 'Mua ngay' : 'Đơn hàng của bạn',
-              isBuyNow ? 'Buy Now' : 'Your order'
-            )}
+            {siteCopy(isBuyNow ? 'buyNowTitle' : 'summaryTitle')}
           </h3>
 
           {items.map(item => (
@@ -665,7 +624,7 @@ function Checkout() {
 
                 {isBuyNow ? (
                   <span>
-                    {pick(lang, 'Số lượng', 'Quantity')}: 1
+                    {siteCopy('quantity')}: 1
                   </span>
                 ) : (
                   <>
@@ -712,7 +671,7 @@ function Checkout() {
                       disabled={checkout.isPending}
                       onClick={() => change(item, 0)}
                     >
-                      {pick(lang, 'Xóa', 'Remove')}
+                      {siteCopy('remove')}
                     </button>
                   </>
                 )}
@@ -729,10 +688,14 @@ function Checkout() {
           ))}
 
           <div className="summary-line total">
-            <span>{pick(lang, 'Tổng cộng', 'Total')}</span>
+            <span>{siteCopy('total')}</span>
             <b>{money(total, lang)}</b>
           </div>
         </aside>
+    )
+    content = (
+      <div className={`checkout-grid ${checkoutLayout.sectionOrder[0] === 'summary' ? 'summary-first' : ''}`}>
+        {checkoutLayout.sectionOrder.map(section => <Fragment key={section}>{section === 'form' ? formPanel : summaryPanel}</Fragment>)}
       </div>
     )
   }
@@ -740,6 +703,7 @@ function Checkout() {
   return (
     <Layout>
       <main className="page checkout-page">
+        {presentation?.media?.CHECKOUT_HERO && <img key={presentation.media.CHECKOUT_HERO} className="presentation-checkout-image" src={presentation.media.CHECKOUT_HERO} alt="" onError={event => { event.currentTarget.hidden = true }} />}
         <div className="page-title">
           <span className="kicker">
             {pick(
@@ -750,11 +714,7 @@ function Checkout() {
           </span>
 
           <h1>
-            {pick(
-              lang,
-              'Thông tin đặt hàng',
-              'Checkout details'
-            )}
+            {siteCopy('title')}
           </h1>
         </div>
 
@@ -764,18 +724,27 @@ function Checkout() {
   )
 }
 function Orders() {
-  const { user, lang, authLoading } = useStore(); const [pageNumber, setPageNumber] = useState(0); const orders = useMyOrders(pageNumber, user?.role === 'USER'); const page = orders.data
-  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Tài khoản', 'Account')}</span><h1>{pick(lang, 'Đơn hàng của tôi', 'My orders')}</h1></div>{authLoading || orders.isLoading ? <Loading text={pick(lang, 'Đang tải đơn hàng...', 'Loading orders...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Vui lòng đăng nhập bằng tài khoản khách hàng.', 'Please sign in with a customer account.')}</Empty> : orders.isError ? <div className="state-box error" role="alert">{orders.error.message}<button onClick={() => orders.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !page?.content.length ? <Empty>{pick(lang, 'Bạn chưa có đơn hàng.', 'You do not have any orders yet.')}</Empty> : <><div className="order-list">{page.content.map(order => <Link className="order-row" to={`/orders/${order.id}`} key={order.id}><div><b>{order.orderCode}</b><small>{date(order.createdAt, lang)}</small></div><span>{pick(lang, 'Đơn hàng', 'Order')}: {orderStatusLabel(order.orderStatus, lang)}</span><span>{pick(lang, 'Thanh toán', 'Payment')}: {paymentStatusLabel(order.paymentStatus, lang)}</span><b>{money(order.totalAmount, lang)}</b></Link>)}</div>{page.totalPages > 1 && <nav className="pagination" aria-label={pick(lang, 'Phân trang đơn hàng', 'Order pagination')}><button disabled={page.first} onClick={() => setPageNumber(value => value - 1)}>{pick(lang, 'Trang trước', 'Previous')}</button><span>{pick(lang, 'Trang', 'Page')} {page.page + 1}/{page.totalPages}</span><button disabled={page.last} onClick={() => setPageNumber(value => value + 1)}>{pick(lang, 'Trang sau', 'Next')}</button></nav>}</>}</main></Layout>
+  const { user, lang, authLoading, presentation } = useStore(); const [pageNumber, setPageNumber] = useState(0); const orders = useMyOrders(pageNumber, user?.role === 'USER'); const page = orders.data
+  return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Tài khoản', 'Account')}</span><h1>{presentationNode(presentation?.content, 'orders', 'title', lang)}</h1></div>{authLoading || orders.isLoading ? <Loading text={pick(lang, 'Đang tải đơn hàng...', 'Loading orders...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Vui lòng đăng nhập bằng tài khoản khách hàng.', 'Please sign in with a customer account.')}</Empty> : orders.isError ? <div className="state-box error" role="alert">{orders.error.message}<button onClick={() => orders.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !page?.content.length ? <Empty>{pick(lang, 'Bạn chưa có đơn hàng.', 'You do not have any orders yet.')}</Empty> : <><div className="order-list">{page.content.map(order => <Link className="order-row" to={`/orders/${order.id}`} key={order.id}><div><b>{order.orderCode}</b><small>{date(order.createdAt, lang)}</small></div><span>{pick(lang, 'Đơn hàng', 'Order')}: {orderStatusLabel(order.orderStatus, lang)}</span><span>{pick(lang, 'Thanh toán', 'Payment')}: {paymentStatusLabel(order.paymentStatus, lang)}</span><b>{money(order.totalAmount, lang)}</b></Link>)}</div>{page.totalPages > 1 && <nav className="pagination" aria-label={pick(lang, 'Phân trang đơn hàng', 'Order pagination')}><button disabled={page.first} onClick={() => setPageNumber(value => value - 1)}>{pick(lang, 'Trang trước', 'Previous')}</button><span>{pick(lang, 'Trang', 'Page')} {page.page + 1}/{page.totalPages}</span><button disabled={page.last} onClick={() => setPageNumber(value => value + 1)}>{pick(lang, 'Trang sau', 'Next')}</button></nav>}</>}</main></Layout>
 }
 function OrderDetail() {
   const { id } = useParams(); const { user, lang, authLoading } = useStore(); const query = useMyOrder(id, user?.role === 'USER'); const order = query.data
   const pendingPayment = order?.paymentStatus === 'PENDING'
   return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Chi tiết đơn hàng', 'Order detail')}</span><h1>{order?.orderCode || pick(lang, 'Đơn hàng', 'Order')}</h1></div>{authLoading || query.isLoading ? <Loading text={pick(lang, 'Đang tải đơn hàng...', 'Loading order...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Vui lòng đăng nhập bằng tài khoản khách hàng.', 'Please sign in with a customer account.')}</Empty> : query.isError && query.error.status === 404 ? <Empty>{pick(lang, 'Không tìm thấy đơn hàng.', 'Order not found.')}</Empty> : query.isError ? <div className="state-box error" role="alert">{query.error.message}<button onClick={() => query.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : <div className="order-detail"><section><h3>{pick(lang, 'Thông tin nhận hàng', 'Recipient information')}</h3><p>{order.receiverName} · {order.phone}</p>{order.email && <p>{order.email}</p>}<p>{order.address}</p>{order.note && <p>{pick(lang, 'Ghi chú', 'Note')}: {order.note}</p>}<p>{pick(lang, 'Ngày tạo', 'Created at')}: {date(order.createdAt, lang)}</p><p>{pick(lang, 'Đơn hàng', 'Order')}: <b>{orderStatusLabel(order.orderStatus, lang)}</b></p><p>{pick(lang, 'Thanh toán', 'Payment')}: <b>{paymentStatusLabel(order.paymentStatus, lang)}</b></p>{pendingPayment && <small>{pick(lang, 'Trang này tự cập nhật trạng thái thanh toán mỗi 5 giây.', 'This page refreshes payment status every 5 seconds.')}</small>}<div className="payment-panel"><h3>{pick(lang, 'Thanh toán payOS', 'payOS payment')}</h3><div className="summary-line"><span>{pick(lang, 'Trạng thái', 'Status')}</span><b>{paymentStatusLabel(order.paymentStatus, lang)}</b></div><div className="summary-line"><span>{pick(lang, 'Số tiền thanh toán', 'Payment amount')}</span><b>{money(order.paymentAmount ?? order.totalAmount, lang)}</b></div>{order.expiresAt && <div className="summary-line"><span>{pick(lang, 'Hết hạn', 'Expires at')}</span><b>{date(order.expiresAt, lang)}</b></div>}{order.qrCode && <img className="payment-qr" src={order.qrCode} alt={pick(lang, 'Mã QR thanh toán payOS', 'payOS payment QR code')} />}{order.checkoutUrl ? <a className="button dark full" href={order.checkoutUrl} target="_blank" rel="noreferrer">{pick(lang, 'Thanh toán qua payOS', 'Pay with payOS')}</a> : pendingPayment && <p className="payment-note">{pick(lang, 'Cổng thanh toán đang chờ cấu hình hoặc thông tin thanh toán chưa khả dụng. Trạng thái đơn hàng vẫn được lấy từ hệ thống.', 'Payment gateway configuration or payment details are not available yet. Order state remains system-authoritative.')}</p>}</div></section><aside className="order-summary">{order.items.map(item => <div className="summary-line" key={item.productId}><span>{lang === 'vi' ? item.productNameVi : item.productNameEn} × {item.quantity}<small>{money(item.sellingPrice, lang)} / {pick(lang, 'sản phẩm', 'item')}</small></span><b>{money(item.totalPrice, lang)}</b></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(order.subtotal, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(order.totalAmount, lang)}</b></div></aside></div>}</main></Layout>
 }
-function Faq() { const { lang } = useStore(); return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">FAQ</span><h1>{pick(lang, 'Câu hỏi thường gặp', 'Frequently asked questions')}</h1></div><section className="faq-list"><details open><summary>{pick(lang, 'Gốm Bàu Trúc có dùng bàn xoay không?', 'Is Bau Truc pottery made with a wheel?')}</summary><p>{pick(lang, 'Không. Sản phẩm được tạo hình bằng tay theo kỹ thuật truyền thống của người Chăm.', 'No. Products are shaped by hand using traditional Cham techniques.')}</p></details><details><summary>{pick(lang, 'Tôi có thể đặt lịch workshop không?', 'Can I book a workshop?')}</summary><p>{pick(lang, 'Có. Mở trang Workshop, chọn gói phù hợp và gửi yêu cầu đặt lịch để cửa hàng xác nhận.', 'Yes. Open Workshop, choose an offering, and submit a booking request for store confirmation.')}</p></details><details><summary>{pick(lang, 'Thanh toán online hoạt động thế nào?', 'How does online payment work?')}</summary><p>{pick(lang, 'Hệ thống tạo Payment trạng thái PENDING và hiển thị thông tin payOS nếu cổng thanh toán đã được cấu hình.', 'The system creates a PENDING payment and shows payOS details when the gateway is configured.')}</p></details></section></main></Layout> }
-function Policy() { const { lang } = useStore(); return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">{pick(lang, 'Chính sách', 'Policy')}</span><h1>{pick(lang, 'Chính sách mua hàng', 'Purchase policy')}</h1></div><section className="policy"><h2>{pick(lang, 'Thanh toán', 'Payment')}</h2><p>{pick(lang, 'Đơn hàng sử dụng thanh toán payOS. Ứng dụng không tự đánh dấu thanh toán thành công; trạng thái được cập nhật từ hệ thống backend.', 'Orders use payOS payment. The app does not mark payment success by itself; status is updated by the backend system.')}</p><h2>{pick(lang, 'Hoàn tiền thủ công', 'Manual refund')}</h2><p>{pick(lang, 'Hoàn tiền tự động ngoài phạm vi. Khi cần, admin chỉ ghi nhận khoản hoàn tiền đã thực hiện bên ngoài hệ thống.', 'Automatic refund is out of scope. When needed, admins only record refunds already completed outside the system.')}</p><h2>{pick(lang, 'Vận chuyển', 'Shipping')}</h2><p>{pick(lang, 'Phí vận chuyển và theo dõi vận chuyển chưa thuộc phạm vi hệ thống hiện tại.', 'Shipping fee and shipment tracking are outside the current system scope.')}</p></section></main></Layout> }
+function Faq() {
+  const { lang, presentation } = useStore()
+  const copy = key => presentationNode(presentation?.content, 'faq', key, lang)
+  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">FAQ</span><h1>{copy('title')}</h1></div><section className="faq-list">{[1, 2, 3].map(number => <details key={number} open={number === 1}><summary>{copy(`question${number}`)}</summary><p>{copy(`answer${number}`)}</p></details>)}</section></main></Layout>
+}
+function Policy() {
+  const { lang, presentation } = useStore()
+  const copy = key => presentationNode(presentation?.content, 'policy', key, lang)
+  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">{pick(lang, 'Chính sách', 'Policy')}</span><h1>{copy('title')}</h1></div><section className="policy">{['payment', 'refund', 'shipping'].map(section => <Fragment key={section}><h2>{copy(`${section}Title`)}</h2><p>{copy(`${section}Body`)}</p></Fragment>)}</section></main></Layout>
+}
 function Workshop() {
-  const { user, notify, lang, support } = useStore()
+  const { user, notify, lang, support, presentation } = useStore()
+  const copy = key => presentationNode(presentation?.content, 'workshop', key, lang)
   const [workshops, setWorkshops] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -799,11 +768,11 @@ function Workshop() {
       notify(pick(lang, 'Đã gửi yêu cầu đặt lịch workshop.', 'Workshop booking request sent.'))
     } catch (error) { notify(error.message) } finally { setSubmitting(false) }
   }
-  return <Layout><main className="page workshop-page"><div className="reference-page"><PageHero title={pick(lang, 'Chạm Tay Vào Lịch Sử', 'Touch History with Your Hands')} subtitle={pick(lang, 'Trải nghiệm làm gốm Chăm cùng nghệ nhân — tự tay tạo nên một tác phẩm của riêng bạn.', 'Make Cham pottery with the artisan — shape a piece of your own.')} seed="experience-hero" /><ExperienceIntro /></div>{workshops.length > 0 && <section className="workshop-cards">{workshops.map(item => <article className={String(item.id) === String(selectedId) ? 'selected' : ''} key={item.id}><img src={item.imageUrl || '/assets/images/tour.jpg'} alt={item.title} /><div><h2>{item.title}</h2><p>{item.description}</p><b>{money(item.priceAmount, lang)}</b><span>{item.durationMinutes} {pick(lang, 'phút', 'minutes')} · {pick(lang, 'tối đa', 'up to')} {item.maxParticipants} {pick(lang, 'khách', 'guests')}</span><button className="button light full" onClick={() => setSelectedId(String(item.id))}>{pick(lang, 'Chọn gói này', 'Select this offering')}</button></div></article>)}</section>}<section className="workshop-layout"><form className="workshop-form" onSubmit={submit}><h2>{pick(lang, 'Thông tin đặt lịch', 'Booking information')}</h2>{created && <div className="form-success" role="status">{pick(lang, `Yêu cầu #${created.id} đã được ghi nhận. Cửa hàng sẽ liên hệ xác nhận.`, `Request #${created.id} has been recorded. The store will contact you to confirm.`)}</div>}<label className="wide">{pick(lang, 'Gói workshop', 'Workshop offering')}<select name="workshopId" value={selectedId} onChange={e => setSelectedId(e.target.value)}><option value="">{pick(lang, 'Tư vấn chọn gói', 'Help me choose')}</option>{workshops.map(item => <option key={item.id} value={item.id}>{item.title} · {money(item.priceAmount, lang)}</option>)}</select></label><label>{pick(lang, 'Họ và tên', 'Full name')}<input name="fullName" defaultValue={defaultName} maxLength="255" required /></label><label>Email<input name="email" type="email" defaultValue={defaultEmail} maxLength="320" required /></label><label>{pick(lang, 'Số điện thoại', 'Phone number')}<input name="phone" maxLength="32" required /></label><label>{pick(lang, 'Ngày giờ mong muốn', 'Preferred date and time')}<input name="preferredAt" type="datetime-local" required /></label><label>{pick(lang, 'Số người', 'Participants')}<input name="participants" type="number" min="1" max="30" defaultValue="2" required /></label><label>{pick(lang, 'Ghi chú', 'Note')}<textarea name="note" maxLength="1000" placeholder={pick(lang, 'Ví dụ: có trẻ em đi cùng, cần tư vấn gói trải nghiệm...', 'Example: children joining, need help choosing an offering...')} /></label><button className="button dark full" disabled={submitting}>{submitting ? pick(lang, 'Đang gửi...', 'Sending...') : pick(lang, 'Gửi yêu cầu đặt lịch', 'Submit booking request')}</button></form><aside className="workshop-info"><h2>{pick(lang, 'Thông tin trải nghiệm', 'Experience information')}</h2><p><b>{pick(lang, 'Địa điểm', 'Location')}:</b> {support.address}</p><p><b>{pick(lang, 'Liên hệ', 'Contact')}:</b> {support.phones.join(' · ')}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}<p><b>{pick(lang, 'Lưu ý', 'Note')}:</b> {pick(lang, 'Đây là yêu cầu đặt lịch. Admin sẽ xác nhận lại thời gian qua điện thoại hoặc email.', 'This is a booking request. Admin will confirm the time by phone or email.')}</p><Link className="button light full" to="/support">{pick(lang, 'Cần tư vấn thêm', 'Need more help')}</Link></aside></section></main></Layout>
+  return <Layout><main className="page workshop-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="experience-hero" imageUrl={presentation?.media?.WORKSHOP_HERO} /><ExperienceIntro presentation={presentation?.content} /></div>{workshops.length > 0 && <section className="workshop-cards">{workshops.map(item => <article className={String(item.id) === String(selectedId) ? 'selected' : ''} key={item.id}><img src={item.imageUrl || '/assets/images/tour.jpg'} alt={item.title} /><div><h2>{item.title}</h2><p>{item.description}</p><b>{money(item.priceAmount, lang)}</b><span>{item.durationMinutes} {pick(lang, 'phút', 'minutes')} · {pick(lang, 'tối đa', 'up to')} {item.maxParticipants} {pick(lang, 'khách', 'guests')}</span><button className="button light full" onClick={() => setSelectedId(String(item.id))}>{pick(lang, 'Chọn gói này', 'Select this offering')}</button></div></article>)}</section>}<section className="workshop-layout"><form className="workshop-form" onSubmit={submit}><h2>{copy('bookingTitle')}</h2>{created && <div className="form-success" role="status">{pick(lang, `Yêu cầu #${created.id} đã được ghi nhận. Cửa hàng sẽ liên hệ xác nhận.`, `Request #${created.id} has been recorded. The store will contact you to confirm.`)}</div>}<label className="wide">{pick(lang, 'Gói workshop', 'Workshop offering')}<select name="workshopId" value={selectedId} onChange={e => setSelectedId(e.target.value)}><option value="">{pick(lang, 'Tư vấn chọn gói', 'Help me choose')}</option>{workshops.map(item => <option key={item.id} value={item.id}>{item.title} · {money(item.priceAmount, lang)}</option>)}</select></label><label>{pick(lang, 'Họ và tên', 'Full name')}<input name="fullName" defaultValue={defaultName} maxLength="255" required /></label><label>Email<input name="email" type="email" defaultValue={defaultEmail} maxLength="320" required /></label><label>{pick(lang, 'Số điện thoại', 'Phone number')}<input name="phone" maxLength="32" required /></label><label>{pick(lang, 'Ngày giờ mong muốn', 'Preferred date and time')}<input name="preferredAt" type="datetime-local" required /></label><label>{pick(lang, 'Số người', 'Participants')}<input name="participants" type="number" min="1" max="30" defaultValue="2" required /></label><label>{pick(lang, 'Ghi chú', 'Note')}<textarea name="note" maxLength="1000" placeholder={pick(lang, 'Ví dụ: có trẻ em đi cùng, cần tư vấn gói trải nghiệm...', 'Example: children joining, need help choosing an offering...')} /></label><button className="button dark full" disabled={submitting}>{submitting ? pick(lang, 'Đang gửi...', 'Sending...') : pick(lang, 'Gửi yêu cầu đặt lịch', 'Submit booking request')}</button></form><aside className="workshop-info"><h2>{copy('informationTitle')}</h2><p><b>{pick(lang, 'Địa điểm', 'Location')}:</b> {support.address}</p><p><b>{pick(lang, 'Liên hệ', 'Contact')}:</b> {support.phones.join(' · ')}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}<p><b>{pick(lang, 'Lưu ý', 'Note')}:</b> {pick(lang, 'Đây là yêu cầu đặt lịch. Admin sẽ xác nhận lại thời gian qua điện thoại hoặc email.', 'This is a booking request. Admin will confirm the time by phone or email.')}</p><Link className="button light full" to="/support">{pick(lang, 'Cần tư vấn thêm', 'Need more help')}</Link></aside></section></main></Layout>
 }
 function AboutPage() { return <Layout><div className="reference-page"><About /></div></Layout> }
 
-function Support() { const { lang, support } = useStore(); return <Layout><main className="page support-page"><div className="reference-page"><PageHero title={pick(lang, 'Kết Nối Với Chúng Tôi', 'Get in Touch')} subtitle={pick(lang, 'Xưởng mở cửa mỗi ngày — ghé thăm, đặt hàng hoặc hẹn lịch trải nghiệm.', 'Our studio is open daily — visit us, place an order or book a workshop.')} seed="contact-hero" /></div><div className="support-layout"><section className="contact-card"><h2>{pick(lang, 'Cơ sở gốm Bàu Trúc Đàng Xem', 'Dang Xem Bau Truc Pottery')}</h2><p><b>Email:</b> <a href={`mailto:${support.email}`}>{support.email}</a></p><p><b>Zalo:</b> {support.phones.map((phone, index) => <span key={phone}>{index > 0 && ' · '}<a href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">{phone}</a></span>)}</p>{support.facebook && <p><b>Facebook:</b> <a href={support.facebook} target="_blank" rel="noreferrer">{pick(lang, 'Xem trang Facebook', 'Open Facebook page')}</a></p>}<p><b>{pick(lang, 'Địa chỉ', 'Address')}:</b> {support.map ? <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a> : support.address}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}</section><section className="faq-list"><details open><summary>{pick(lang, 'Gốm Bàu Trúc có dùng bàn xoay không?', 'Is Bau Truc pottery made with a wheel?')}</summary><p>{pick(lang, 'Không. Sản phẩm được tạo hình hoàn toàn bằng tay theo kỹ thuật truyền thống của người Chăm.', 'No. Every piece is shaped entirely by hand using traditional Cham techniques.')}</p></details><details><summary>{pick(lang, 'Làm sao theo dõi đơn hàng?', 'How can I track an order?')}</summary><p>{pick(lang, 'Đăng nhập và mở mục Đơn hàng trên thanh điều hướng.', 'Sign in and open Orders in the navigation bar.')}</p></details></section></div></main></Layout> }
+function Support() { const { lang, support, presentation } = useStore(); const copy = key => presentationNode(presentation?.content, 'support', key, lang); return <Layout><main className="page support-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="contact-hero" imageUrl={presentation?.media?.SUPPORT_HERO} /></div><div className="support-layout"><section className="contact-card"><h2>{copy('contactTitle')}</h2><p><b>Email:</b> <a href={`mailto:${support.email}`}>{support.email}</a></p><p><b>Zalo:</b> {support.phones.map((phone, index) => <span key={phone}>{index > 0 && ' · '}<a href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">{phone}</a></span>)}</p>{support.facebook && <p><b>Facebook:</b> <a href={support.facebook} target="_blank" rel="noreferrer">{pick(lang, 'Xem trang Facebook', 'Open Facebook page')}</a></p>}<p><b>{pick(lang, 'Địa chỉ', 'Address')}:</b> {support.map ? <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a> : support.address}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}</section><section className="faq-list"><details open><summary>{copy('question1')}</summary><p>{copy('answer1')}</p></details><details><summary>{copy('question2')}</summary><p>{copy('answer2')}</p></details></section></div></main></Layout> }
 
 function AdminPortal() {
   const store = useStore()

@@ -5,9 +5,14 @@ import { api } from './api'
 import { businessDateTimeLocal, businessLocalDateTimeToOffset, formatBusinessDateTime, localBusinessDate, monthStartBusinessDate } from './utils/businessDate'
 import heroPottery from './design/assets/hero-pottery.jpg'
 import artisan from './design/assets/artisan.jpg'
+import portrait from './design/assets/portrait.jpg'
+import { aboutDefaults } from './design/aboutDefaults'
+import { presentationDefaults, presentationFields, colorPresets, fontPresets, presentationStyle } from './design/sitePresentation'
+import { PotIcon } from './design/PotIcon'
 import pVase from './design/assets/p-vase.jpg'
 import pKit from './design/assets/p-kit.jpg'
 import wsFamily from './design/assets/ws-family.jpg'
+import wsCouple from './design/assets/ws-couple.jpg'
 import pApsara from './design/assets/p-apsara.jpg'
 import wsTour from './design/assets/ws-tour.jpg'
 import { formatNotification } from './utils/notifications'
@@ -55,7 +60,7 @@ function useImagePreviews(files) {
   return previews
 }
 const adminSections = [
-  ['dashboard', 'Tổng quan', 'Dashboard'], ['products', 'Sản phẩm', 'Products'], ['collections', 'Bộ sưu tập', 'Collections'], ['homepage', 'Trang chủ', 'Homepage'],
+  ['dashboard', 'Tổng quan', 'Dashboard'], ['products', 'Sản phẩm', 'Products'], ['collections', 'Bộ sưu tập', 'Collections'], ['homepage', 'Trang chủ', 'Homepage'], ['about', 'Về chúng tôi', 'About CMS'], ['presentation', 'Giao diện', 'Site appearance'],
   ['workshop', 'Workshop', 'Workshop'], ['inventory', 'Kho hàng', 'Inventory'], ['orders', 'Đơn hàng', 'Orders'], ['users', 'Người dùng', 'Users'], ['notifications', 'Thông báo', 'Notifications'], ['settings', 'Cấu hình', 'Settings']
 ]
 const adminSectionIds = new Set(adminSections.map(([id]) => id))
@@ -74,7 +79,7 @@ export default function Admin({ user, notify, onLogout, lang = 'vi' }) {
   }, [requestedSection, section, setSearchParams])
   if (!user) return <Navigate to="/" replace />
   if (user.role !== 'ADMIN') return <Navigate to="/" replace />
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams({ section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'homepage' && <HomepageContent notify={notify} lang={lang} />}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams({ section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'homepage' && <HomepageContent notify={notify} lang={lang} />}{section === 'about' && <AboutContent notify={notify} lang={lang} />}{section === 'presentation' && <SitePresentationEditor notify={notify} lang={lang} />}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
 }
 
 function LoadState({ loading, error, empty, children, lang = 'vi' }) {
@@ -879,8 +884,8 @@ function HomepageMediaCard({ config, media, busy, onUpload, onClear, lang = 'vi'
 
   return <article className={`homepage-media-card ${compact ? 'compact' : ''}`}>
     <div className={`homepage-media-preview ${config.shape}`}>
-      <img src={src} alt={label} />
-      <span className={`homepage-media-source ${managed ? 'managed' : 'default'}`}>{managed ? adminText(lang, 'Ảnh quản lý', 'Managed') : adminText(lang, 'Ảnh mặc định', 'Default')}</span>
+      {src ? <img src={src} alt={label} /> : config.fallbackIcon ? <div className="homepage-featured-empty"><PotIcon className="presentation-default-icon" /></div> : <div className="homepage-featured-empty">{adminText(lang, config.emptyVi || 'Chưa có ảnh ở vị trí này.', config.emptyEn || 'No image is shown in this position.')}</div>}
+      <span className={`homepage-media-source ${managed ? 'managed' : 'default'}`}>{managed ? adminText(lang, 'Ảnh đã tải lên', 'Uploaded image') : config.fallbackIcon ? adminText(lang, 'Biểu tượng mặc định', 'Default icon') : config.fallback ? adminText(lang, 'Ảnh mặc định', 'Default image') : adminText(lang, 'Chưa có ảnh', 'No image')}</span>
       {previewUrl && <span className="homepage-media-pending">{adminText(lang, 'Xem trước ảnh mới', 'New image preview')}</span>}
     </div>
     <div className="homepage-media-copy">
@@ -905,6 +910,627 @@ function HomepageMediaCard({ config, media, busy, onUpload, onClear, lang = 'vi'
       <button type="button" disabled={!managed || busy} onClick={() => onClear(config.slot)}>{adminText(lang, 'Dùng ảnh mặc định', 'Use default image')}</button>
     </div>
   </article>
+}
+
+const aboutTextFields = [['heroTitle', 'Tiêu đề Hero', 'Hero title'],
+  ['heroSubtitle', 'Phụ đề Hero', 'Hero subtitle'],
+  ['storyEyebrow', 'Nhãn hành trình', 'Story eyebrow'],
+  ['storyTitle', 'Tiêu đề câu chuyện', 'Story title'],
+  ['valuesEyebrow', 'Nhãn giá trị', 'Values eyebrow'],
+  ['valuesTitle', 'Tiêu đề giá trị', 'Values title'],
+  ['heritageTitle', 'Tiêu đề di sản', 'Heritage title'],
+  ['heritageBody', 'Nội dung di sản', 'Heritage description'],
+  ['certificateEyebrow', 'Nhãn chứng nhận', 'Certificate eyebrow'],
+  ['certificateTitle', 'Tiêu đề chứng nhận', 'Certificate title'],
+  ['certificateBody', 'Mô tả chứng nhận', 'Certificate description'],
+  ['certificateMockTitle', 'Tiêu đề minh họa', 'Illustration title'],
+  ['certificateMockPiece', 'Mã tác phẩm minh họa', 'Illustration piece'],
+  ['certificateMockMaker', 'Nghệ nhân minh họa', 'Illustration maker'],
+  ['certificateMockSlogan', 'Slogan minh họa', 'Illustration slogan']
+]
+
+const aboutMediaConfig = [
+  {
+    slot: 'ABOUT_HERO',
+    field: 'heroUrl',
+    vi: 'Ảnh bìa trang Về chúng tôi',
+    en: 'About hero image',
+    fallback: heroPottery,
+    shape: 'wide'
+  },
+  {
+    slot: 'ABOUT_PORTRAIT',
+    field: 'portraitUrl',
+    vi: 'Ảnh chân dung nghệ nhân',
+    en: 'Artisan portrait',
+    fallback: portrait,
+    shape: 'wide'
+  },
+  {
+    slot: 'ABOUT_CERTIFICATE',
+    field: 'certificateUrl',
+    vi: 'Ảnh chứng nhận',
+    en: 'Certificate image',
+    helpVi: 'Chưa tải ảnh hoặc đã xóa: website hiện khung minh họa.',
+    helpEn: 'Missing or cleared image: the website shows an illustration.',
+    fallback: null,
+    shape: 'wide'
+  }
+]
+
+function SitePresentationEditor({ notify, lang = 'vi' }) {
+  const queryClient = useQueryClient()
+  const [page, setPage] = useState('brand')
+  const [settings, setSettings] = useState(null)
+  const [media, setMedia] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [busySlot, setBusySlot] = useState('')
+  const [error, setError] = useState('')
+  const [previewLang, setPreviewLang] = useState('vi')
+  const [savedSettings, setSavedSettings] = useState(null)
+  const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['catalog', 'Sản phẩm', 'Products'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
+  const mediaSlots = [
+    { slot: 'SITE_LOGO', vi: 'Logo thương hiệu', en: 'Brand logo', fallbackIcon: true, shape: 'wide' },
+    { slot: 'CATALOG_HERO', vi: 'Ảnh bìa Sản phẩm', en: 'Products hero image', fallback: pVase, shape: 'wide' },
+    { slot: 'WORKSHOP_HERO', vi: 'Ảnh bìa Workshop', en: 'Workshop hero image', fallback: wsCouple, shape: 'wide' },
+    { slot: 'SUPPORT_HERO', vi: 'Ảnh bìa Liên hệ', en: 'Contact hero image', fallback: heroPottery, shape: 'wide' },
+    { slot: 'CHECKOUT_HERO', vi: 'Ảnh thanh toán', en: 'Checkout image', emptyVi: 'Trang thanh toán hiện không có ảnh minh họa.', emptyEn: 'Checkout currently has no illustration.', shape: 'wide' }
+  ]
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const result = await api.adminSitePresentation()
+      const defaults = structuredClone(presentationDefaults)
+      const saved = result.content || {}
+      const next = { ...defaults, ...saved, pages: Object.fromEntries(Object.entries(presentationFields).map(([name, fields]) => [name, { ...fields, ...saved.pages?.[name] }])) }
+      setSettings(next)
+      setSavedSettings(next)
+      setMedia(result.media || {})
+    } catch (failure) { setError(failure.message) }
+    finally { setLoading(false) }
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  function updateText(key, language, value) {
+    setSettings(current => ({ ...current, pages: { ...current.pages, [page]: { ...current.pages[page], [key]: { ...current.pages[page][key], [language]: value } } } }))
+  }
+  function updateAppearance(key, property, value) {
+    setSettings(current => ({ ...current, pages: { ...current.pages, [page]: { ...current.pages[page], [key]: { ...current.pages[page][key], [property]: value || null } } } }))
+  }
+  function move(section, index, direction) {
+    setSettings(current => {
+      const values = [...current.checkout[section]]
+      const next = index + direction
+      if (next < 0 || next >= values.length) return current
+      ;[values[index], values[next]] = [values[next], values[index]]
+      return { ...current, checkout: { ...current.checkout, [section]: values } }
+    })
+  }
+  async function save(event) {
+    event.preventDefault()
+    setSaving(true)
+    try {
+      const result = await api.updateSitePresentation(settings)
+      setSettings(result.content)
+      setSavedSettings(result.content)
+      await queryClient.invalidateQueries({ queryKey: ['site-presentation'] })
+      notify(adminText(lang, 'Đã lưu giao diện.', 'Site appearance saved.'))
+    } catch (failure) { notify(failure.message) }
+    finally { setSaving(false) }
+  }
+  async function upload(slot, file) {
+    setBusySlot(slot)
+    try {
+      const result = await api.uploadSiteMedia(slot, file)
+      setMedia(current => ({ ...current, [slot]: result.url }))
+      await queryClient.invalidateQueries({ queryKey: ['site-presentation'] })
+      notify(adminText(lang, 'Đã tải ảnh.', 'Image uploaded.'))
+      return true
+    } catch (failure) { notify(failure.message); return false }
+    finally { setBusySlot('') }
+  }
+  async function clear(slot) {
+    setBusySlot(slot)
+    try {
+      await api.clearSiteMedia(slot)
+      setMedia(current => ({ ...current, [slot]: '' }))
+      await queryClient.invalidateQueries({ queryKey: ['site-presentation'] })
+      notify(adminText(lang, 'Đã đặt lại ảnh.', 'Image reset.'))
+    } catch (failure) { notify(failure.message) }
+    finally { setBusySlot('') }
+  }
+
+  if (loading) return <div className="admin-state">{adminText(lang, 'Đang tải...', 'Loading...')}</div>
+  if (error) return <div className="admin-state error" role="alert">{error}<button type="button" onClick={load}>{adminText(lang, 'Thử lại', 'Retry')}</button></div>
+  if (!settings) return null
+
+  const pageName = adminText(lang, ...pages.find(([key]) => key === page).slice(1))
+  const previewText = key => settings.pages[page]?.[key]?.[previewLang] || ''
+  const brandText = key => settings.pages.brand?.[key]?.[previewLang] || ''
+  const previewTitleKey = { brand: 'name', home: 'storyTitle', catalog: 'title', cart: 'title', checkout: 'title', orders: 'title', workshop: 'heroTitle', support: 'heroTitle', faq: 'title', policy: 'title' }[page]
+  const previewBodyKey = { brand: 'footerDescription', home: 'heroBody', catalog: 'subtitle', cart: 'empty', checkout: 'buyNowNotice', workshop: 'heroSubtitle', support: 'heroSubtitle', policy: 'paymentBody' }[page]
+  const previewSlot = { brand: 'SITE_LOGO', catalog: 'CATALOG_HERO', workshop: 'WORKSHOP_HERO', support: 'SUPPORT_HERO', checkout: 'CHECKOUT_HERO' }[page]
+  const previewColors = colorPresets[settings.colorPreset]?.colors || colorPresets.clay.colors
+  const previewFont = `"${fontPresets[settings.fontPreset]?.heading || fontPresets.heritage.heading}", "Be Vietnam Pro", sans-serif`
+  const dirty = savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings)
+
+  return <Panel title={adminText(lang, 'Tùy chỉnh giao diện', 'Site appearance')}>
+    <p className="admin-help">{adminText(lang, 'Chọn trang, sửa chữ tiếng Việt và tiếng Anh, xem thử rồi bấm Lưu thay đổi. Ảnh được lưu ngay khi tải lên.', 'Choose a page, edit Vietnamese and English text, preview it, then save. Images are saved when uploaded.')}</p>
+    <nav className="presentation-page-nav" aria-label={adminText(lang, 'Chọn trang', 'Choose page')}>{pages.map(([key, vi, en]) => <button key={key} type="button" aria-current={page === key ? 'page' : undefined} onClick={() => setPage(key)}>{adminText(lang, vi, en)}</button>)}</nav>
+    <div className="presentation-workspace">
+    <div className="presentation-editor">
+    <h3>{adminText(lang, 'Chữ trên trang', 'Page text')} · {pageName}</h3>
+    <form className="admin-form" onSubmit={save}>
+      {Object.entries(presentationFields[page]).map(([key, fallback]) => <fieldset className="admin-fieldset wide" key={key}>
+        <legend>{adminText(lang, fallback.vi, fallback.en).slice(0, 90)}</legend>
+        {['vi', 'en'].map(language => <label key={language}>{language === 'vi' ? adminText(lang, 'Tiếng Việt', 'Vietnamese') : adminText(lang, 'Tiếng Anh', 'English')}<textarea value={settings.pages[page][key][language]} maxLength={5000} required onChange={event => updateText(key, language, event.target.value)} /></label>)}
+        <label>{adminText(lang, 'Phông chữ riêng', 'Individual font')}<select value={settings.pages[page][key].font || ''} onChange={event => updateAppearance(key, 'font', event.target.value)}><option value="">{adminText(lang, 'Theo phông chung', 'Use store font')}</option>{Object.entries(fontPresets).filter(([id]) => id !== 'modern').map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}</select></label>
+        <label>{adminText(lang, 'Màu chữ riêng', 'Individual text color')}<span className="presentation-color-control"><input type="color" value={settings.pages[page][key].color || previewColors[3]} onChange={event => updateAppearance(key, 'color', event.target.value)} /><button type="button" disabled={!settings.pages[page][key].color} onClick={() => updateAppearance(key, 'color', '')}>{adminText(lang, 'Dùng màu chung', 'Use store color')}</button></span></label>
+      </fieldset>)}
+      {page === 'brand' && <fieldset className="admin-fieldset wide"><legend>{adminText(lang, 'Màu và phông chữ của cửa hàng', 'Store colors and fonts')}</legend>
+        <label>{adminText(lang, 'Bộ màu cửa hàng', 'Store color palette')}<select value={settings.colorPreset} onChange={event => setSettings(current => ({ ...current, colorPreset: event.target.value }))}>{Object.entries(colorPresets).map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}{!colorPresets[settings.colorPreset] && <option value={settings.colorPreset}>{settings.colorPreset}</option>}</select></label>
+        <label>{adminText(lang, 'Bộ phông chữ', 'Store font set')}<select value={settings.fontPreset} onChange={event => setSettings(current => ({ ...current, fontPreset: event.target.value }))}>{Object.entries(fontPresets).filter(([id]) => id !== 'modern' || settings.fontPreset === 'modern').map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}</select></label>
+        <div className="presentation-palette-swatches wide" aria-label={adminText(lang, 'Sáu màu của bộ màu đang chọn', 'Six colors in the selected palette')}>{previewColors.map((color, index) => <span key={index} style={{ background: color }} title={color} />)}</div>
+      </fieldset>}
+      {page === 'checkout' && <fieldset className="admin-fieldset wide"><legend>{adminText(lang, 'Thứ tự hiển thị', 'Display order')}</legend>
+        <p>{adminText(lang, 'Các trường bắt buộc luôn hiển thị và vẫn được kiểm tra khi đặt hàng.', 'Required fields always appear and remain validated during checkout.')}</p>
+        {settings.checkout.sectionOrder.map((value, index) => <div className="presentation-order-row" key={value}><span>{value === 'form' ? adminText(lang, 'Thông tin nhận hàng', 'Recipient information') : adminText(lang, 'Tóm tắt đơn hàng', 'Order summary')}</span><button type="button" aria-label={adminText(lang, 'Chuyển lên', 'Move up')} disabled={index === 0} onClick={() => move('sectionOrder', index, -1)}>↑</button><button type="button" aria-label={adminText(lang, 'Chuyển xuống', 'Move down')} disabled={index === 1} onClick={() => move('sectionOrder', index, 1)}>↓</button></div>)}
+        {settings.checkout.fieldOrder.map((value, index) => <div className="presentation-order-row" key={value}><span>{adminText(lang, presentationFields.checkout[value].vi, presentationFields.checkout[value].en)}</span><button type="button" aria-label={adminText(lang, 'Chuyển lên', 'Move up')} disabled={index === 0} onClick={() => move('fieldOrder', index, -1)}>↑</button><button type="button" aria-label={adminText(lang, 'Chuyển xuống', 'Move down')} disabled={index === 4} onClick={() => move('fieldOrder', index, 1)}>↓</button></div>)}
+        <label className="presentation-checkbox"><input type="checkbox" checked={settings.checkout.showNote} onChange={event => setSettings(current => ({ ...current, checkout: { ...current.checkout, showNote: event.target.checked } }))} />{adminText(lang, 'Hiện trường ghi chú', 'Show note field')}</label>
+        <label className="presentation-checkbox"><input type="checkbox" checked={settings.checkout.showEmail !== false} onChange={event => setSettings(current => ({ ...current, checkout: { ...current.checkout, showEmail: event.target.checked } }))} />{adminText(lang, 'Hiện trường email (không bắt buộc)', 'Show optional email field')}</label>
+      </fieldset>}
+      <div className="presentation-save wide"><span role="status">{dirty ? adminText(lang, 'Có thay đổi chưa lưu', 'Unsaved changes') : adminText(lang, 'Đã lưu nội dung', 'Content saved')}</span><button className="admin-primary" disabled={saving || !dirty}>{saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu thay đổi', 'Save changes')}</button></div>
+    </form>
+    {['brand', 'catalog', 'workshop', 'support', 'checkout'].includes(page) && <section className="presentation-images"><h3>{adminText(lang, 'Hình ảnh trên trang', 'Page images')}</h3><p>{adminText(lang, 'Chọn ảnh để thay hình đang dùng. Ảnh mới sẽ xuất hiện ngay trên trang khách.', 'Choose an image to replace the current one. New images appear on the site immediately.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{mediaSlots.filter(item => item.slot.startsWith(page === 'brand' ? 'SITE_' : page.toUpperCase())).map(config => <HomepageMediaCard key={config.slot} config={config} media={{ url: media[config.slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} />)}</div></section>}
+    </div>
+    <aside className="presentation-preview" aria-label={adminText(lang, 'Xem trước', 'Preview')}>
+      <div className="presentation-preview-head"><div><strong>{adminText(lang, 'Xem trước', 'Preview')}</strong><small>{adminText(lang, 'Chữ thay đổi ngay khi bạn gõ; chưa đăng cho đến khi lưu.', 'Text updates as you type; changes are not published until saved.')}</small></div><div className="presentation-language"><button type="button" aria-pressed={previewLang === 'vi'} onClick={() => setPreviewLang('vi')}>Việt</button><button type="button" aria-pressed={previewLang === 'en'} onClick={() => setPreviewLang('en')}>English</button></div></div>
+      <div className="presentation-preview-page" style={{ background: previewColors[0], color: previewColors[3] }}>
+        <div className="presentation-preview-nav"><span style={{ fontFamily: previewFont }}>{media.SITE_LOGO ? <img src={media.SITE_LOGO} alt="" /> : <PotIcon className="presentation-preview-logo" />}<span style={presentationStyle(settings, 'brand', 'name')}>{brandText('name')}</span></span><span><span style={presentationStyle(settings, 'brand', 'navProducts')}>{brandText('navProducts')}</span> · {brandText('navContact')}</span></div>
+        {previewSlot && page !== 'brand' && (media[previewSlot] || mediaSlots.find(item => item.slot === previewSlot)?.fallback) && <img className="presentation-preview-hero" src={media[previewSlot] || mediaSlots.find(item => item.slot === previewSlot)?.fallback} alt="" />}
+        <div className="presentation-preview-content"><small style={{ color: previewColors[2] }}>{pageName}</small><h2 style={{ fontFamily: previewFont, color: previewColors[2], ...presentationStyle(settings, page, previewTitleKey) }}>{previewText(previewTitleKey)}</h2>{previewBodyKey && <p style={presentationStyle(settings, page, previewBodyKey)}>{previewText(previewBodyKey)}</p>}{page === 'checkout' && settings.checkout.sectionOrder.map(section => <div className="presentation-preview-section" key={section}><b style={presentationStyle(settings, page, section === 'form' ? 'formTitle' : 'summaryTitle')}>{previewText(section === 'form' ? 'formTitle' : 'summaryTitle')}</b>{section === 'form' && <p>{settings.checkout.fieldOrder.filter(field => (field !== 'email' || settings.checkout.showEmail) && (field !== 'note' || settings.checkout.showNote)).map(field => previewText(field)).join(' · ')}</p>}</div>)}{page === 'faq' && <p>{previewText('question1')}<br />{previewText('answer1')}</p>}{page === 'home' && <p>{previewText('featuredTitle')} · {previewText('experienceTitle')}</p>}</div>
+      </div>
+      <p className="presentation-preview-note">{adminText(lang, 'Bản xem trước minh họa chữ, màu, phông và ảnh chính. Bố cục trang thật có thể khác.', 'Preview shows text, color, font, and main image. The live page layout may differ.')}</p>
+    </aside>
+    </div>
+  </Panel>
+}
+
+function AboutContent({ notify, lang = 'vi' }) {
+  const queryClient = useQueryClient()
+  const [about, setAbout] = useState(null)
+  const [content, setContent] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [busySlot, setBusySlot] = useState('')
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await api.adminAbout()
+      setAbout(response)
+      setContent(
+        structuredClone(response.content || aboutDefaults)
+      )
+    } catch (exception) {
+      setError(exception.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function updatePair(key, language, value) {
+    setContent(current => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        [language]: value
+      }
+    }))
+  }
+
+  function updateEntry(section, index, path, value) {
+    setContent(current => {
+      const entries = current[section].map((entry, position) => {
+        if (position !== index) return entry
+
+        if (path === 'year') {
+          return { ...entry, year: value }
+        }
+
+        const [field, language] = path.split('.')
+
+        return {
+          ...entry,
+          [field]: {
+            ...entry[field],
+            [language]: value
+          }
+        }
+      })
+
+      return {
+        ...current,
+        [section]: entries
+      }
+    })
+  }
+
+  function addEntry(section) {
+    setContent(current => {
+      const limit = section === 'timeline' ? 10 : 12
+      if (current[section].length >= limit) return current
+
+      const entry = section === 'timeline'
+        ? { year: '', text: { vi: '', en: '' } }
+        : {
+            title: { vi: '', en: '' },
+            description: { vi: '', en: '' }
+          }
+
+      return {
+        ...current,
+        [section]: [...current[section], entry]
+      }
+    })
+  }
+
+  function removeEntry(section, index) {
+    setContent(current => {
+      if (current[section].length <= 1) return current
+
+      return {
+        ...current,
+        [section]: current[section].filter(
+          (_, position) => position !== index
+        )
+      }
+    })
+  }
+
+  async function save(event) {
+    event.preventDefault()
+    if (!content || saving) return
+
+    setSaving(true)
+
+    try {
+      const response = await api.updateAboutContent(content)
+      setAbout(response)
+      setContent(structuredClone(response.content))
+      await queryClient.invalidateQueries({
+        queryKey: ['about']
+      })
+
+      notify(adminText(
+        lang,
+        'Đã lưu nội dung trang Về chúng tôi.',
+        'About page content saved.'
+      ))
+    } catch (exception) {
+      notify(exception.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function replaceMedia(slot, url) {
+    const config = aboutMediaConfig.find(
+      item => item.slot === slot
+    )
+
+    if (!config) return
+
+    setAbout(current => ({
+      ...current,
+      [config.field]: url
+    }))
+  }
+
+  async function uploadMedia(slot, file) {
+    if (busySlot) return false
+    setBusySlot(slot)
+
+    try {
+      const response = await api.uploadAboutMedia(slot, file)
+      replaceMedia(slot, response.url)
+      await queryClient.invalidateQueries({
+        queryKey: ['about']
+      })
+
+      notify(adminText(
+        lang,
+        'Đã tải ảnh thành công.',
+        'Image uploaded successfully.'
+      ))
+      return true
+    } catch (exception) {
+      notify(exception.message)
+      return false
+    } finally {
+      setBusySlot('')
+    }
+  }
+
+  async function clearMedia(slot) {
+    if (!window.confirm(adminText(
+      lang,
+      'Dùng hình mặc định cho vị trí này?',
+      'Restore the default image for this slot?'
+    ))) return
+
+    setBusySlot(slot)
+
+    try {
+      await api.clearAboutMedia(slot)
+      replaceMedia(slot, null)
+      await queryClient.invalidateQueries({
+        queryKey: ['about']
+      })
+
+      notify(adminText(
+        lang,
+        'Đã đặt lại ảnh mặc định.',
+        'Default image restored.'
+      ))
+    } catch (exception) {
+      notify(exception.message)
+    } finally {
+      setBusySlot('')
+    }
+  }
+
+  if (loading) {
+    return <div className="admin-state">
+      {adminText(lang, 'Đang tải...', 'Loading...')}
+    </div>
+  }
+
+  if (error) {
+    return <div className="admin-state error">
+      <p>{error}</p>
+      <button type="button" onClick={load}>
+        {adminText(lang, 'Thử lại', 'Retry')}
+      </button>
+    </div>
+  }
+
+  if (!content) return null
+
+  return (
+    <Panel
+      title={adminText(
+        lang,
+        'Quản lý trang Về chúng tôi',
+        'Manage About page'
+      )}
+    >
+      <form className="admin-form" onSubmit={save}>
+        <h3 className="wide">
+          {adminText(lang, 'Nội dung song ngữ', 'Bilingual content')}
+        </h3>
+
+        {aboutTextFields.map(([key, vi, en]) => {
+          const longText =
+            key.endsWith('Body') ||
+            key === 'heroSubtitle'
+
+          return (
+            <fieldset className="admin-fieldset wide" key={key}>
+              <legend>{adminText(lang, vi, en)}</legend>
+
+              {['vi', 'en'].map(language => (
+                <label key={language}>
+                  {language.toUpperCase()}
+
+                  {longText ? (
+                    <textarea
+                      value={content[key][language]}
+                      maxLength={5000}
+                      required
+                      onChange={event =>
+                        updatePair(
+                          key,
+                          language,
+                          event.target.value
+                        )
+                      }
+                    />
+                  ) : (
+                    <input
+                      value={content[key][language]}
+                      maxLength={5000}
+                      required
+                      onChange={event =>
+                        updatePair(
+                          key,
+                          language,
+                          event.target.value
+                        )
+                      }
+                    />
+                  )}
+                </label>
+              ))}
+            </fieldset>
+          )
+        })}
+
+        <fieldset className="admin-fieldset wide">
+          <legend>
+            {adminText(lang, 'Mốc thời gian', 'Timeline')}
+          </legend>
+
+          {content.timeline.map((entry, index) => (
+            <div key={index} className="admin-about-entry">
+              <h4>
+                {adminText(lang, 'Mốc', 'Entry')} {index + 1}
+              </h4>
+
+              <label>
+                {adminText(lang, 'Năm', 'Year')}
+                <input
+                  value={entry.year}
+                  maxLength={20}
+                  required
+                  onChange={event =>
+                    updateEntry(
+                      'timeline',
+                      index,
+                      'year',
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+
+              {['vi', 'en'].map(language => (
+                <label key={language}>
+                  {language.toUpperCase()}
+                  <textarea
+                    value={entry.text[language]}
+                    required
+                    maxLength={5000}
+                    onChange={event =>
+                      updateEntry(
+                        'timeline',
+                        index,
+                        `text.${language}`,
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              ))}
+
+              <button
+                type="button"
+                disabled={content.timeline.length <= 1}
+                onClick={() => removeEntry('timeline', index)}
+              >
+                {adminText(lang, 'Xóa mốc', 'Remove entry')}
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            disabled={content.timeline.length >= 10}
+            onClick={() => addEntry('timeline')}
+          >
+            + {adminText(lang, 'Thêm mốc', 'Add timeline entry')}
+          </button>
+        </fieldset>
+
+        <fieldset className="admin-fieldset wide">
+          <legend>
+            {adminText(lang, 'Giá trị cốt lõi', 'Core values')}
+          </legend>
+
+          {content.values.map((entry, index) => (
+            <div className="admin-about-entry" key={index}>
+              <h4>
+                {adminText(lang, 'Giá trị', 'Value')} {index + 1}
+              </h4>
+
+              {[
+                ['title', 'Tiêu đề', 'Title'],
+                ['description', 'Mô tả', 'Description']
+              ].map(([field, vi, en]) => (
+                <div key={field}>
+                  <b>{adminText(lang, vi, en)}</b>
+
+                  {['vi', 'en'].map(language => (
+                    <label key={language}>
+                      {language.toUpperCase()}
+
+                      <textarea
+                        value={entry[field][language]}
+                        maxLength={5000}
+                        required
+                        onChange={event =>
+                          updateEntry(
+                            'values',
+                            index,
+                            `${field}.${language}`,
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                disabled={content.values.length <= 1}
+                onClick={() => removeEntry('values', index)}
+              >
+                {adminText(lang, 'Xóa giá trị', 'Remove value')}
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            disabled={content.values.length >= 12}
+            onClick={() => addEntry('values')}
+          >
+            + {adminText(lang, 'Thêm giá trị', 'Add value')}
+          </button>
+        </fieldset>
+
+        <button
+          className="admin-primary wide"
+          disabled={saving}
+        >
+          {saving
+            ? adminText(lang, 'Đang lưu...', 'Saving...')
+            : adminText(
+                lang,
+                'Lưu nội dung Về chúng tôi',
+                'Save About content'
+              )}
+        </button>
+      </form>
+
+      <section className="homepage-media-section">
+        <div className="homepage-media-section-head">
+          <h3>
+            {adminText(lang, 'Quản lý hình ảnh', 'Manage images')}
+          </h3>
+        </div>
+
+        <div className="homepage-media-grid homepage-media-grid-primary">
+          {aboutMediaConfig.map(config => (
+            <HomepageMediaCard
+              key={config.slot}
+              config={config}
+              media={{
+                url: about?.[config.field] || null,
+                updatedAt: null
+              }}
+              busy={Boolean(busySlot)}
+              onUpload={uploadMedia}
+              onClear={clearMedia}
+              lang={lang}
+            />
+          ))}
+        </div>
+      </section>
+    </Panel>
+  )
 }
 
 function SupportSettings({ notify, lang = 'vi' }) {

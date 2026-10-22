@@ -88,6 +88,24 @@ const queryString = params => {
 
 export const api = {
   home: () => request('/home'),
+  about: () => request('/about'),
+  sitePresentation: () => request('/site/presentation'),
+  adminSitePresentation: () => request('/admin/site/presentation'),
+  updateSitePresentation: values => request('/admin/site/presentation', { method: 'PUT', body: JSON.stringify(values) }),
+  uploadSiteMedia: (slot, file) => {
+    const body = new FormData()
+    body.append('file', file)
+    return request(`/admin/site/media/${encodeURIComponent(slot)}`, { method: 'PUT', body })
+  },
+  clearSiteMedia: slot => request(`/admin/site/media/${encodeURIComponent(slot)}`, { method: 'DELETE' }),
+  adminAbout: () => request('/admin/about'),
+  updateAboutContent: values => request('/admin/about', { method: 'PUT', body: JSON.stringify(values) }),
+  uploadAboutMedia: (slot, file) => {
+    const body = new FormData()
+    body.append('file', file)
+    return request(`/admin/about/media/${encodeURIComponent(slot)}`, { method: 'PUT', body })
+  },
+  clearAboutMedia: slot => request(`/admin/about/media/${encodeURIComponent(slot)}`, { method: 'DELETE' }),
   products: (params = {}, size) => {
     const normalized = typeof params === 'number' ? { page: params, size: size ?? 20 } : params
     return request(`/products?${queryString({ page: 0, size: 20, ...normalized })}`)

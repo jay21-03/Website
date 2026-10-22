@@ -61,6 +61,7 @@ public class HomepageContentService {
 
         List<SiteMediaView> mediaViews = new ArrayList<>();
         for (SiteMediaSlot slot : SiteMediaSlot.values()) {
+            if (!slot.isHome()) continue;
             SiteMedia item = mediaBySlot.get(slot);
             String url = item == null || item.getObjectKey() == null ? null : storage.publicUrl(item.getObjectKey());
             mediaViews.add(new SiteMediaView(slot, url, item == null ? null : item.getUpdatedAt()));

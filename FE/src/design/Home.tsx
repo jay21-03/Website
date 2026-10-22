@@ -12,31 +12,10 @@ import pKit from "./assets/p-kit.jpg";
 import pApsara from "./assets/p-apsara.jpg";
 import wsFamily from "./assets/ws-family.jpg";
 import wsTour from "./assets/ws-tour.jpg";
+import { presentationNode } from "./sitePresentation";
 
 
-const TRUST = [
-  {
-    icon: PotIcon,
-    vi: "100% Thủ Công",
-    en: "100% Handmade",
-    dVi: "Không khuôn, không bàn xoay máy — tạo hình hoàn toàn bằng tay.",
-    dEn: "No molds, no wheel — every piece is shaped entirely by hand.",
-  },
-  {
-    icon: Leaf,
-    vi: "Nguyên Liệu Tự Nhiên",
-    en: "Natural Materials",
-    dVi: "Đất sét lấy từ cánh đồng Nu Lanh, pha cát mịn sông Quao.",
-    dEn: "Clay from the Nu Lanh fields blended with fine Quao river sand.",
-  },
-  {
-    icon: Landmark,
-    vi: "Di Sản UNESCO",
-    en: "UNESCO Heritage",
-    dVi: "Nghệ thuật gốm Chăm Bàu Trúc được ghi danh năm 2022.",
-    dEn: "Cham pottery of Bàu Trúc was inscribed by UNESCO in 2022.",
-  },
-];
+const TRUST = [PotIcon, Leaf, Landmark];
 
 type HomepageMedia = {
   slot: string;
@@ -65,6 +44,7 @@ type HomepageData = {
 type HomeProps = {
   home?: HomepageData | null;
   fallbackProducts?: HomepageProduct[];
+  presentation?: any;
 };
 
 const SOCIAL_FALLBACKS = [artisan, pVase, pKit, wsFamily, pApsara, wsTour];
@@ -76,8 +56,9 @@ function imageFallback(event: SyntheticEvent<HTMLImageElement>, fallback: string
 }
 
 
-export default function Home({ home, fallbackProducts = [] }: HomeProps) {
-  const { t } = useI18n();
+export default function Home({ home, fallbackProducts = [], presentation }: HomeProps) {
+  const { t, lang } = useI18n();
+  const copy = (key: string) => presentationNode(presentation, "home", key, lang);
   const managedFeatured = [...(home?.featuredProducts ?? [])].sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const featuredProducts = managedFeatured.length === 3 ? managedFeatured : fallbackProducts.slice(0, 3);
   const socialBySlot = new Map((home?.socialImages ?? []).map(item => [item.slot, item.url]));
@@ -107,7 +88,7 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
         <div className="mx-auto w-full max-w-7xl px-5 py-24 sm:py-32 lg:px-8">
           <Reveal>
             <p className="mb-6 text-xs uppercase tracking-[0.3em] text-primary">
-              {t("Làng gốm Bàu Trúc · Khánh Hòa", "Bàu Trúc pottery village · Khánh Hòa")}
+              {copy("eyebrow")}
             </p>
             <h1 className="max-w-4xl font-display text-[2.4rem] leading-[1.08] sm:text-6xl lg:text-7xl">
               {t(
@@ -116,29 +97,23 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
               )}
             </h1>
             <p className="mt-6 font-serif text-xl italic text-wood sm:text-2xl">
-              {t(
-                "Gốm thủ công Chăm Bàu Trúc | Di sản UNESCO 2022",
-                "Handmade Cham pottery from Bàu Trúc | UNESCO Heritage 2022",
-              )}
+              {copy("heroTagline")}
             </p>
             <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              {t(
-                "Mỗi sản phẩm là một phiên bản duy nhất — được tạo ra hoàn toàn bằng đôi bàn tay của nghệ nhân Chăm, từ đất sét tự nhiên làng Bàu Trúc, Khánh Hòa.",
-                "Every piece is one of a kind — shaped entirely by the hands of Cham artisans from natural clay of Bàu Trúc village, Khánh Hòa.",
-              )}
+              {copy("heroBody")}
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
               <Link
                 to="/san-pham"
                 className="inline-flex items-center justify-center gap-2 rounded-sm bg-primary px-7 py-3.5 text-sm tracking-wide text-primary-foreground transition-colors hover:bg-wood"
               >
-                {t("Khám Phá Sản Phẩm", "Explore Products")} <ArrowRight className="h-4 w-4" />
+                {copy("productsAction")} <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 to="/trai-nghiem"
                 className="inline-flex items-center justify-center rounded-sm border border-primary px-7 py-3.5 text-sm tracking-wide text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
               >
-                {t("Đặt Lịch Trải Nghiệm", "Book an Experience")}
+                {copy("bookingAction")}
               </Link>
             </div>
           </Reveal>
@@ -148,12 +123,12 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
       {/* Trust bar */}
       <section className="rule-clay border-b border-primary/45">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:grid-cols-3 lg:px-8">
-          {TRUST.map(({ icon: Icon, vi, en, dVi, dEn }, i) => (
-            <Reveal key={vi} delay={i * 90} className="flex gap-4">
+          {TRUST.map((Icon, i) => (
+            <Reveal key={i} delay={i * 90} className="flex gap-4">
               <Icon className="mt-1 h-8 w-8 shrink-0 text-primary" />
               <div className="min-w-0">
-                <h3 className="font-display text-xl">{t(vi, en)}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t(dVi, dEn)}</p>
+                <h3 className="font-display text-xl">{copy(`trust${i + 1}Title`)}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{copy(`trust${i + 1}Body`)}</p>
               </div>
             </Reveal>
           ))}
@@ -177,21 +152,18 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
             </div>
           </Reveal>
           <Reveal delay={120}>
-            <p className="mb-3 text-xs uppercase tracking-[0.25em] text-primary">{t("Câu chuyện", "Our story")}</p>
+            <p className="mb-3 text-xs uppercase tracking-[0.25em] text-primary">{copy("storyEyebrow")}</p>
             <h2 className="font-display text-3xl sm:text-4xl">
-              {t("Hơn 15 năm giữ lửa nghề Chăm", "Over 15 years keeping the Cham craft alive")}
+              {copy("storyTitle")}
             </h2>
             <p className="mt-6 text-base leading-loose text-muted-foreground">
-              {t(
-                "Từ năm 2009, Nghệ nhân Đàng Xem đã gìn giữ và phát triển nghề gốm truyền thống của người Chăm tại làng Bàu Trúc. Mỗi sản phẩm mang trong mình hàng trăm năm lịch sử và dấu ấn riêng của đôi bàn tay tạo ra nó.",
-                "Since 2009, artisan Đàng Xem has preserved and developed the traditional Cham pottery craft in Bàu Trúc village. Each piece carries centuries of history and the mark of the hands that made it.",
-              )}
+              {copy("storyBody")}
             </p>
             <Link
               to="/ve-chung-toi"
               className="mt-8 inline-flex items-center gap-2 border-b border-primary pb-1 text-sm text-primary transition-colors hover:text-wood"
             >
-              {t("Đọc thêm câu chuyện của chúng tôi →", "Read more of our story →")}
+              {copy("storyAction")}
             </Link>
           </Reveal>
         </div>
@@ -200,8 +172,8 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
       {/* Featured products */}
       <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
         <Reveal>
-          <SectionTitle eyebrow={t("Bộ sưu tập", "Collection")}>
-            {t("Sản Phẩm Nổi Bật", "Featured Products")}
+          <SectionTitle eyebrow={copy("featuredEyebrow")}>
+            {copy("featuredTitle")}
           </SectionTitle>
         </Reveal>
         {featuredProducts.length > 0 ? (
@@ -233,7 +205,7 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
                         to={`/products/${product.id}`}
                         className="mt-6 inline-flex w-fit items-center gap-2 rounded-sm border border-primary px-5 py-2.5 text-sm text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                       >
-                        {t("Xem Chi Tiết", "View Details")} <ArrowRight className="h-4 w-4" />
+                        {copy("detailsAction")} <ArrowRight className="h-4 w-4" />
                       </Link>
                     </div>
                   </div>
@@ -253,19 +225,16 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
         <div className="mx-auto max-w-3xl px-5 py-24 text-center lg:px-8">
           <Reveal>
             <h2 className="font-display text-3xl sm:text-4xl">
-              {t("Trải Nghiệm Làm Gốm Cùng Nghệ Nhân", "Make Pottery with the Artisan")}
+              {copy("experienceTitle")}
             </h2>
             <p className="mt-6 text-base leading-loose text-muted-foreground">
-              {t(
-                "Đặt tay vào đất sét — cảm nhận hàng trăm năm văn hóa Chăm qua đôi bàn tay của chính bạn. Workshop phù hợp cho cá nhân, gia đình và đoàn tour.",
-                "Put your hands in the clay and feel centuries of Cham culture. Workshops for individuals, families and tour groups.",
-              )}
+              {copy("experienceBody")}
             </p>
             <Link
               to="/trai-nghiem"
               className="mt-10 inline-flex items-center gap-2 rounded-sm bg-primary px-8 py-3.5 text-sm tracking-wide text-primary-foreground transition-colors hover:bg-wood"
             >
-              {t("Đặt Lịch Ngay", "Book Now")} <ArrowRight className="h-4 w-4" />
+              {copy("bookNowAction")} <ArrowRight className="h-4 w-4" />
             </Link>
           </Reveal>
         </div>
@@ -274,13 +243,13 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
       {/* Partners */}
       <section className="mx-auto max-w-5xl px-5 py-24 text-center lg:px-8">
         <Reveal>
-          <h2 className="font-display text-3xl">{t("Đối Tác Tin Cậy", "Trusted Partners")}</h2>
+          <h2 className="font-display text-3xl">{copy("partnersTitle")}</h2>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-x-14 gap-y-6 font-serif text-xl text-wood">
-            <span>Amanoi Resort</span>
+            <span>{copy("partner1")}</span>
             <span className="hidden h-5 w-px bg-primary/40 sm:block" />
-            <span>{t("Tour lữ hành địa phương", "Local tour operators")}</span>
+            <span>{copy("partner2")}</span>
             <span className="hidden h-5 w-px bg-primary/40 sm:block" />
-            <span>UNESCO</span>
+            <span>{copy("partner3")}</span>
           </div>
         </Reveal>
       </section>
@@ -288,8 +257,8 @@ export default function Home({ home, fallbackProducts = [] }: HomeProps) {
       {/* Social feed */}
       <section className="mx-auto max-w-7xl px-5 pb-8 lg:px-8">
         <Reveal className="text-center">
-          <h2 className="font-display text-3xl">{t("Theo Dõi Hành Trình Gốm", "Follow the Pottery Journey")}</h2>
-          <p className="mt-3 text-sm tracking-wide text-primary">@dangxem.baoutruc</p>
+          <h2 className="font-display text-3xl">{copy("socialTitle")}</h2>
+          <p className="mt-3 text-sm tracking-wide text-primary">{copy("socialHandle")}</p>
         </Reveal>
         <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((n, i) => {

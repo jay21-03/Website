@@ -129,4 +129,43 @@ describe('API client security', () => {
     }))
   })
 
+  it('loads public About content without a CSRF request', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ success: true, data: { content: null } }))
+
+    expect((await api.about()).content).toBeNull()
+    expect(fetch).toHaveBeenCalledWith('/api/v1/about', expect.objectContaining({ credentials: 'include' }))
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves About content with admin CSRF protection', async () => {
+    const { api } = await import('./api')
+    const content = { heroTitle: { vi: 'Giới thiệu', en: 'About us' } }
+    fetch.mockResolvedValueOnce(response({ data: { token: 'about-token' } }))
+      .mockResolvedValueOnce(response({ success: true, data: { content } }))
+
+    await api.updateAboutContent(content)
+
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/admin/about', expect.objectContaining({
+      method: 'PUT', credentials: 'include', body: JSON.stringify(content),
+      headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'about-token' })
+    }))
+  })
+
+  it('loads site presentation publicly and saves admin changes with CSRF', async () => {
+    const { api } = await import('./api')
+    const content = { pages: {}, checkout: { fieldOrder: ['receiverName', 'phone', 'email', 'address', 'note'], sectionOrder: ['form', 'summary'], showNote: true }, colorPreset: 'clay', fontPreset: 'heritage' }
+    fetch.mockResolvedValueOnce(response({ success: true, data: { content: null, media: {} } }))
+      .mockResolvedValueOnce(response({ data: { token: 'site-token' } }))
+      .mockResolvedValueOnce(response({ success: true, data: { content, media: {} } }))
+
+    expect((await api.sitePresentation()).content).toBeNull()
+    await api.updateSitePresentation(content)
+
+    expect(fetch).toHaveBeenNthCalledWith(1, '/api/v1/site/presentation', expect.objectContaining({ credentials: 'include' }))
+    expect(fetch).toHaveBeenNthCalledWith(3, '/api/v1/admin/site/presentation', expect.objectContaining({
+      method: 'PUT', body: JSON.stringify(content),
+      headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'site-token' })
+    }))
+  })
 })

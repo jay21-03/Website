@@ -23,8 +23,7 @@ header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
 .site-footer p, .footer-col a { color: var(--muted-foreground); line-height: 1.7; font-size: 14px; overflow-wrap: anywhere; }
 .site-footer .footer-slogan { font: italic 20px var(--font-serif); color: var(--primary); }
 .footer-col h3 { font: 600 20px var(--font-display); }
-.catalog-hero { background: var(--background); }
-.catalog-hero::before { background-image: url('../../src/design/assets/p-vase.jpg'); }
+.catalog-hero { background: linear-gradient(rgba(251,246,236,.86), rgba(251,246,236,.86)), url('../../src/design/assets/p-vase.jpg') center 48% / cover; }
 .catalog-page .catalog-card { background: var(--card); border-radius: 4px; }
 .button { border-radius: 4px; }
 .button.dark { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
@@ -53,3 +52,27 @@ header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
   .product-detail-info h1 { font-size: clamp(30px, 8vw, 34px); }
 }
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } .reveal { opacity: 1; transform: none; transition: none; } }
+.presentation-checkout-image { display: block; width: 100%; max-height: 320px; object-fit: cover; margin-bottom: 24px; border-radius: 4px; }
+.presentation-footer-logo { width: 32px; height: 32px; object-fit: contain; margin-right: 8px; vertical-align: middle; }
+@media (min-width: 901px) { .checkout-grid.summary-first { grid-template-columns: .7fr 1.4fr; } }
+@media (max-width: 900px) { .checkout-grid .order-summary { grid-row: auto; } }
+:root:not(.dark)[data-color-preset="clay"] { --background:#FBF6EC;--card:#F1E4D2;--clay:#9D4B2F;--foreground:#2C1A0E;--wood:#704126;--gold:#C69A56 }
+:root:not(.dark)[data-color-preset="royal"] { --background:#F9F4EC;--card:#EDE2D5;--clay:#563820;--foreground:#25170F;--wood:#826044;--gold:#B1844C }
+:root:not(.dark)[data-color-preset="minimal"] { --background:#FAF9F6;--card:#F0EDE7;--clay:#484340;--foreground:#242424;--wood:#786C64;--gold:#AA8064 }
+:root:not(.dark)[data-color-preset="nature"] { --background:#F7F4E9;--card:#EBE6D6;--clay:#315641;--foreground:#233025;--wood:#6A7052;--gold:#B18C53 }
+:root:not(.dark)[data-color-preset="sunset"] { --background:#FFF7F0;--card:#F9E4D6;--clay:#AA4D3C;--foreground:#3A231B;--wood:#865741;--gold:#D69B64 }
+:root[data-color-preset="night"] { --background:#1D1713;--card:#30251E;--clay:#D18B5A;--foreground:#F5E9DB;--wood:#AE8A72;--gold:#E2B976;--paper:#1D1713;--sand:#30251E;--primary-foreground:#1D1713;--card-foreground:#F5E9DB;--muted-foreground:#C7AB97;--border:#594536;--input:#594536;--popover:#30251E;--popover-foreground:#F5E9DB;--secondary-foreground:#F5E9DB;--accent-foreground:#1D1713 }
+:root[data-color-preset] { --primary:var(--clay);--ring:var(--clay);--accent:var(--gold) }
+:root[data-color-preset] { --ink:var(--foreground);--white:var(--background);--soft:var(--card);--line:var(--border) }
+:root[data-color-preset] :is(.catalog-hero p,.workshop-cards p,.workshop-info p,.workshop-hero p) { color:var(--muted-foreground) }
+:root:not(.dark)[data-color-preset] { --secondary:var(--card);--muted:var(--card);--card-foreground:var(--foreground);--secondary-foreground:var(--foreground);--muted-foreground:var(--wood);--border:color-mix(in srgb,var(--wood) 32%,var(--background));--input:var(--border) }
+:root[data-font-preset="vietnamese"] { --font-display:"Noto Serif","Be Vietnam Pro",serif }
+:root[data-font-preset="editorial"] { --font-display:"Lora","Be Vietnam Pro",serif }
+:root[data-font-preset="commerce"] { --font-display:"Montserrat","Be Vietnam Pro",sans-serif }
+:root[data-font-preset="minimal"] { --font-display:"Be Vietnam Pro",sans-serif;--font-serif:"Be Vietnam Pro",sans-serif }
+:root[data-font-preset="minimal"] :is(h1,h2,h3,h4,.font-display) { font-weight:700 }
+:root[data-font-preset="modern"] { --font-display:"Be Vietnam Pro",sans-serif;--font-serif:"Be Vietnam Pro",sans-serif;--font-sans:"DM Sans","Be Vietnam Pro",sans-serif }
+:root[data-font-preset] :is(h1,h2,h3,h4,.brand,.font-display,.product-top p,.catalog-contact p) { font-family:var(--font-display) }
+:root[data-font-preset] :is(.font-serif,.footer-slogan) { font-family:var(--font-serif) }
+:root[data-color-preset="night"] :is(.state-box,.contact-card,.order-row,.order-detail>section,.order-detail>.order-summary,.product-detail-info,.product-detail-panel,.workshop-cards article,.workshop-form,.workshop-info,.collection-card,.checkout-form textarea,.checkout-item button,.product-thumbs button,.gallery-controls button,.gallery-step button) { background:var(--card);color:var(--foreground);border-color:var(--border) }
+:root[data-color-preset="night"] .product-detail-info :is(h1,h2,h3) { color:var(--foreground) }

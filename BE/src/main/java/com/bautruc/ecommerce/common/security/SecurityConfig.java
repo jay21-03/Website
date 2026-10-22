@@ -92,6 +92,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/workshops/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/support/settings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/home").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/about").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/site/presentation").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/workshop/bookings").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook/payos").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()

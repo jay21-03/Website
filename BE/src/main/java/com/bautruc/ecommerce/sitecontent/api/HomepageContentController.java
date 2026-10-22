@@ -1,5 +1,6 @@
 package com.bautruc.ecommerce.sitecontent.api;
 
+import com.bautruc.ecommerce.common.exception.BusinessException;
 import com.bautruc.ecommerce.common.logging.LogContext;
 import com.bautruc.ecommerce.common.response.ApiResponse;
 import com.bautruc.ecommerce.common.time.BusinessClock;
@@ -67,12 +68,20 @@ public class HomepageContentController {
             @PathVariable SiteMediaSlot slot,
             @RequestPart("file") MultipartFile file
     ) {
+        requireHomeSlot(slot);
         return ok(HomepageMediaResponse.from(mediaService.upload(slot, file)));
     }
 
     @DeleteMapping("/api/v1/admin/home/media/{slot}")
     public ApiResponse<HomepageMediaResponse> clearMedia(@PathVariable SiteMediaSlot slot) {
+        requireHomeSlot(slot);
         return ok(HomepageMediaResponse.from(mediaService.clear(slot)));
+    }
+
+    private void requireHomeSlot(SiteMediaSlot slot) {
+        if (slot == null || !slot.isHome()) {
+            throw new BusinessException("HOMEPAGE_MEDIA_SLOT_NOT_FOUND", "Invalid homepage media slot.");
+        }
     }
 
     private <T> ApiResponse<T> ok(T data) {

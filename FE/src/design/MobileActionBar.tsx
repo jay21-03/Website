@@ -3,10 +3,12 @@ import { CalendarDays, LayoutGrid, Phone, ShoppingBag } from "lucide-react";
 import { cn } from "./utils";
 import { useI18n } from "./i18n";
 import { useCart } from "./cart";
+import { presentationNode } from "./sitePresentation";
 
 /** Sticky bottom quick-action bar — mobile only. */
-export function MobileActionBar({ phone }: { phone?: string }) {
-  const { t } = useI18n();
+export function MobileActionBar({ phone, presentation }: { phone?: string; presentation?: object | null }) {
+  const { lang } = useI18n();
+  const copy = (key: string) => presentationNode(presentation, "brand", key, lang);
   const { count, setOpen } = useCart();
   const { pathname } = useLocation();
 
@@ -21,22 +23,22 @@ export function MobileActionBar({ phone }: { phone?: string }) {
           className={cn(base, pathname === "/san-pham" ? "text-primary" : "text-foreground/70")}
         >
           <LayoutGrid className="h-5 w-5" />
-          {t("Sản phẩm", "Shop")}
+          {copy("mobileProducts")}
         </Link>
         <Link
           to="/trai-nghiem"
           className={cn(base, pathname === "/trai-nghiem" ? "text-primary" : "text-foreground/70")}
         >
           <CalendarDays className="h-5 w-5" />
-          {t("Đặt lịch", "Book")}
+          {copy("mobileBooking")}
         </Link>
         <a href={`tel:${phone}`} className={cn(base, "text-foreground/70")}>
           <Phone className="h-5 w-5" />
-          {t("Gọi", "Call")}
+          {copy("mobileCall")}
         </a>
         <button type="button" onClick={() => setOpen(true)} className={cn(base, "relative text-foreground/70")}>
           <ShoppingBag className="h-5 w-5" />
-          {t("Giỏ hàng", "Cart")}
+          {copy("mobileCart")}
           {count > 0 && (
             <span className="absolute right-3 top-1 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-foreground">
               {count}

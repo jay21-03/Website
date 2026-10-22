@@ -15,12 +15,15 @@ export const NAV_LINKS = [
   { to: "/lien-he", vi: "Liên Hệ", en: "Contact" },
 ] as const;
 
-export function SiteHeader({ account, phone }: { account: import('react').ReactNode; phone?: string }) {
+export function SiteHeader({ account, phone, brandName = "Đàng Xem", logoUrl, navLabels = {}, menuLabels = {} }: { account: import('react').ReactNode; phone?: string; brandName?: import('react').ReactNode; logoUrl?: string | null; navLabels?: Record<string, import('react').ReactNode>; menuLabels?: Record<string, import('react').ReactNode> }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
   const { lang, setLang, t } = useI18n();
   const { theme, toggle: toggleTheme } = useTheme();
   const { count, setOpen: setCartOpen } = useCart();
+
+  useEffect(() => setLogoFailed(false), [logoUrl]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -93,9 +96,9 @@ export function SiteHeader({ account, phone }: { account: import('react').ReactN
     >
       <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-8">
         <Link to="/" className="flex min-w-0 items-center gap-2.5" onClick={() => setOpen(false)}>
-          <PotIcon className="h-7 w-7 shrink-0 text-primary" />
+          {logoUrl && !logoFailed ? <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 object-contain" onError={() => setLogoFailed(true)} /> : <PotIcon className="h-7 w-7 shrink-0 text-primary" />}
           <span className="truncate font-display text-xl tracking-tight text-foreground sm:text-2xl">
-            Đàng Xem
+            {brandName}
           </span>
         </Link>
 
@@ -109,7 +112,7 @@ export function SiteHeader({ account, phone }: { account: import('react').ReactN
 
                 className="text-sm tracking-wide transition-colors hover:text-primary"
               >
-                {t(l.vi, l.en)}
+                {navLabels[l.to] || t(l.vi, l.en)}
               </Link>
             ))}
           </nav>
@@ -152,7 +155,7 @@ export function SiteHeader({ account, phone }: { account: import('react').ReactN
 
               className="flex items-center justify-between border-b border-border/60 py-4 font-display text-2xl"
             >
-              <span>{t(l.vi, l.en)}</span>
+              <span>{navLabels[l.to] || t(l.vi, l.en)}</span>
               <span className="text-xs tracking-[0.2em] text-primary/60">0{i + 1}</span>
             </Link>
           ))}
@@ -164,13 +167,13 @@ export function SiteHeader({ account, phone }: { account: import('react').ReactN
             onClick={() => setOpen(false)}
             className="inline-flex items-center justify-center gap-2 rounded-sm bg-primary px-6 py-3.5 text-sm tracking-wide text-primary-foreground"
           >
-            {t("Đặt Lịch Trải Nghiệm", "Book an Experience")} <ArrowRight className="h-4 w-4" />
+            {menuLabels.booking || t("Đặt Lịch Trải Nghiệm", "Book an Experience")} <ArrowRight className="h-4 w-4" />
           </Link>
           <a
             href={`tel:${phone}`}
             className="inline-flex items-center justify-center gap-2 rounded-sm border border-primary px-6 py-3.5 text-sm tracking-wide text-primary"
           >
-            <Phone className="h-4 w-4" /> {t("Gọi nghệ nhân", "Call the artisan")}
+            <Phone className="h-4 w-4" /> {menuLabels.call || t("Gọi nghệ nhân", "Call the artisan")}
           </a>
         </div>
 

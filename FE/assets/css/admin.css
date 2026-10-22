@@ -169,3 +169,61 @@
 @media(max-width:960px){.homepage-featured-grid{grid-template-columns:1fr}.homepage-featured-slot{grid-template-columns:140px minmax(0,1fr);align-items:center}.homepage-featured-preview{grid-row:1/3}.homepage-featured-meta{grid-column:2}}
 @media(max-width:560px){.homepage-featured-slot{grid-template-columns:1fr}.homepage-featured-preview,.homepage-featured-meta{grid-column:auto;grid-row:auto}.homepage-featured-actions button{width:100%;min-width:0}}
 @media(max-width:560px){.homepage-slogan-form{grid-template-columns:1fr}.homepage-slogan-form button{width:100%;min-width:0}}
+
+/* Phase 4: About CMS */
+
+.admin-about-entry {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  margin-bottom: 18px;
+  border: 1px solid #d8c7ad;
+  background: #fbf6ec;
+  min-width: 0;
+}
+
+.admin-about-entry label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-about-entry input,
+.admin-about-entry textarea {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+}
+
+.admin-about-entry textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.admin-about-entry h4 {
+  margin: 0;
+}
+
+.admin-about-entry > button {
+  justify-self: start;
+}
+
+@media (max-width: 640px) {
+  .admin-about-entry {
+    padding: 14px;
+  }
+}
+.presentation-page-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.presentation-page-nav button { border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: 4px; padding: 8px 12px; cursor: pointer; }
+.presentation-page-nav button[aria-current="page"] { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+.presentation-order-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.presentation-order-row span { flex: 1; }
+.presentation-order-row button { min-width: 36px; min-height: 36px; }
+.presentation-checkbox { display: flex !important; align-items: center; gap: 8px; }
+.presentation-checkbox input { width: auto; }
+.presentation-default-icon{width:64px;height:64px;color:var(--admin-primary)}
+.presentation-preview-logo{width:22px;height:22px;color:var(--admin-primary)}
+.presentation-color-control{display:flex;align-items:center;gap:8px}.presentation-color-control input{width:52px;min-width:52px;height:40px;padding:3px;cursor:pointer}.presentation-color-control button{min-height:40px;padding:6px 10px;border:1px solid var(--border);background:var(--admin-surface);color:var(--foreground);border-radius:4px;cursor:pointer}.presentation-color-control button:disabled{opacity:.5;cursor:default}
+.presentation-palette-swatches{display:flex;gap:6px}.presentation-palette-swatches span{width:32px;height:32px;border:1px solid var(--border);border-radius:4px}
+.presentation-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(310px,.75fr);gap:28px;align-items:start}.presentation-editor{min-width:0}.presentation-editor>h3,.presentation-images h3{font:600 18px 'Be Vietnam Pro',sans-serif;margin:8px 0 16px}.presentation-editor .admin-fieldset{background:var(--admin-surface);border-radius:8px;gap:10px 16px}.presentation-editor .admin-fieldset legend{max-width:100%;font-size:14px;line-height:1.5;color:var(--foreground)}.presentation-editor .admin-fieldset label{font-size:12px;font-weight:600}.presentation-editor .admin-fieldset textarea{min-height:70px;resize:vertical;font-weight:400}.presentation-save{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-top:1px solid var(--border)}.presentation-save span{font-size:12px;color:var(--muted-foreground)}.presentation-save button{min-width:160px}.presentation-images{margin-top:30px;border-top:1px solid var(--border);padding-top:18px}.presentation-images>p{font-size:12px;line-height:1.6;color:var(--muted-foreground)}.presentation-images .homepage-media-grid{grid-template-columns:1fr}.presentation-preview{position:sticky;top:20px;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--admin-surface);padding:16px;box-shadow:0 8px 24px rgb(44 26 14 / 7%)}.presentation-preview-head{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:14px}.presentation-preview-head strong,.presentation-preview-head small{display:block}.presentation-preview-head small{margin-top:4px;color:var(--muted-foreground);font-size:11px;line-height:1.45}.presentation-language{display:flex;gap:4px;flex-shrink:0}.presentation-language button{border:1px solid var(--border);background:transparent;color:var(--foreground);padding:6px 8px;border-radius:4px;cursor:pointer;font-size:11px}.presentation-language button[aria-pressed="true"]{background:var(--admin-primary);border-color:var(--admin-primary);color:#fff}.presentation-preview-page{overflow:hidden;border:1px solid var(--border);border-radius:6px;min-height:280px}.presentation-preview-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgb(48 40 32 / 15%);padding:12px;font-size:10px}.presentation-preview-nav>span:first-child{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:600}.presentation-preview-nav img{width:22px;height:22px;object-fit:contain}.presentation-preview-nav>span:last-child{text-align:right}.presentation-preview-hero{width:100%;height:145px;object-fit:cover;display:block}.presentation-preview-content{padding:28px 20px;overflow-wrap:anywhere}.presentation-preview-content small{text-transform:uppercase;letter-spacing:.12em;font-size:10px}.presentation-preview-content h2{font-size:clamp(21px,3vw,30px);line-height:1.2;margin:10px 0}.presentation-preview-content p{font-size:12px;line-height:1.65;max-width:56ch}.presentation-preview-section{border-top:1px solid rgb(48 40 32 / 20%);margin-top:18px;padding-top:12px;font-size:12px}.presentation-preview-section p{margin-bottom:0}.presentation-preview-note{margin:12px 0 0;font-size:11px;line-height:1.5;color:var(--muted-foreground)}.presentation-page-nav button:focus-visible,.presentation-language button:focus-visible,.presentation-order-row button:focus-visible{outline:2px solid var(--admin-primary);outline-offset:2px}
+@media(max-width:1050px){.presentation-workspace{grid-template-columns:1fr}.presentation-preview{position:static;grid-row:1}.presentation-editor .admin-fieldset{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.presentation-editor .admin-fieldset{grid-template-columns:1fr}.presentation-preview-head{flex-wrap:wrap}.presentation-save{align-items:stretch;flex-direction:column}.presentation-save button{width:100%}}
