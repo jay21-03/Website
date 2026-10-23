@@ -8,6 +8,10 @@ export default function AdminAnalytics({ lang = 'vi' }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const t = (vi, en) => lang === 'en' ? en : vi
+  const days = data?.daily || []
+  const channels = data?.channels || []
+  const maxDaily = Math.max(1, ...days.map(item => Number(item.sessions || 0)))
+  const maxChannel = Math.max(1, ...channels.map(item => Number(item.sessions || 0)))
 
   async function load() {
     setLoading(true)
@@ -44,9 +48,21 @@ export default function AdminAnalytics({ lang = 'vi' }) {
         ].map(([label, value]) => <article className="metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}
       </div>
       <p>{t('Tỷ lệ thoát là tỷ lệ phiên không tương tác; không phải tỷ lệ khách chỉ xem một trang.', 'Bounce rate is the share of unengaged sessions, not single-page visits.')}</p>
-      <div className="admin-grid">
-        <section className="admin-panel"><h2>{t('Xu hướng theo ngày', 'Daily trend')}</h2><div className="table-wrap"><table><thead><tr><th>{t('Ngày', 'Date')}</th><th>{t('Người dùng', 'Users')}</th><th>{t('Phiên', 'Sessions')}</th></tr></thead><tbody>{(data.daily || []).map(item => <tr key={item.date}><td>{item.date}</td><td>{formatNumber(item.activeUsers)}</td><td>{formatNumber(item.sessions)}</td></tr>)}</tbody></table></div></section>
-        <section className="admin-panel"><h2>{t('Nguồn truy cập', 'Traffic channels')}</h2><div className="table-wrap"><table><thead><tr><th>{t('Kênh', 'Channel')}</th><th>{t('Phiên', 'Sessions')}</th></tr></thead><tbody>{(data.channels || []).map(item => <tr key={item.channel}><td>{item.channel}</td><td>{formatNumber(item.sessions)}</td></tr>)}</tbody></table></div></section>
+      <div className="analytics-reports">
+        <section className="admin-panel analytics-trend">
+          <div className="panel-head"><h2>{t('Xu hướng truy cập', 'Visit trend')}</h2><span>{t('Phiên mỗi ngày', 'Sessions per day')}</span></div>
+          {days.length ? <>
+            <div className="analytics-bars" role="img" aria-label={t('Biểu đồ số phiên theo ngày', 'Daily sessions chart')}>
+              {days.map(item => <div className="analytics-bar" key={item.date} title={`${item.date}: ${formatNumber(item.sessions)} ${t('phiên', 'sessions')}`}><span style={{ height: `${Math.max(3, Number(item.sessions || 0) / maxDaily * 100)}%` }} /></div>)}
+            </div>
+            <div className="analytics-axis"><span>{days[0].date}</span><span>{days.at(-1).date}</span></div>
+            <details><summary>{t('Xem số liệu từng ngày', 'View daily figures')}</summary><div className="table-wrap"><table><thead><tr><th>{t('Ngày', 'Date')}</th><th>{t('Người dùng', 'Users')}</th><th>{t('Phiên', 'Sessions')}</th></tr></thead><tbody>{days.map(item => <tr key={item.date}><td>{item.date}</td><td>{formatNumber(item.activeUsers)}</td><td>{formatNumber(item.sessions)}</td></tr>)}</tbody></table></div></details>
+          </> : <p>{t('Chưa có dữ liệu theo ngày.', 'No daily data yet.')}</p>}
+        </section>
+        <section className="admin-panel analytics-sources">
+          <div className="panel-head"><h2>{t('Nguồn truy cập', 'Traffic sources')}</h2><span>{t('Theo số phiên', 'By sessions')}</span></div>
+          {channels.length ? <ol>{channels.map(item => <li key={item.channel}><div><span>{item.channel}</span><strong>{formatNumber(item.sessions)}</strong></div><div className="analytics-track"><span style={{ width: `${Number(item.sessions || 0) / maxChannel * 100}%` }} /></div></li>)}</ol> : <p>{t('Chưa có dữ liệu nguồn truy cập.', 'No traffic source data yet.')}</p>}
+        </section>
       </div>
     </>}
   </div>
