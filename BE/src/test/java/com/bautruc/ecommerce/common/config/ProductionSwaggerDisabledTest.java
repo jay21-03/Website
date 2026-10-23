@@ -18,7 +18,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SpringBootTest
+@SpringBootTest(properties = "bautruc.scheduling.enabled=false")
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
 @Testcontainers
@@ -61,6 +61,8 @@ class ProductionSwaggerDisabledTest {
     @DisplayName("production profile disables Swagger UI and OpenAPI docs")
     void productionProfileDisablesSwaggerUiAndApiDocs() throws Exception {
         assertThat(environment.matchesProfiles("prod")).isTrue();
+        assertThat(environment.getProperty("bautruc.scheduling.enabled"))
+                .isEqualTo("false");
 
         assertThat(environment.getProperty("springdoc.api-docs.enabled"))
                 .isEqualTo("false");
