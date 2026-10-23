@@ -11,3 +11,31 @@
 @media(max-width:900px){.chat-admin-workspace{grid-template-columns:1fr;height:auto;min-height:0}.chat-admin-list{height:260px;border-right:0;border-bottom:1px solid var(--border)}.chat-admin-detail{height:520px}}@media(max-width:560px){.chat-admin-heading{align-items:start;flex-direction:column}.chat-admin-message p{max-width:90%}.chat-admin-compose>div{flex-wrap:wrap}}
 .chat-toggle{display:grid;place-items:center;background:var(--chat-color);color:var(--chat-foreground)}.chat-toggle::after,.chat-toggle.is-open::after{content:none}.chat-box-header,.chat-compose-row button,.chat-message.customer span{background:var(--chat-color);color:var(--chat-foreground)}
 .chat-toggle{position:relative}.chat-custom-icon{position:absolute;inset:11px;width:26px;height:26px;object-fit:contain}
+/* Chat popup - hạ thấp và giảm chiều cao */
+.chat-widget {
+  right: 22px;
+  bottom: 138px;
+}
+
+.chat-box {
+  right: 58px;
+  bottom: -65px;
+  height: min(450px, calc(100dvh - 180px));
+  min-height: 0;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .chat-widget {
+    right: 14px;
+    bottom: 122px;
+  }
+
+  .chat-box {
+    right: 54px;
+    bottom: -65px;
+    width: min(380px, calc(100vw - 76px));
+    height: min(420px, calc(100dvh - 150px));
+    min-height: 0;
+  }
+}
