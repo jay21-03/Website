@@ -29,4 +29,13 @@ describe('site presentation fallback and checkout fields', () => {
     expect(contrastText('#D18B5A')).toBe('#1D1713')
     expect(contrastText('#315641')).toBe('#FFFFFF')
   })
+
+  it('keeps storefront icon settings in the saved presentation with safe defaults', () => {
+    expect(presentationText(null, 'home', 'trust1Icon', 'vi')).toBe('pot')
+    expect(presentationText(null, 'brand', 'zaloLabel', 'vi')).toBe('Z')
+    const saved = { pages: { home: { trust1Icon: { vi: 'heart', en: 'heart', color: '#9D4B2F' } }, brand: { chatIcon: { vi: 'bubble', en: 'bubble', color: '#315641' } } } }
+    expect(presentationText(saved, 'home', 'trust1Icon', 'vi')).toBe('heart')
+    expect(presentationText(saved, 'brand', 'chatIcon', 'en')).toBe('bubble')
+    expect(contrastText(saved.pages.brand.chatIcon.color)).toBe('#FFFFFF')
+  })
 })

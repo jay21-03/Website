@@ -5,6 +5,7 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, use
 import { api } from './api'
 import Admin from './Admin'
 import { ProductReviews } from './ProductReviews'
+import { ChatWidget } from './ChatWidget'
 import ReferenceHome from './design/Home'
 import { ExperienceIntro } from './design/ExperienceIntro'
 import About from './design/About'
@@ -20,7 +21,7 @@ import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
 import { formatNotification } from './utils/notifications'
-import { presentationNode, presentationDefaults, presentationMode, presentationPalette, fontPresets, contrastText, visibleCheckoutFields } from './design/sitePresentation'
+import { presentationNode, presentationText, presentationDefaults, presentationMode, presentationPalette, fontPresets, contrastText, visibleCheckoutFields } from './design/sitePresentation'
 
 const Store = createContext(null)
 const fallbackImage = '/assets/images/vase.jpg'
@@ -250,7 +251,8 @@ function Layout({ children }) {
     {children}
     <BilingualFooter />
     <MobileActionBar phone={support.phones[0]} presentation={presentation?.content} />
-    <div className="floating-chat">{support.phones[0] && <a className="zalo" href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo">Z</a>}{support.facebook && <a className="facebook" href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook">f</a>}</div>
+    <div className="floating-chat">{support.phones[0] && <a className="zalo" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8') }} href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo">{presentationText(presentation?.content, 'brand', 'zaloLabel', lang)}</a>}{support.facebook && <a className="facebook" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2') }} href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook">{presentationText(presentation?.content, 'brand', 'facebookLabel', lang)}</a>}</div>
+    <ChatWidget lang={lang} presentation={presentation?.content} />
   </DesignContext.Provider>
 }
 function CustomerNotificationLink({ userId, lang }) {

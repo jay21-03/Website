@@ -103,6 +103,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/me/orders/**").hasRole("USER")
                         .requestMatchers("/api/v1/me/products/**").hasRole("USER")
                         .requestMatchers("/api/v1/me/notifications/**").hasRole("USER")
+                        .requestMatchers("/api/v1/chat/**").permitAll()
+                        .requestMatchers("/api/v1/admin/chat/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/payments/*").hasRole("USER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

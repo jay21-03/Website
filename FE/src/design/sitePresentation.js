@@ -22,7 +22,10 @@ export const presentationFields = {
     mobileCall: pair('Gọi', 'Call'),
     mobileCart: pair('Giỏ hàng', 'Cart'),
     menuBooking: pair('Đặt Lịch Trải Nghiệm', 'Book an Experience'),
-    menuCall: pair('Gọi nghệ nhân', 'Call the artisan')
+    menuCall: pair('Gọi nghệ nhân', 'Call the artisan'),
+    chatIcon: pair('message', 'message'),
+    zaloLabel: pair('Z', 'Z'),
+    facebookLabel: pair('f', 'f')
   },
   home: {
     eyebrow: pair('Làng gốm Bàu Trúc · Khánh Hòa', 'Bàu Trúc pottery village · Khánh Hòa'),
@@ -39,6 +42,9 @@ export const presentationFields = {
     trust2Body: pair('Đất sét lấy từ cánh đồng Nu Lanh, pha cát mịn sông Quao.', 'Clay from the Nu Lanh fields blended with fine Quao river sand.'),
     trust3Title: pair('Di Sản UNESCO', 'UNESCO Heritage'),
     trust3Body: pair('Nghệ thuật gốm Chăm Bàu Trúc được ghi danh năm 2022.', 'Cham pottery of Bàu Trúc was inscribed by UNESCO in 2022.'),
+    trust1Icon: pair('pot', 'pot'),
+    trust2Icon: pair('leaf', 'leaf'),
+    trust3Icon: pair('landmark', 'landmark'),
     storyEyebrow: pair('Câu chuyện', 'Our story'),
     storyTitle: pair('Hơn 15 năm giữ lửa nghề Chăm', 'Over 15 years keeping the Cham craft alive'),
     storyBody: pair('Từ năm 2009, Nghệ nhân Đàng Xem đã gìn giữ và phát triển nghề gốm truyền thống của người Chăm tại làng Bàu Trúc. Mỗi sản phẩm mang trong mình hàng trăm năm lịch sử và dấu ấn riêng của đôi bàn tay tạo ra nó.', 'Since 2009, artisan Đàng Xem has preserved and developed the traditional Cham pottery craft in Bàu Trúc village. Each piece carries centuries of history and the mark of the hands that made it.'),

@@ -1,6 +1,6 @@
 import type { SyntheticEvent } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Leaf, Landmark } from "lucide-react";
+import { ArrowRight, Leaf, Landmark, Heart, Sparkles } from "lucide-react";
 import { Reveal } from "./Reveal";
 import { SectionTitle } from "./PageHero";
 import { PotIcon } from "./PotIcon";
@@ -15,7 +15,7 @@ import wsTour from "./assets/ws-tour.jpg";
 import { presentationNode } from "./sitePresentation";
 
 
-const TRUST = [PotIcon, Leaf, Landmark];
+const TRUST = { pot: PotIcon, leaf: Leaf, landmark: Landmark, heart: Heart, sparkles: Sparkles };
 
 type HomepageMedia = {
   slot: string;
@@ -123,15 +123,17 @@ export default function Home({ home, fallbackProducts = [], presentation }: Home
       {/* Trust bar */}
       <section className="rule-clay border-b border-primary/45">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:grid-cols-3 lg:px-8">
-          {TRUST.map((Icon, i) => (
+          {[1, 2, 3].map(i => {
+            const Icon = TRUST[presentation?.pages?.home?.[`trust${i}Icon`]?.vi as keyof typeof TRUST] || [PotIcon, Leaf, Landmark][i - 1];
+            return (
             <Reveal key={i} delay={i * 90} className="flex gap-4">
-              <Icon className="mt-1 h-8 w-8 shrink-0 text-primary" />
+              <Icon className="mt-1 h-8 w-8 shrink-0 text-primary" style={/^#[0-9a-fA-F]{6}$/.test(presentation?.pages?.home?.[`trust${i}Icon`]?.color || '') ? { color: presentation.pages.home[`trust${i}Icon`].color } : undefined} />
               <div className="min-w-0">
-                <h3 className="font-display text-xl">{copy(`trust${i + 1}Title`)}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{copy(`trust${i + 1}Body`)}</p>
+                <h3 className="font-display text-xl">{copy(`trust${i}Title`)}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{copy(`trust${i}Body`)}</p>
               </div>
             </Reveal>
-          ))}
+          )})}
         </div>
       </section>
 
