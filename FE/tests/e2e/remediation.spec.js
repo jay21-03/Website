@@ -698,3 +698,250 @@ test('QA-02 ADMIN hides a customer review', async ({ page }) => {
   await page.goto('/admin?section=reviews')
   const card = page.locator('.admin-review-card'); await expect(card).toContainText('Beautiful pottery and excellent craftsmanship.'); await card.getByRole('button', { name: 'Hide review' }).click(); await expect(card).toContainText('Hidden'); await expect(card.getByRole('button', { name: 'Show review' })).toBeVisible(); expect(review.hidden).toBe(true)
 })
+
+test('QA-02B guest and admin exchange messages, close and reopen chat', async ({ page, browser }) => {
+  test.setTimeout(60000)
+
+  const origin = 'http://127.0.0.1:4173'
+  const now = () => new Date().toISOString()
+
+  const conversations = []
+  const messages = []
+  let nextConversationId = 101
+  let nextMessageId = 1
+  let guestSessionRequests = 0
+
+  const latest = () => conversations.at(-1) || null
+
+  const thread = conversation => ({
+    conversation,
+    messages: conversation
+      ? messages.filter(m => m.conversationId === conversation.id)
+      : []
+  })
+
+  const respond = (route, data) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data
+      })
+    })
+
+  await page.addInitScript(() => {
+    localStorage.setItem('dxLang', 'en')
+  })
+
+  await mockApi(page, null)
+
+  await page.route('**/api/v1/chat/session', route => {
+    guestSessionRequests++
+    return respond(route, thread(latest()))
+  })
+
+  await page.route('**/api/v1/chat/messages', async route => {
+    const input = route.request().postDataJSON()
+    let current = latest()
+
+    if (!current || current.status === 'CLOSED') {
+      current = {
+        id: nextConversationId++,
+        userId: null,
+        guestName: input.guestName || null,
+        guestEmail: input.guestEmail || null,
+        status: 'OPEN',
+        updatedAt: now(),
+        closedAt: null
+      }
+      conversations.push(current)
+    }
+
+    messages.push({
+      id: nextMessageId++,
+      conversationId: current.id,
+      sender: 'CUSTOMER',
+      body: input.body,
+      createdAt: now()
+    })
+
+    current.updatedAt = now()
+    return respond(route, thread(current))
+  })
+
+  await page.goto('/')
+
+  const adminContext = await browser.newContext({
+    baseURL: origin
+  })
+
+  try {
+    const admin = await adminContext.newPage()
+
+    await admin.addInitScript(() => {
+      localStorage.setItem('dxLang', 'en')
+    })
+
+    await mockApi(admin, 'ADMIN')
+
+    await admin.route(
+      '**/api/v1/admin/chat/conversations?*',
+      route => {
+        const url = new URL(route.request().url())
+        const status = url.searchParams.get('status') || 'OPEN'
+
+        const rows = conversations
+          .filter(c => c.status === status)
+          .toReversed()
+
+        return respond(route, {
+          content: rows,
+          page: 0,
+          size: 20,
+          totalElements: rows.length,
+          totalPages: rows.length ? 1 : 0
+        })
+      }
+    )
+
+    await admin.route(
+      /\/api\/v1\/admin\/chat\/conversations\/\d+(?:\/(?:messages|close))?$/,
+      async route => {
+        const url = new URL(route.request().url())
+        const match = url.pathname.match(
+          /\/conversations\/(\d+)(?:\/(messages|close))?$/
+        )
+
+        const id = Number(match[1])
+        const action = match[2]
+        const current = conversations.find(c => c.id === id)
+
+        if (!current) {
+          return route.fulfill({ status: 404 })
+        }
+
+        if (action === 'messages') {
+          const input = route.request().postDataJSON()
+
+          messages.push({
+            id: nextMessageId++,
+            conversationId: id,
+            sender: 'ADMIN',
+            body: input.body,
+            createdAt: now()
+          })
+
+          current.updatedAt = now()
+        }
+
+        if (action === 'close') {
+          current.status = 'CLOSED'
+          current.closedAt = now()
+          current.updatedAt = now()
+        }
+
+        return respond(route, thread(current))
+      }
+    )
+
+    // Guest starts a conversation
+    await page.getByRole('button', {
+      name: 'Chat with the store'
+    }).click()
+
+    await page.getByRole('textbox', {
+      name: 'Your name'
+    }).fill('QA Guest')
+
+    await page.getByRole('textbox', {
+      name: 'Email'
+    }).fill('guest@example.com')
+
+    await page.getByRole('textbox', {
+      name: 'Message'
+    }).fill('I need help with a pottery order.')
+
+    await page.getByRole('button', {
+      name: 'Send message'
+    }).click()
+
+    await expect(page.locator('.chat-messages'))
+      .toContainText('I need help with a pottery order.')
+
+    expect(conversations).toHaveLength(1)
+
+    // Admin reads the guest's message
+    await admin.goto('/admin?section=chat')
+
+    await expect(admin.locator('.chat-admin-item'))
+      .toContainText('QA Guest')
+
+    await admin.locator('.chat-admin-item').first().click()
+
+    await expect(admin.locator('.chat-admin-messages'))
+      .toContainText('I need help with a pottery order.')
+
+    // Admin replies; guest receives the reply by polling
+    const requestsBeforeReply = guestSessionRequests
+
+    await admin.getByRole('textbox', {
+      name: 'Reply to customer'
+    }).fill('Your pottery order is being checked.')
+
+    await admin.getByRole('button', {
+      name: 'Send reply'
+    }).click()
+
+    await expect(admin.locator('.chat-admin-messages'))
+      .toContainText('Your pottery order is being checked.')
+
+    await expect(page.locator('.chat-messages'))
+      .toContainText(
+        'Your pottery order is being checked.',
+        { timeout: 15000 }
+      )
+
+    expect(guestSessionRequests)
+      .toBeGreaterThan(requestsBeforeReply)
+
+    // Admin closes the conversation
+    await admin.getByRole('button', {
+      name: 'Close conversation'
+    }).click()
+
+    await expect(admin.locator('.chat-admin-closed'))
+      .toBeVisible()
+
+    await expect(page.locator('.chat-note'))
+      .toContainText(
+        'This conversation ended.',
+        { timeout: 15000 }
+      )
+
+    expect(conversations[0].status).toBe('CLOSED')
+
+    // Guest sends again; a new conversation is created
+    await page.getByRole('textbox', {
+      name: 'Message'
+    }).fill('I have another question.')
+
+    await page.getByRole('button', {
+      name: 'Send message'
+    }).click()
+
+    await expect(page.locator('.chat-messages'))
+      .toContainText('I have another question.')
+
+    expect(conversations).toHaveLength(2)
+    expect(conversations[0].status).toBe('CLOSED')
+    expect(conversations[1].status).toBe('OPEN')
+    expect(conversations[1].id)
+      .not.toBe(conversations[0].id)
+
+    await expect(admin.locator('.chat-admin-item'))
+      .toHaveCount(1, { timeout: 15000 })
+  } finally {
+    await adminContext.close()
+  }
+})
