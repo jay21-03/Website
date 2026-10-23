@@ -343,7 +343,7 @@ function CollectionsPage() {
 }
 
 function ProductDetail() {
-  const { id } = useParams(); const { add, lang, presentation } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
+  const { id } = useParams(); const { add, lang, presentation, user } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
   const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
   const relatedQuery = useQuery({ queryKey: ['related-products', product?.collectionId], queryFn: () => api.products({ collectionId: product.collectionId, page: 0, size: 5, sort: 'createdAt,desc' }), enabled: Boolean(product?.collectionId) })
   useEffect(() => { setSelected(0); setZoom(1); setTouchStart(null); setActiveTab('description') }, [id])
@@ -380,7 +380,7 @@ function ProductDetail() {
         {activeTab === 'description' ? <p className="product-long-description">{description || pick(lang, 'Mô tả chi tiết đang được cập nhật.', 'Detailed description is being updated.')}</p> : <dl className="product-specifications"><div><dt>{pick(lang, 'Kích thước', 'Size')}</dt><dd>{product.sizeCm ? `${product.sizeCm} cm` : pick(lang, 'Chưa cập nhật', 'Not available')}</dd></div><div><dt>{pick(lang, 'Cân nặng', 'Weight')}</dt><dd>{product.weightGrams != null ? `${product.weightGrams.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')} g` : pick(lang, 'Chưa cập nhật', 'Not available')}</dd></div></dl>}
       </div>
     </section>
-    <ProductReviews productId={product.id} user={useStore().user} lang={lang} />
+    <ProductReviews productId={product.id} user={user} lang={lang} />
     <section className="product-related"><h2>{pick(lang, 'Sản phẩm liên quan', 'Related products')}</h2>
       {relatedQuery.isLoading ? <Loading text={pick(lang, 'Đang tải sản phẩm liên quan...', 'Loading related products...')} /> : relatedQuery.isError ? <div className="state-box error" role="alert">{pick(lang, 'Không thể tải sản phẩm liên quan.', 'Unable to load related products.')}<button type="button" onClick={() => relatedQuery.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : relatedProducts.length ? <div className="product-related-grid">{relatedProducts.map(item => <CatalogCard key={item.id} product={item} />)}</div> : <p>{pick(lang, 'Chưa có sản phẩm liên quan.', 'No related products available.')}</p>}
     </section></main></Layout>
