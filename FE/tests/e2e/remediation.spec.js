@@ -393,7 +393,9 @@ test('admin homepage media supports preview, upload and reset to default', async
   await expect(page.getByRole('heading', { name: 'Nội dung hình ảnh trang chủ' })).toBeVisible()
 
   const hero = page.locator('.homepage-media-card').filter({ hasText: 'Ảnh Hero' })
-  await expect(hero.getByText('Ảnh quản lý')).toBeVisible()
+  await expect(
+    hero.getByText('Ảnh đã tải lên', { exact: true })
+  ).toBeVisible()
   await hero.locator('input[type="file"]').setInputFiles({ name: 'hero.png', mimeType: 'image/png', buffer: Buffer.from('mock-home-image') })
   await hero.getByRole('button', { name: 'Tải ảnh đã chọn' }).click()
   await expect(page.getByText('Đã cập nhật Ảnh Hero.')).toBeVisible()
