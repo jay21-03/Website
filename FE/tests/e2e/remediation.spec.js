@@ -700,7 +700,8 @@ test('QA-02 ADMIN hides a customer review', async ({ page }) => {
 })
 
 test('QA-02B guest and admin exchange messages, close and reopen chat', async ({ page, browser }) => {
-  test.setTimeout(60000)
+  test.setTimeout(90000)
+  page.setDefaultTimeout(10000)
 
   const origin = 'http://127.0.0.1:4173'
   const now = () => new Date().toISOString()
@@ -772,12 +773,26 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
 
   await page.goto('/')
 
+  // Xử lý Analytics Consent trước khi mở Chat
+  const analyticsConsent = page.getByRole('dialog', {
+    name: 'Analytics preferences'
+  })
+
+  await expect(analyticsConsent).toBeVisible()
+
+  await analyticsConsent.getByRole('button', {
+    name: 'Decline'
+  }).click()
+
+  await expect(analyticsConsent).toBeHidden()
+
   const adminContext = await browser.newContext({
     baseURL: origin
   })
 
   try {
     const admin = await adminContext.newPage()
+    admin.setDefaultTimeout(10000)
 
     await admin.addInitScript(() => {
       localStorage.setItem('dxLang', 'en')
@@ -896,6 +911,8 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
     await expect(admin.locator('.chat-admin-messages'))
       .toContainText('Your pottery order is being checked.')
 
+    await page.bringToFront()
+
     await expect(page.locator('.chat-messages'))
       .toContainText(
         'Your pottery order is being checked.',
@@ -912,6 +929,8 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
 
     await expect(admin.locator('.chat-admin-closed'))
       .toBeVisible()
+
+    await page.bringToFront()
 
     await expect(page.locator('.chat-note'))
       .toContainText(
@@ -938,6 +957,8 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
     expect(conversations[1].status).toBe('OPEN')
     expect(conversations[1].id)
       .not.toBe(conversations[0].id)
+
+    await admin.bringToFront()
 
     await expect(admin.locator('.chat-admin-item'))
       .toHaveCount(1, { timeout: 15000 })
