@@ -168,4 +168,20 @@ describe('API client security', () => {
       headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'site-token' })
     }))
   })
+  it('loads guest chat with credentials', async () => {
+    const { api } = await import('./api')
+    fetch.mockResolvedValueOnce(response({ success: true, data: { conversation: null, messages: [] } }))
+    const result = await api.chatSession()
+    expect(result.messages).toEqual([])
+    expect(fetch).toHaveBeenCalledWith('/api/v1/chat/session', expect.objectContaining({ credentials: 'include' }))
+  })
+
+  it('sends chat messages with CSRF', async () => {
+    const { api } = await import('./api')
+    const values = { body: 'Xin chào cửa hàng' }
+    fetch.mockResolvedValueOnce(response({ data: { token: 'chat-csrf' } }))
+      .mockResolvedValueOnce(response({ success: true, data: { conversation: { id: 12, status: 'OPEN' }, messages: [] } }))
+    await api.chatSend(values)
+    expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/chat/messages', expect.objectContaining({ method: 'POST', credentials: 'include', body: JSON.stringify(values), headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'chat-csrf', 'Content-Type': 'application/json' }) }))
+  })
 })

@@ -12,8 +12,8 @@ export default function AdminChatWorkspace({ lang = 'vi' }) {
   const endRef = useRef(null)
   const client = useQueryClient()
   const copy = (vi, en) => lang === 'en' ? en : vi
-  const list = useQuery({ queryKey: ['admin-chat', status, page], queryFn: () => api.adminChatConversations(status, page), refetchInterval: 10000 })
-  const thread = useQuery({ queryKey: ['admin-chat-thread', selected], queryFn: () => api.adminChatThread(selected), enabled: selected != null, refetchInterval: selected != null ? 10000 : false })
+  const list = useQuery({ queryKey: ['admin-chat', status, page], queryFn: () => api.adminChatConversations(status, page), refetchInterval: 5000, refetchIntervalInBackground: false, retry: 1 })
+  const thread = useQuery({ queryKey: ['admin-chat-thread', selected], queryFn: () => api.adminChatThread(selected), enabled: selected != null, refetchInterval: selected != null ? 5000 : false, refetchIntervalInBackground: false, retry: 1 })
   const conversation = thread.data?.conversation
   const label = item => item.guestName || (item.userId ? `${copy('Khách hàng', 'Customer')} #${item.userId}` : copy('Khách vãng lai', 'Guest'))
   const time = value => new Date(value).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })

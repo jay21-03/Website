@@ -4,7 +4,7 @@ import { api } from './api'
 import { HelpCircle, MessageCircle, MessageSquare } from 'lucide-react'
 import { contrastText } from './design/sitePresentation'
 
-export function ChatWidget({ lang = 'vi', presentation, iconUrl }) {
+export function ChatWidget({ lang = 'vi', presentation, iconUrl, user }) {
   const [open, setOpen] = useState(false)
   const [body, setBody] = useState('')
   const [name, setName] = useState('')
@@ -18,7 +18,9 @@ export function ChatWidget({ lang = 'vi', presentation, iconUrl }) {
   const ChatIcon = icons[presentation?.pages?.brand?.chatIcon?.vi] || MessageCircle
   const savedColor = presentation?.pages?.brand?.chatIcon?.color
   const chatColor = /^#[0-9a-fA-F]{6}$/.test(savedColor || '') ? savedColor : '#0877e8'
-  const chat = useQuery({ queryKey: ['chat-session'], queryFn: api.chatSession, enabled: open, refetchInterval: open ? 10000 : false })
+  const identity = user?.role === 'USER' ? `user:${user.id}` : user?.role === 'ADMIN' ? `admin:${user.id}` : 'guest'
+  const chatKey = ['chat-session', identity]
+  const chat = useQuery({ queryKey: chatKey, queryFn: api.chatSession, enabled: open && user?.role !== 'ADMIN', refetchInterval: 5000, refetchIntervalInBackground: false, retry: 1 })
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [chat.data?.messages?.length, open])
 
@@ -29,13 +31,14 @@ export function ChatWidget({ lang = 'vi', presentation, iconUrl }) {
     setError('')
     try {
       const thread = await api.chatSend({ body: body.trim(), guestName: name || undefined, guestEmail: email || undefined })
-      client.setQueryData(['chat-session'], thread)
+      client.setQueryData(chatKey, thread)
       setBody('')
     } catch (cause) {
       setError(cause.message)
     } finally { setSending(false) }
   }
 
+  if (user?.role === 'ADMIN') return null
   return <div className="chat-widget" style={{ '--chat-color': chatColor, '--chat-foreground': contrastText(chatColor) }}>
     <button data-preview-target="field:brand.chatIcon" className={`chat-toggle${open ? ' is-open' : ''}`} type="button" aria-expanded={open} aria-controls="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')} onClick={() => setOpen(value => !value)}><ChatIcon aria-hidden="true" size={23} />{iconUrl && <img className="chat-custom-icon" src={iconUrl} alt="" onError={event => { event.currentTarget.hidden = true }} />}</button>
     {open && <section className="chat-box" id="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')}>
