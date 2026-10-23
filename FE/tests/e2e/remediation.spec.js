@@ -665,3 +665,28 @@ test('brand favicon assets are served as images instead of the SPA fallback', as
   expect([...((await ico.body()).subarray(0, 6))]).toEqual([0, 0, 1, 0, 1, 0])
   expect([...((await apple.body()).subarray(0, 8))]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
 })
+
+test('QA-02 USER creates and edits a product review', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dxLang', 'en'))
+  await mockApi(page, 'USER')
+  let savedReview = null
+  const respond = (route, data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ success: true, data }) })
+  await page.route('**/api/v1/products/10/reviews?*', route => { const content = savedReview ? [savedReview] : []; return respond(route, { averageRating: savedReview?.rating ?? 0, ratingCount: content.length, reviews: { content, page: 0, size: 10, totalElements: content.length, totalPages: 1, first: true, last: true } }) })
+  await page.route('**/api/v1/me/products/10/review', async route => { const method = route.request().method(); if (method === 'GET') return respond(route, { eligible: true, review: savedReview, hidden: false }); const input = route.request().postDataJSON(); savedReview = { id: 101, productId: 10, rating: input.rating, body: input.body, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; return respond(route, savedReview, method === 'POST' ? 201 : 200) })
+  await page.goto('/products/10')
+  const reviews = page.locator('.product-reviews'); const editor = reviews.locator('.review-form textarea')
+  await expect(editor).toBeVisible()
+  await editor.fill('Beautiful handmade pottery with excellent quality.'); await reviews.getByRole('button', { name: 'Save review' }).click(); await expect(reviews.locator('.review-card')).toContainText('Beautiful handmade pottery')
+  await editor.fill('Updated review after using this pottery product.'); await reviews.getByRole('button', { name: 'Save review' }).click(); await expect(reviews.locator('.review-card')).toContainText('Updated review after using this pottery'); expect(savedReview.body).toBe('Updated review after using this pottery product.')
+})
+
+test('QA-02 ADMIN hides a customer review', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dxLang', 'en'))
+  await mockApi(page, 'ADMIN')
+  const review = { id: 101, productId: 10, userId: 2, rating: 5, body: 'Beautiful pottery and excellent craftsmanship.', hidden: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+  const respond = (route, data) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data }) })
+  await page.route('**/api/v1/admin/reviews?*', route => respond(route, { content: [review], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true }))
+  await page.route('**/api/v1/admin/reviews/101/visibility', async route => { review.hidden = route.request().postDataJSON().hidden; return respond(route, review) })
+  await page.goto('/admin?section=reviews')
+  const card = page.locator('.admin-review-card'); await expect(card).toContainText('Beautiful pottery and excellent craftsmanship.'); await card.getByRole('button', { name: 'Hide review' }).click(); await expect(card).toContainText('Hidden'); await expect(card.getByRole('button', { name: 'Show review' })).toBeVisible(); expect(review.hidden).toBe(true)
+})
