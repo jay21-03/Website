@@ -23,7 +23,13 @@ public enum SiteMediaSlot {
     CHECKOUT_HERO("hero"),
     CHECKOUT_HERO_DARK("hero-dark"),
     SITE_LOGO("logo"),
-    SITE_LOGO_DARK("logo-dark");
+    SITE_LOGO_DARK("logo-dark"),
+    SITE_CHAT_ICON("chat-icon"),
+    SITE_ZALO_ICON("zalo-icon"),
+    SITE_FACEBOOK_ICON("facebook-icon"),
+    SITE_TRUST_1_ICON("trust-1-icon"),
+    SITE_TRUST_2_ICON("trust-2-icon"),
+    SITE_TRUST_3_ICON("trust-3-icon");
 
     private final String pathSegment;
 
@@ -42,7 +48,7 @@ public enum SiteMediaSlot {
     public String objectKeyPrefix() {
         if (isHome()) return "site/home/" + pathSegment + "/";
         if (isAbout()) return "site/about/" + pathSegment + "/";
-        if (this == SITE_LOGO || this == SITE_LOGO_DARK) return "site/brand/" + pathSegment + "/";
+        if (name().startsWith("SITE_")) return "site/brand/" + pathSegment + "/";
         return "site/" + name().substring(0, name().indexOf('_')).toLowerCase(Locale.ROOT) + "/" + pathSegment + "/";
     }
 }

@@ -21,7 +21,7 @@ import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
 import { formatNotification } from './utils/notifications'
-import { presentationNode, presentationText, presentationDefaults, presentationMode, presentationPalette, fontPresets, contrastText, visibleCheckoutFields } from './design/sitePresentation'
+import { presentationNode, presentationText, presentationDefaults, presentationMode, presentationPalette, fontPresets, contrastText, visibleCheckoutFields, findPreviewTarget } from './design/sitePresentation'
 
 const Store = createContext(null)
 const fallbackImage = '/assets/images/vase.jpg'
@@ -57,6 +57,7 @@ function StoreProvider({ children }) {
   const homepageQuery = useQuery({ queryKey: ['home'], queryFn: api.home })
   const presentationQuery = useQuery({ queryKey: ['site-presentation'], queryFn: api.sitePresentation })
   const [draftPresentation, setDraftPresentation] = useState(null)
+  const [previewFocus, setPreviewFocus] = useState(null)
   const [lang, setLang] = useState(() => preview ? new URLSearchParams(window.location.search).get('lang') || 'vi' : localStorage.getItem('dxLang') || 'vi')
   const rawPresentation = draftPresentation || presentationQuery.data
   const activeContent = useMemo(() => presentationMode(rawPresentation?.content || presentationDefaults, theme), [rawPresentation, theme])
@@ -72,12 +73,27 @@ function StoreProvider({ children }) {
     const receive = event => {
       if (event.origin === window.location.origin && event.source === window.parent && event.data?.type === 'site-presentation-preview') {
         setDraftPresentation({ content: event.data.content, media: event.data.media })
+        setPreviewFocus(current => current?.seq === event.data.focus?.seq ? current : event.data.focus || null)
       }
     }
     window.addEventListener('message', receive)
     window.parent.postMessage({ type: 'site-presentation-preview-ready' }, window.location.origin)
     return () => window.removeEventListener('message', receive)
   }, [preview])
+  useEffect(() => {
+    if (!preview || !previewFocus) return undefined
+    let timer
+    const frame = requestAnimationFrame(() => {
+      const target = findPreviewTarget(document, previewFocus.target)
+      document.querySelector('[data-preview-active]')?.removeAttribute('data-preview-active')
+      target.setAttribute('data-preview-active', 'true')
+      if (!target.closest('.floating-chat,.chat-widget')) {
+        window.scrollTo({ top: Math.max(0, window.scrollY + target.getBoundingClientRect().top - window.innerHeight * 0.35), behavior: 'auto' })
+      }
+      timer = window.setTimeout(() => target.removeAttribute('data-preview-active'), 1600)
+    })
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer) }
+  }, [preview, previewFocus])
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
   const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
   const [support, setSupport] = useState(contact)
@@ -251,8 +267,8 @@ function Layout({ children }) {
     {children}
     <BilingualFooter />
     <MobileActionBar phone={support.phones[0]} presentation={presentation?.content} />
-    <div className="floating-chat">{support.phones[0] && <a className="zalo" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8') }} href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo">{presentationText(presentation?.content, 'brand', 'zaloLabel', lang)}</a>}{support.facebook && <a className="facebook" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2') }} href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook">{presentationText(presentation?.content, 'brand', 'facebookLabel', lang)}</a>}</div>
-    <ChatWidget lang={lang} presentation={presentation?.content} />
+    <div className="floating-chat">{support.phones[0] && <a data-preview-target="field:brand.zaloLabel" className="zalo" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8') }} href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo"><span className="floating-symbol">{presentationText(presentation?.content, 'brand', 'zaloLabel', lang)}{presentation?.media?.SITE_ZALO_ICON && <img src={presentation.media.SITE_ZALO_ICON} alt="" onError={event => { event.currentTarget.hidden = true }} />}</span></a>}{support.facebook && <a data-preview-target="field:brand.facebookLabel" className="facebook" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2') }} href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook"><span className="floating-symbol">{presentationText(presentation?.content, 'brand', 'facebookLabel', lang)}{presentation?.media?.SITE_FACEBOOK_ICON && <img src={presentation.media.SITE_FACEBOOK_ICON} alt="" onError={event => { event.currentTarget.hidden = true }} />}</span></a>}</div>
+    <ChatWidget lang={lang} presentation={presentation?.content} iconUrl={presentation?.media?.SITE_CHAT_ICON} />
   </DesignContext.Provider>
 }
 function CustomerNotificationLink({ userId, lang }) {
@@ -305,7 +321,7 @@ function CatalogCard({ product }) {
 }
 function Home() {
   const { products, homepage, presentation } = useStore()
-  return <Layout><div className="reference-page"><ReferenceHome home={homepage} fallbackProducts={products} presentation={presentation?.content} /></div></Layout>
+  return <Layout><div className="reference-page"><ReferenceHome home={homepage} fallbackProducts={products} presentation={presentation?.content} media={presentation?.media} /></div></Layout>
 }
 function Products() {
   const { collections, lang, presentation } = useStore(); const [searchParams] = useSearchParams(); const [filters, setFilters] = useState(() => ({ keyword: searchParams.get('keyword') || '', collectionId: searchParams.get('collectionId') || '', minPrice: searchParams.get('minPrice') || '', maxPrice: searchParams.get('maxPrice') || '', page: Number(searchParams.get('page') || 0), size: 20, sort: searchParams.get('sort') || 'createdAt,desc' }))

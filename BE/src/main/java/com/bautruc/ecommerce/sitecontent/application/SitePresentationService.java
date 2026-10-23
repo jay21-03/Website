@@ -60,7 +60,10 @@ public class SitePresentationService {
                 SiteMediaSlot.WORKSHOP_HERO, SiteMediaSlot.WORKSHOP_HERO_DARK,
                 SiteMediaSlot.SUPPORT_HERO, SiteMediaSlot.SUPPORT_HERO_DARK,
                 SiteMediaSlot.CHECKOUT_HERO, SiteMediaSlot.CHECKOUT_HERO_DARK,
-                SiteMediaSlot.SITE_LOGO, SiteMediaSlot.SITE_LOGO_DARK).stream().collect(Collectors.toMap(SiteMediaSlot::name,
+                SiteMediaSlot.SITE_LOGO, SiteMediaSlot.SITE_LOGO_DARK,
+                SiteMediaSlot.SITE_CHAT_ICON, SiteMediaSlot.SITE_ZALO_ICON, SiteMediaSlot.SITE_FACEBOOK_ICON,
+                SiteMediaSlot.SITE_TRUST_1_ICON, SiteMediaSlot.SITE_TRUST_2_ICON,
+                SiteMediaSlot.SITE_TRUST_3_ICON).stream().collect(Collectors.toMap(SiteMediaSlot::name,
                 slot -> media.findBySlot(slot).map(item -> item.getObjectKey())
                         .filter(key -> key != null && !key.isBlank()).map(storage::publicUrl).orElse("")));
         return new SitePresentationResponse(content, urls);

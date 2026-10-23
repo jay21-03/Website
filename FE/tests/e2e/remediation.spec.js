@@ -34,6 +34,25 @@ test('appearance editor switches mode before editing and previews the unsaved da
   await expect(page.locator('.presentation-editor fieldset').first().getByRole('textbox', { name: 'Tiếng Việt' })).toHaveValue('Đàng Xem')
 })
 
+test('appearance preview follows the edited field on the selected storefront page', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  await page.route('**/api/v1/admin/site/presentation', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ success: true, data: { content: null, media: {} } })
+  }))
+  await page.goto('/admin?section=presentation')
+  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Trang chủ' }).click()
+  await page.locator('[data-preview-target="field:home.storyTitle"]').getByRole('textbox', { name: 'Tiếng Việt' }).fill('Câu chuyện bản nháp')
+  const frame = page.frameLocator('iframe[title="Trang khách xem trước"]')
+  await expect(frame.locator('[data-preview-target="field:home.storyTitle"]')).toHaveText('Câu chuyện bản nháp')
+  await expect(frame.locator('[data-preview-target="field:home.storyTitle"]')).toHaveAttribute('data-preview-active', 'true')
+  await expect.poll(() => frame.locator('body').evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Sản phẩm' }).click()
+  await page.locator('[data-preview-target="field:catalog.title"]').getByRole('textbox', { name: 'Tiếng Việt' }).fill('Sản phẩm bản nháp')
+  await expect(frame.locator('[data-preview-target="field:catalog.title"]')).toHaveText('Sản phẩm bản nháp')
+  await expect.poll(() => frame.locator('body').evaluate(() => window.location.pathname)).toBe('/san-pham')
+})
+
 const product = {
   id: 10,
   nameVi: 'Binh gom do',

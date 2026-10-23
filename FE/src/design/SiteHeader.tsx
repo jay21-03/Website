@@ -95,7 +95,7 @@ export function SiteHeader({ account, phone, brandName = "Đàng Xem", logoUrl, 
       )}
     >
       <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-8">
-        <Link to="/" className="flex min-w-0 items-center gap-2.5" onClick={() => setOpen(false)}>
+        <Link to="/" data-preview-target="media:SITE_LOGO" className="flex min-w-0 items-center gap-2.5" onClick={() => setOpen(false)}>
           {logoUrl && !logoFailed ? <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 object-contain" onError={() => setLogoFailed(true)} /> : <PotIcon className="h-7 w-7 shrink-0 text-primary" />}
           <span className="truncate font-display text-xl tracking-tight text-foreground sm:text-2xl">
             {brandName}

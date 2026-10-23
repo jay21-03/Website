@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { presentationDefaults, presentationText, presentationStyle, presentationMode, presentationPalette, presetColors, contrastText, visibleCheckoutFields } from './sitePresentation'
+import { presentationDefaults, presentationText, presentationStyle, presentationMode, presentationPalette, presetColors, contrastText, visibleCheckoutFields, findPreviewTarget } from './sitePresentation'
 
 describe('site presentation fallback and checkout fields', () => {
   it('uses the configured language and falls back to the built-in page copy', () => {
@@ -37,5 +37,12 @@ describe('site presentation fallback and checkout fields', () => {
     expect(presentationText(saved, 'home', 'trust1Icon', 'vi')).toBe('heart')
     expect(presentationText(saved, 'brand', 'chatIcon', 'en')).toBe('bubble')
     expect(contrastText(saved.pages.brand.chatIcon.color)).toBe('#FFFFFF')
+  })
+
+  it('finds the edited field or icon in the preview and falls back safely', () => {
+    document.body.innerHTML = '<main><span data-preview-target="field:home.storyTitle">Story</span><span data-preview-target="field:brand.chatIcon">Chat</span></main>'
+    expect(findPreviewTarget(document, 'field:home.storyTitle').textContent).toBe('Story')
+    expect(findPreviewTarget(document, 'media:SITE_CHAT_ICON').textContent).toBe('Chat')
+    expect(findPreviewTarget(document, 'media:UNKNOWN')).toBe(document.querySelector('main'))
   })
 })

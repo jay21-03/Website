@@ -45,6 +45,7 @@ type HomeProps = {
   home?: HomepageData | null;
   fallbackProducts?: HomepageProduct[];
   presentation?: any;
+  media?: Record<string, string>;
 };
 
 const SOCIAL_FALLBACKS = [artisan, pVase, pKit, wsFamily, pApsara, wsTour];
@@ -56,7 +57,7 @@ function imageFallback(event: SyntheticEvent<HTMLImageElement>, fallback: string
 }
 
 
-export default function Home({ home, fallbackProducts = [], presentation }: HomeProps) {
+export default function Home({ home, fallbackProducts = [], presentation, media }: HomeProps) {
   const { t, lang } = useI18n();
   const copy = (key: string) => presentationNode(presentation, "home", key, lang);
   const managedFeatured = [...(home?.featuredProducts ?? [])].sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
@@ -69,6 +70,7 @@ export default function Home({ home, fallbackProducts = [], presentation }: Home
       <section className="grain relative isolate flex min-h-[88svh] items-center sm:min-h-screen overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <img
+            data-preview-target="media:HOME_HERO"
             src={home?.heroImageUrl || heroPottery}
             alt={t("Nghệ nhân Chăm tạo hình gốm bằng tay", "A Cham artisan shaping pottery by hand")}
             width={1600}
@@ -127,7 +129,10 @@ export default function Home({ home, fallbackProducts = [], presentation }: Home
             const Icon = TRUST[presentation?.pages?.home?.[`trust${i}Icon`]?.vi as keyof typeof TRUST] || [PotIcon, Leaf, Landmark][i - 1];
             return (
             <Reveal key={i} delay={i * 90} className="flex gap-4">
-              <Icon className="mt-1 h-8 w-8 shrink-0 text-primary" style={/^#[0-9a-fA-F]{6}$/.test(presentation?.pages?.home?.[`trust${i}Icon`]?.color || '') ? { color: presentation.pages.home[`trust${i}Icon`].color } : undefined} />
+              <span data-preview-target={`field:home.trust${i}Icon`} className="relative mt-1 h-8 w-8 shrink-0">
+                <Icon className="h-8 w-8 text-primary" style={/^#[0-9a-fA-F]{6}$/.test(presentation?.pages?.home?.[`trust${i}Icon`]?.color || '') ? { color: presentation.pages.home[`trust${i}Icon`].color } : undefined} />
+                {media?.[`SITE_TRUST_${i}_ICON`] && <img src={media[`SITE_TRUST_${i}_ICON`]} alt="" className="absolute inset-0 h-8 w-8 object-contain" onError={event => { event.currentTarget.hidden = true }} />}
+              </span>
               <div className="min-w-0">
                 <h3 className="font-display text-xl">{copy(`trust${i}Title`)}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{copy(`trust${i}Body`)}</p>
@@ -143,6 +148,7 @@ export default function Home({ home, fallbackProducts = [], presentation }: Home
           <Reveal>
             <div className="aspect-4/3 overflow-hidden rounded-sm border border-primary/25">
               <img
+                data-preview-target="media:HOME_STORY"
                 src={home?.storyImageUrl || artisan}
                 alt={t("Nghệ nhân Đàng Xem bên lò nung gốm", "Artisan Đàng Xem beside the open kiln")}
                 width={1000}

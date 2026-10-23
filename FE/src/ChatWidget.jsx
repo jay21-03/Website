@@ -4,7 +4,7 @@ import { api } from './api'
 import { HelpCircle, MessageCircle, MessageSquare } from 'lucide-react'
 import { contrastText } from './design/sitePresentation'
 
-export function ChatWidget({ lang = 'vi', presentation }) {
+export function ChatWidget({ lang = 'vi', presentation, iconUrl }) {
   const [open, setOpen] = useState(false)
   const [body, setBody] = useState('')
   const [name, setName] = useState('')
@@ -37,7 +37,7 @@ export function ChatWidget({ lang = 'vi', presentation }) {
   }
 
   return <div className="chat-widget" style={{ '--chat-color': chatColor, '--chat-foreground': contrastText(chatColor) }}>
-    <button className={`chat-toggle${open ? ' is-open' : ''}`} type="button" aria-expanded={open} aria-controls="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')} onClick={() => setOpen(value => !value)}><ChatIcon aria-hidden="true" size={23} /></button>
+    <button data-preview-target="field:brand.chatIcon" className={`chat-toggle${open ? ' is-open' : ''}`} type="button" aria-expanded={open} aria-controls="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')} onClick={() => setOpen(value => !value)}><ChatIcon aria-hidden="true" size={23} />{iconUrl && <img className="chat-custom-icon" src={iconUrl} alt="" onError={event => { event.currentTarget.hidden = true }} />}</button>
     {open && <section className="chat-box" id="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')}>
       <header className="chat-box-header"><div><strong>{copy('Đàng Xem hỗ trợ', 'Đàng Xem support')}</strong><span>{copy('Gửi tin nhắn, cửa hàng sẽ phản hồi tại đây', 'Send a message and we’ll reply here')}</span></div><button type="button" onClick={() => setOpen(false)} aria-label={copy('Đóng chat', 'Close chat')}>×</button></header>
       <div className="chat-messages" role="log" aria-live="polite" aria-relevant="additions text">

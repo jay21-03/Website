@@ -56,7 +56,10 @@ public class SitePresentationController {
                 slot != SiteMediaSlot.WORKSHOP_HERO && slot != SiteMediaSlot.WORKSHOP_HERO_DARK &&
                 slot != SiteMediaSlot.SUPPORT_HERO && slot != SiteMediaSlot.SUPPORT_HERO_DARK &&
                 slot != SiteMediaSlot.CHECKOUT_HERO && slot != SiteMediaSlot.CHECKOUT_HERO_DARK &&
-                slot != SiteMediaSlot.SITE_LOGO && slot != SiteMediaSlot.SITE_LOGO_DARK) {
+                slot != SiteMediaSlot.SITE_LOGO && slot != SiteMediaSlot.SITE_LOGO_DARK &&
+                slot != SiteMediaSlot.SITE_CHAT_ICON && slot != SiteMediaSlot.SITE_ZALO_ICON &&
+                slot != SiteMediaSlot.SITE_FACEBOOK_ICON && slot != SiteMediaSlot.SITE_TRUST_1_ICON &&
+                slot != SiteMediaSlot.SITE_TRUST_2_ICON && slot != SiteMediaSlot.SITE_TRUST_3_ICON) {
             throw new BusinessException("SITE_MEDIA_SLOT_INVALID", "Invalid site media slot.");
         }
     }

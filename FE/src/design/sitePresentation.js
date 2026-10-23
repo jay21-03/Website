@@ -198,7 +198,24 @@ export const presentationText = (content, page, key, lang) => {
 }
 
 export const presentationNode = (content, page, key, lang) =>
-  createElement('span', { style: presentationStyle(content, page, key) }, presentationText(content, page, key, lang))
+  createElement('span', { style: presentationStyle(content, page, key), 'data-preview-target': `field:${page}.${key}` }, presentationText(content, page, key, lang))
+
+export const findPreviewTarget = (document, target) => {
+  const slot = target?.startsWith('media:') ? target.slice(6).replace(/_DARK$/, '') : ''
+  const iconField = {
+    SITE_CHAT_ICON: 'brand.chatIcon', SITE_ZALO_ICON: 'brand.zaloLabel',
+    SITE_FACEBOOK_ICON: 'brand.facebookLabel', SITE_TRUST_1_ICON: 'home.trust1Icon',
+    SITE_TRUST_2_ICON: 'home.trust2Icon', SITE_TRUST_3_ICON: 'home.trust3Icon'
+  }
+  const resolvedTarget = iconField[slot] ? `field:${iconField[slot]}` : slot ? `media:${slot}` : target
+  const mediaFallback = {
+    CATALOG_HERO: '.catalog-hero', WORKSHOP_HERO: '.workshop-page',
+    SUPPORT_HERO: '.support-page', CHECKOUT_HERO: '.presentation-checkout-image',
+    SITE_LOGO: '.presentation-footer-logo'
+  }
+  return [...document.querySelectorAll('[data-preview-target]')].find(node => node.dataset.previewTarget === resolvedTarget) ||
+    (mediaFallback[slot] && document.querySelector(mediaFallback[slot])) || document.querySelector('main') || document.body
+}
 
 export const visibleCheckoutFields = layout =>
   layout.fieldOrder.filter(name =>

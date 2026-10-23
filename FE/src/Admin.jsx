@@ -106,7 +106,7 @@ function Dashboard({ lang = 'vi' }) {
   return <LoadState loading={!data && !error} error={error} lang={lang}><div className="metric-grid"><Metric label={adminText(lang, 'Tổng đơn hàng', 'Total orders')} value={data?.totalOrders} /><Metric label={adminText(lang, 'Doanh thu', 'Revenue')} value={cash(data?.totalRevenue)} /><Metric label={adminText(lang, 'Đơn hàng mới', 'New orders')} value={data?.newOrders} /><Metric label={adminText(lang, 'Sắp hết hàng', 'Low stock')} value={data?.lowStockProducts?.length || 0} /></div><div className="admin-grid"><Panel title={adminText(lang, 'Đơn hàng gần đây', 'Recent orders')}><SimpleTable heads={[adminText(lang, 'Mã đơn', 'Order code'), adminText(lang, 'Trạng thái', 'Status'), adminText(lang, 'Giá trị', 'Value')]} rows={(data?.recentOrders || []).map(x => [x.orderCode, x.orderStatus, cash(x.totalAmount)])} /></Panel><Panel title={adminText(lang, 'Sản phẩm bán chạy', 'Best selling products')}><SimpleTable heads={[adminText(lang, 'Sản phẩm', 'Product'), adminText(lang, 'Đã bán', 'Sold'), adminText(lang, 'Doanh thu', 'Revenue')]} rows={(data?.bestSellingProducts || []).map(x => [lang === 'vi' ? x.productNameVi : x.productNameEn || x.productNameVi, x.totalQuantity, cash(x.totalRevenue)])} /></Panel><Panel title={adminText(lang, 'Cảnh báo tồn kho', 'Inventory alerts')}><SimpleTable heads={[adminText(lang, 'Sản phẩm', 'Product'), adminText(lang, 'Khả dụng', 'Available')]} rows={(data?.lowStockProducts || []).map(x => [lang === 'vi' ? x.productNameVi : x.productNameEn || x.productNameVi, x.availableQuantity])} /></Panel></div><Reports lang={lang} /></LoadState>
 }
 function Metric({ label, value }) { return <article className="metric"><span>{label}</span><strong>{value ?? 0}</strong></article> }
-function Panel({ title, children, action }) { return <section className="admin-panel"><div className="panel-head"><h2>{title}</h2>{action}</div>{children}</section> }
+function Panel({ title, children, action, className = '' }) { return <section className={`admin-panel ${className}`}><div className="panel-head"><h2>{title}</h2>{action}</div>{children}</section> }
 function SimpleTable({ heads, rows, actions, actionLabel = 'Thao tác' }) { return <div className="table-wrap"><table><thead><tr>{heads.map(x => <th key={x}>{x}</th>)}{actions && <th>{actionLabel}</th>}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell ?? '—'}</td>)}{actions && <td>{actions(i)}</td>}</tr>)}</tbody></table></div> }
 
 function Reports({ lang = 'vi' }) {
@@ -981,6 +981,8 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   const previewFrame = useRef(null)
   const previewContainerRef = useRef(null)
   const [previewScale, setPreviewScale] = useState(0.3)
+  const [previewFocus, setPreviewFocus] = useState(null)
+  const focusSequence = useRef(0)
   const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['catalog', 'Sản phẩm', 'Products'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
   const mediaSlots = [
     { slot: 'SITE_LOGO', vi: 'Logo thương hiệu', en: 'Brand logo', fallbackIcon: true, shape: 'wide' },
@@ -989,6 +991,18 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     { slot: 'SUPPORT_HERO', vi: 'Ảnh bìa Liên hệ', en: 'Contact hero image', fallback: heroPottery, shape: 'wide' },
     { slot: 'CHECKOUT_HERO', vi: 'Ảnh thanh toán', en: 'Checkout image', emptyVi: 'Trang thanh toán hiện không có ảnh minh họa.', emptyEn: 'Checkout currently has no illustration.', shape: 'wide' }
   ]
+  const iconSlots = {
+    brand: [
+      ['SITE_CHAT_ICON', 'Biểu tượng Chat', 'Chat icon'],
+      ['SITE_ZALO_ICON', 'Biểu tượng Zalo', 'Zalo icon'],
+      ['SITE_FACEBOOK_ICON', 'Biểu tượng Facebook', 'Facebook icon']
+    ],
+    home: [
+      ['SITE_TRUST_1_ICON', 'Biểu tượng thủ công', 'Handmade icon'],
+      ['SITE_TRUST_2_ICON', 'Biểu tượng nguyên liệu', 'Materials icon'],
+      ['SITE_TRUST_3_ICON', 'Biểu tượng di sản', 'Heritage icon']
+    ]
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1041,7 +1055,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   }, [loading, error])
   useEffect(() => {
     const send = () => {
-      if (settings) previewFrame.current?.contentWindow?.postMessage({ type: 'site-presentation-preview', content: settings, media }, window.location.origin)
+      if (settings) previewFrame.current?.contentWindow?.postMessage({ type: 'site-presentation-preview', content: settings, media, focus: previewFocus }, window.location.origin)
     }
     const ready = event => {
       if (event.origin === window.location.origin && event.source === previewFrame.current?.contentWindow && event.data?.type === 'site-presentation-preview-ready') send()
@@ -1049,7 +1063,11 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     window.addEventListener('message', ready)
     send()
     return () => window.removeEventListener('message', ready)
-  }, [settings, media, previewMode, previewLang, page])
+  }, [settings, media, previewMode, previewLang, page, previewFocus])
+
+  function focusPreview(target) {
+    setPreviewFocus({ target, seq: ++focusSequence.current })
+  }
 
   function updateMode(change) {
     setSettings(current => previewMode === 'dark'
@@ -1088,6 +1106,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     try {
       const result = await api.uploadSiteMedia(slot, file)
       setMedia(current => ({ ...current, [slot]: result.url }))
+      focusPreview(`media:${slot}`)
       await queryClient.invalidateQueries({ queryKey: ['site-presentation'] })
       notify(adminText(lang, 'Đã tải ảnh.', 'Image uploaded.'))
       return true
@@ -1099,6 +1118,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     try {
       await api.clearSiteMedia(slot)
       setMedia(current => ({ ...current, [slot]: '' }))
+      focusPreview(`media:${slot}`)
       await queryClient.invalidateQueries({ queryKey: ['site-presentation'] })
       notify(adminText(lang, 'Đã đặt lại ảnh.', 'Image reset.'))
     } catch (failure) { notify(failure.message) }
@@ -1116,27 +1136,27 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   const previewUrl = `${previewRoute}?${new URLSearchParams({ presentationPreview: '1', mode: previewMode, lang: previewLang })}`
   const dirty = savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings)
 
-  return <Panel title={adminText(lang, 'Tùy chỉnh giao diện', 'Site appearance')}>
+  return <Panel className="presentation-panel" title={adminText(lang, 'Tùy chỉnh giao diện', 'Site appearance')}>
     <p className="admin-help">{adminText(lang, 'Chọn trang, sửa chữ tiếng Việt và tiếng Anh, xem thử rồi bấm Lưu thay đổi. Ảnh được lưu ngay khi tải lên.', 'Choose a page, edit Vietnamese and English text, preview it, then save. Images are saved when uploaded.')}</p>
     <div className="presentation-mode-picker" role="group" aria-label={adminText(lang, 'Chọn chế độ để chỉnh sửa', 'Choose mode to edit')}><button type="button" aria-pressed={previewMode === 'light'} onClick={() => setPreviewMode('light')}>{adminText(lang, 'Chỉnh chế độ sáng', 'Edit light mode')}</button><button type="button" aria-pressed={previewMode === 'dark'} onClick={() => setPreviewMode('dark')}>{adminText(lang, 'Chỉnh chế độ tối', 'Edit dark mode')}</button></div>
-    <nav className="presentation-page-nav" aria-label={adminText(lang, 'Chọn trang', 'Choose page')}>{pages.map(([key, vi, en]) => <button key={key} type="button" aria-current={page === key ? 'page' : undefined} onClick={() => setPage(key)}>{adminText(lang, vi, en)}</button>)}</nav>
+    <nav className="presentation-page-nav" aria-label={adminText(lang, 'Chọn trang', 'Choose page')}>{pages.map(([key, vi, en]) => <button key={key} type="button" aria-current={page === key ? 'page' : undefined} onClick={() => { setPage(key); setPreviewFocus(null) }}>{adminText(lang, vi, en)}</button>)}</nav>
     <div className="presentation-workspace">
     <div className="presentation-editor">
     <h3>{adminText(lang, 'Chữ trên trang', 'Page text')} · {pageName}</h3>
-    <form className="admin-form" onSubmit={save}>
-      {Object.entries(presentationFields[page]).map(([key, fallback]) => <fieldset className="admin-fieldset wide" key={key}>
+    <form className="admin-form" onSubmit={save} onFocusCapture={event => { const target = event.target.closest('[data-preview-target]')?.dataset.previewTarget; if (target) focusPreview(target) }}>
+      {Object.entries(presentationFields[page]).map(([key, fallback]) => <fieldset className="admin-fieldset wide" data-preview-target={`field:${page}.${key}`} key={key}>
         <legend>{({ trust1Icon: 'Biểu tượng thủ công', trust2Icon: 'Biểu tượng nguyên liệu', trust3Icon: 'Biểu tượng di sản', chatIcon: 'Biểu tượng Chat', zaloLabel: 'Ký hiệu Zalo', facebookLabel: 'Ký hiệu Facebook' })[key] || adminText(lang, fallback.vi, fallback.en).slice(0, 90)}</legend>
         {key.endsWith('Icon') || key === 'chatIcon' ? <label>{adminText(lang, 'Biểu tượng', 'Icon')}<select value={active.pages[page][key].vi} onChange={event => { updateText(key, 'vi', event.target.value); updateText(key, 'en', event.target.value) }}>{(key === 'chatIcon' ? [['message', 'Chat'], ['bubble', 'Bong bóng chat'], ['help', 'Hỗ trợ']] : [['pot', 'Bình gốm'], ['leaf', 'Lá'], ['landmark', 'Di sản'], ['heart', 'Trái tim'], ['sparkles', 'Lấp lánh']]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label> : ['vi', 'en'].map(language => <label key={language}>{language === 'vi' ? adminText(lang, 'Tiếng Việt', 'Vietnamese') : adminText(lang, 'Tiếng Anh', 'English')}{['zaloLabel', 'facebookLabel'].includes(key) ? <input value={active.pages[page][key][language]} maxLength={2} required onChange={event => updateText(key, language, event.target.value)} /> : <textarea value={active.pages[page][key][language]} maxLength={5000} required onChange={event => updateText(key, language, event.target.value)} />}</label>)}
         <label>{adminText(lang, 'Phông chữ riêng', 'Individual font')}<select value={active.pages[page][key].font || ''} onChange={event => updateAppearance(key, 'font', event.target.value)}><option value="">{adminText(lang, 'Theo phông chung', 'Use store font')}</option>{Object.entries(fontPresets).filter(([id]) => id !== 'modern').map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}</select></label>
-        <label>{['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? adminText(lang, 'Màu nền nút', 'Button background') : adminText(lang, 'Màu chữ riêng', 'Individual text color')}<span className="presentation-color-control"><input type="color" value={active.pages[page][key].color || paletteColors[['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? 2 : 3]} onChange={event => updateAppearance(key, 'color', event.target.value)} /><button type="button" disabled={!active.pages[page][key].color} onClick={() => updateAppearance(key, 'color', '')}>{adminText(lang, 'Dùng màu chung', 'Use store color')}</button></span></label>
+        <label>{['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? adminText(lang, 'Màu nền nút', 'Button background') : key.endsWith('Icon') ? adminText(lang, 'Màu biểu tượng có sẵn', 'Built-in icon color') : adminText(lang, 'Màu chữ riêng', 'Individual text color')}<span className="presentation-color-control"><input type="color" value={active.pages[page][key].color || paletteColors[['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? 2 : 3]} onChange={event => updateAppearance(key, 'color', event.target.value)} /><button type="button" disabled={!active.pages[page][key].color} onClick={() => updateAppearance(key, 'color', '')}>{adminText(lang, 'Dùng màu chung', 'Use store color')}</button></span></label>
       </fieldset>)}
-      {page === 'brand' && <fieldset className="admin-fieldset wide"><legend>{adminText(lang, 'Màu và phông chữ của cửa hàng', 'Store colors and fonts')}</legend>
+      {page === 'brand' && <fieldset className="admin-fieldset wide" data-preview-target="page:brand"><legend>{adminText(lang, 'Màu và phông chữ của cửa hàng', 'Store colors and fonts')}</legend>
         <label>{adminText(lang, 'Bộ màu cửa hàng', 'Store color palette')}<select value={active.colorPreset} onChange={event => updateMode(() => ({ colorPreset: event.target.value, colors: presetColors(event.target.value) }))}>{Object.entries(colorPresets).map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}{!colorPresets[active.colorPreset] && <option value={active.colorPreset}>{active.colorPreset}</option>}</select></label>
         <label>{adminText(lang, 'Bộ phông chữ', 'Store font set')}<select value={active.fontPreset} onChange={event => updateMode(() => ({ fontPreset: event.target.value }))}>{Object.entries(fontPresets).filter(([id]) => id !== 'modern' || active.fontPreset === 'modern').map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}</select></label>
         <div className="presentation-palette-swatches wide" aria-label={adminText(lang, 'Sáu màu của bộ màu đang chọn', 'Six colors in the selected palette')}>{paletteColors.map((color, index) => <span key={index} style={{ background: color }} title={color} />)}</div>
         {colorNames.map((key, index) => <label key={key}>{adminText(lang, ['Nền', 'Thẻ', 'Màu chính', 'Chữ', 'Màu phụ', 'Màu nhấn'][index], ['Background', 'Card', 'Primary', 'Text', 'Secondary', 'Accent'][index])}<span className="presentation-color-control"><input type="color" value={active.colors[key]} onChange={event => updateMode(current => ({ colors: { ...current.colors, [key]: event.target.value } }))} /><code>{active.colors[key]}</code></span></label>)}
       </fieldset>}
-      {page === 'checkout' && <fieldset className="admin-fieldset wide"><legend>{adminText(lang, 'Thứ tự hiển thị', 'Display order')}</legend>
+      {page === 'checkout' && <fieldset className="admin-fieldset wide" data-preview-target="page:checkout"><legend>{adminText(lang, 'Thứ tự hiển thị', 'Display order')}</legend>
         <p>{adminText(lang, 'Các trường bắt buộc luôn hiển thị và vẫn được kiểm tra khi đặt hàng.', 'Required fields always appear and remain validated during checkout.')}</p>
         {active.checkout.sectionOrder.map((value, index) => <div className="presentation-order-row" key={value}><span>{value === 'form' ? adminText(lang, 'Thông tin nhận hàng', 'Recipient information') : adminText(lang, 'Tóm tắt đơn hàng', 'Order summary')}</span><button type="button" aria-label={adminText(lang, 'Chuyển lên', 'Move up')} disabled={index === 0} onClick={() => move('sectionOrder', index, -1)}>↑</button><button type="button" aria-label={adminText(lang, 'Chuyển xuống', 'Move down')} disabled={index === 1} onClick={() => move('sectionOrder', index, 1)}>↓</button></div>)}
         {active.checkout.fieldOrder.map((value, index) => <div className="presentation-order-row" key={value}><span>{adminText(lang, presentationFields.checkout[value].vi, presentationFields.checkout[value].en)}</span><button type="button" aria-label={adminText(lang, 'Chuyển lên', 'Move up')} disabled={index === 0} onClick={() => move('fieldOrder', index, -1)}>↑</button><button type="button" aria-label={adminText(lang, 'Chuyển xuống', 'Move down')} disabled={index === 4} onClick={() => move('fieldOrder', index, 1)}>↓</button></div>)}
@@ -1145,6 +1165,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
       </fieldset>}
       <div className="presentation-save wide"><span role="status">{dirty ? adminText(lang, 'Có thay đổi chưa lưu', 'Unsaved changes') : adminText(lang, 'Đã lưu nội dung', 'Content saved')}</span><button className="admin-primary" disabled={saving || !dirty}>{saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu thay đổi', 'Save changes')}</button></div>
     </form>
+    {iconSlots[page] && <section className="presentation-images"><h3>{adminText(lang, 'Biểu tượng tải lên', 'Uploaded icons')}</h3><p>{adminText(lang, 'Ảnh tải lên sẽ thay biểu tượng đã chọn ở trên. Đặt lại để dùng biểu tượng có sẵn. Dùng PNG/WebP nền trong suốt để hiển thị đẹp trên cả hai chế độ; màu ảnh không đổi theo bộ chọn màu.', 'An uploaded image replaces the selected icon above. Reset it to use the built-in icon. A transparent PNG/WebP works best in both modes; the color picker does not recolor uploaded images.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{iconSlots[page].map(([slot, vi, en]) => <HomepageMediaCard key={slot} config={{ slot, vi, en, shape: 'icon', emptyVi: 'Đang dùng biểu tượng có sẵn', emptyEn: 'Using the built-in icon' }} media={{ url: media[slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} compact />)}</div></section>}
     {['brand', 'catalog', 'workshop', 'support', 'checkout'].includes(page) && <section className="presentation-images"><h3>{adminText(lang, 'Hình ảnh trên trang', 'Page images')}</h3><p>{adminText(lang, 'Ảnh được lưu ngay khi tải lên. Chế độ tối dùng ảnh riêng nếu bạn tải lên; nếu để trống sẽ dùng ảnh chế độ sáng.', 'Images save when uploaded. Dark mode uses its own image if uploaded; otherwise it uses the light mode image.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{mediaSlots.filter(item => item.slot.startsWith(page === 'brand' ? 'SITE_' : page.toUpperCase())).map(config => { const slot = previewMode === 'dark' ? `${config.slot}_DARK` : config.slot; return <HomepageMediaCard key={slot} config={{ ...config, slot, fallback: previewMode === 'dark' ? media[config.slot] || config.fallback : config.fallback }} media={{ url: media[slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} /> })}</div></section>}
     </div>
     <aside className="presentation-preview" aria-label={adminText(lang, 'Xem trước', 'Preview')}>
@@ -1177,7 +1198,8 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
               {
                 type: 'site-presentation-preview',
                 content: settings,
-                media
+                media,
+                focus: previewFocus
               },
               window.location.origin
             )
