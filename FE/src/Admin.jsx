@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from './api'
+import { AdminProductReviews } from './ProductReviews'
 import { businessDateTimeLocal, businessLocalDateTimeToOffset, formatBusinessDateTime, localBusinessDate, monthStartBusinessDate } from './utils/businessDate'
 import heroPottery from './design/assets/hero-pottery.jpg'
 import artisan from './design/assets/artisan.jpg'
@@ -63,6 +64,7 @@ const adminSections = [
   ['dashboard', 'Tổng quan', 'Dashboard'], ['products', 'Sản phẩm', 'Products'], ['collections', 'Bộ sưu tập', 'Collections'], ['homepage', 'Trang chủ', 'Homepage'], ['about', 'Về chúng tôi', 'About CMS'], ['presentation', 'Giao diện', 'Site appearance'],
   ['workshop', 'Workshop', 'Workshop'], ['inventory', 'Kho hàng', 'Inventory'], ['orders', 'Đơn hàng', 'Orders'], ['users', 'Người dùng', 'Users'], ['notifications', 'Thông báo', 'Notifications'], ['settings', 'Cấu hình', 'Settings']
 ]
+adminSections.push(['reviews', 'Đánh giá', 'Reviews'])
 const adminSectionIds = new Set(adminSections.map(([id]) => id))
 const adminSectionTitle = (lang, section) => {
   const match = adminSections.find(([id]) => id === section)

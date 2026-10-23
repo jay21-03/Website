@@ -111,6 +111,12 @@ export const api = {
     return request(`/products?${queryString({ page: 0, size: 20, ...normalized })}`)
   },
   product: id => request(`/products/${encodeURIComponent(id)}`),
+  productReviews: (id, page = 0) => request(`/products/${encodeURIComponent(id)}/reviews?page=${page}&size=10`),
+  myProductReview: id => request(`/me/products/${encodeURIComponent(id)}/review`),
+  createProductReview: (id, values) => request(`/me/products/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify(values) }),
+  updateProductReview: (id, values) => request(`/me/products/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(values) }),
+  adminReviews: (page = 0) => request(`/admin/reviews?page=${page}&size=20`),
+  setReviewHidden: (id, hidden) => request(`/admin/reviews/${encodeURIComponent(id)}/visibility`, { method: 'PATCH', body: JSON.stringify({ hidden }) }),
   collections: () => request('/collections'),
   workshops: () => request('/workshops'),
   supportSettings: () => request('/support/settings'),
