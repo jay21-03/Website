@@ -50,6 +50,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class SecurityConfigIntegrationTest {
     private static final Instant NOW = Instant.parse("2026-08-12T03:30:00Z");

@@ -1,8 +1,11 @@
 package com.bautruc.ecommerce.cart.api;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import java.time.Instant;import com.bautruc.ecommerce.common.security.*;import com.bautruc.ecommerce.identity.domain.*;import com.bautruc.ecommerce.identity.infrastructure.UserJpaRepository;import com.fasterxml.jackson.databind.*;import jakarta.servlet.http.Cookie;
-import org.junit.jupiter.api.*;import org.springframework.beans.factory.annotation.Autowired;import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;import org.springframework.boot.test.context.SpringBootTest;import org.springframework.http.MediaType;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.test.context.*;import org.springframework.test.web.servlet.*;import org.testcontainers.containers.PostgreSQLContainer;import org.testcontainers.junit.jupiter.*;
-@SpringBootTest @AutoConfigureMockMvc @ActiveProfiles("test") @Testcontainers
+import org.junit.jupiter.api.*;import org.springframework.beans.factory.annotation.Autowired;import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;import org.springframework.boot.test.context.SpringBootTest;import org.springframework.http.MediaType;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.test.annotation.DirtiesContext;
+
+import org.springframework.test.context.*;import org.springframework.test.web.servlet.*;import org.testcontainers.containers.PostgreSQLContainer;import org.testcontainers.junit.jupiter.*;
+@SpringBootTest @AutoConfigureMockMvc @ActiveProfiles("test") @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@Testcontainers
 class CartInventoryApiIntegrationTest{
  @Container static final PostgreSQLContainer<?> postgres=new PostgreSQLContainer<>("postgres:16-alpine");
  @DynamicPropertySource static void db(DynamicPropertyRegistry r){r.add("spring.datasource.url",postgres::getJdbcUrl);r.add("spring.datasource.username",postgres::getUsername);r.add("spring.datasource.password",postgres::getPassword);}

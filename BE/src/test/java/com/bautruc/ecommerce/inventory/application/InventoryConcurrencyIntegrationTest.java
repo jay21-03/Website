@@ -2,8 +2,11 @@ package com.bautruc.ecommerce.inventory.application;
 import static org.assertj.core.api.Assertions.*;
 import java.time.Instant;import java.util.*;import java.util.concurrent.*;
 import com.bautruc.ecommerce.catalog.api.request.*;import com.bautruc.ecommerce.catalog.application.CatalogService;import com.bautruc.ecommerce.catalog.domain.*;import com.bautruc.ecommerce.cart.application.*;import com.bautruc.ecommerce.cart.infrastructure.CartJpaRepository;import com.bautruc.ecommerce.common.exception.BusinessException;import com.bautruc.ecommerce.identity.domain.*;import com.bautruc.ecommerce.identity.infrastructure.UserJpaRepository;import com.bautruc.ecommerce.inventory.domain.*;import com.bautruc.ecommerce.inventory.infrastructure.*;
-import org.junit.jupiter.api.*;import org.springframework.beans.factory.annotation.Autowired;import org.springframework.boot.test.context.SpringBootTest;import org.springframework.dao.DataIntegrityViolationException;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.test.context.*;import org.testcontainers.containers.PostgreSQLContainer;import org.testcontainers.junit.jupiter.*;
-@SpringBootTest @ActiveProfiles("test") @Testcontainers
+import org.junit.jupiter.api.*;import org.springframework.beans.factory.annotation.Autowired;import org.springframework.boot.test.context.SpringBootTest;import org.springframework.dao.DataIntegrityViolationException;import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.test.annotation.DirtiesContext;
+
+import org.springframework.test.context.*;import org.testcontainers.containers.PostgreSQLContainer;import org.testcontainers.junit.jupiter.*;
+@SpringBootTest @ActiveProfiles("test") @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@Testcontainers
 class InventoryConcurrencyIntegrationTest{
  @Container static final PostgreSQLContainer<?> postgres=new PostgreSQLContainer<>("postgres:16-alpine");
  @DynamicPropertySource static void db(DynamicPropertyRegistry r){r.add("spring.datasource.url",postgres::getJdbcUrl);r.add("spring.datasource.username",postgres::getUsername);r.add("spring.datasource.password",postgres::getPassword);}

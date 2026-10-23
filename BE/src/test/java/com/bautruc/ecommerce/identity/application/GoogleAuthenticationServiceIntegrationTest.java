@@ -28,9 +28,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.test.annotation.DirtiesContext;
+
 import org.springframework.test.context.ActiveProfiles;
+
 import org.springframework.test.context.DynamicPropertyRegistry;
+
 import org.springframework.test.context.DynamicPropertySource;
+
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -41,6 +46,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @TestPropertySource(properties = {
         "bautruc.admin-emails=admin@example.com,demoted@example.com"
 })
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class GoogleAuthenticationServiceIntegrationTest {
     private static final Instant NOW = Instant.parse("2026-08-12T03:30:00Z");
