@@ -141,6 +141,7 @@ export const api = {
   myNotifications: (page = 0, isRead = '') => request(`/me/notifications?page=${page}&size=20${isRead === '' ? '' : `&isRead=${isRead}`}`),
   readMyNotification: id => request(`/me/notifications/${id}/read`, { method: 'PATCH' }),
   adminDashboard: () => request('/admin/dashboard'),
+  adminAnalytics: () => request('/admin/analytics'),
   adminHome: () => request('/admin/home'),
   updateHomeSlogan: values => request('/admin/home/slogan', { method: 'PUT', body: JSON.stringify(values) }),
   uploadHomeMedia: (slot, file) => {

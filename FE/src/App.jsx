@@ -4,6 +4,7 @@ import { Bell } from 'lucide-react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import Admin from './Admin'
+import { trackAnalytics, useAnalyticsConsent } from './analytics/Analytics'
 import { ProductReviews } from './ProductReviews'
 import { ChatWidget } from './ChatWidget'
 import ReferenceHome from './design/Home'
@@ -150,7 +151,7 @@ function StoreProvider({ children }) {
     initializeCart()
     return () => { active = false }
   }, [notify])
-  useEffect(() => { if (!preview) localStorage.setItem('dxLang', lang); document.documentElement.lang = lang }, [lang, preview])
+  useEffect(() => { if (!preview) localStorage.setItem('dxLang', lang); document.documentElement.lang = lang; window.dispatchEvent(new Event('dx-language-change')) }, [lang, preview])
   useEffect(() => {
     const root = document.documentElement
     const colors = presentationPalette(activeContent)
@@ -242,16 +243,18 @@ function StoreProvider({ children }) {
     })
   }
   async function add(product) {
+    const trackAdd = () => trackAnalytics('add_to_cart', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [{ item_id: String(product.id), item_name: product.nameVi, price: Number(product.sellingPrice || 0), quantity: 1 }] })
     const productId = product.id
     if (!user) {
       const entries = addGuestQuantity(readGuestCart(), productId)
       writeGuestCart(entries)
       setCart(current => guestCartFromProducts(entries, [...current.items, product]))
       notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.'))
+      trackAdd()
       return true
     }
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
-    try { setCart(await api.addCart(productId)); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
+    try { setCart(await api.addCart(productId)); trackAdd(); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
   }
   return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, homepage: homepageQuery.data, presentation, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
@@ -345,6 +348,9 @@ function CollectionsPage() {
 function ProductDetail() {
   const { id } = useParams(); const { add, lang, presentation, user } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
   const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
+  const analyticsConsent = useAnalyticsConsent()
+  const trackedProductId = useRef(null)
+  useEffect(() => { if (!analyticsConsent || !product || trackedProductId.current === product.id) return; if (trackAnalytics('view_item', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [{ item_id: String(product.id), item_name: product.nameVi, price: Number(product.sellingPrice || 0), quantity: 1 }] })) trackedProductId.current = product.id }, [product, analyticsConsent])
   const relatedQuery = useQuery({ queryKey: ['related-products', product?.collectionId], queryFn: () => api.products({ collectionId: product.collectionId, page: 0, size: 5, sort: 'createdAt,desc' }), enabled: Boolean(product?.collectionId) })
   useEffect(() => { setSelected(0); setZoom(1); setTouchStart(null); setActiveTab('description') }, [id])
   const images = product?.images?.length ? product.images : [{ id: 'fallback', url: product?.thumbnailUrl || fallbackImage, thumbnail: true }]
@@ -433,7 +439,7 @@ function Checkout() {
 
   const buyNowProduct = buyNowQuery.data
 
-  const buyNowItem = buyNowProduct
+  const buyNowItem = useMemo(() => buyNowProduct
     ? {
         id: `buy-now-${buyNowProduct.id}`,
         productId: buyNowProduct.id,
@@ -444,15 +450,18 @@ function Checkout() {
         sellingPrice: buyNowProduct.sellingPrice,
         lineTotal: buyNowProduct.sellingPrice
       }
-    : null
+    : null, [buyNowProduct])
 
-  const items = isBuyNow
+  const items = useMemo(() => isBuyNow
     ? (buyNowItem ? [buyNowItem] : [])
-    : cart.items
+    : cart.items, [isBuyNow, buyNowItem, cart.items])
 
   const total = isBuyNow
     ? (buyNowItem?.lineTotal ?? 0)
     : cart.totalAmount
+  const analyticsConsent = useAnalyticsConsent()
+  const checkoutTracked = useRef(false)
+  useEffect(() => { if (!analyticsConsent || !items.length || checkoutTracked.current) return; if (trackAnalytics('begin_checkout', { currency: 'VND', value: Number(total || 0), items: items.map(item => ({ item_id: String(item.productId), item_name: item.nameVi, price: Number(item.sellingPrice || 0), quantity: item.quantity })) })) checkoutTracked.current = true }, [analyticsConsent, items, total])
 
   async function change(item, quantity) {
     if (isBuyNow) return
@@ -793,6 +802,8 @@ function Orders() {
 function OrderDetail() {
   const { id } = useParams(); const { user, lang, authLoading } = useStore(); const query = useMyOrder(id, user?.role === 'USER'); const order = query.data
   const pendingPayment = order?.paymentStatus === 'PENDING'
+  const analyticsConsent = useAnalyticsConsent()
+  useEffect(() => { if (!analyticsConsent || order?.paymentStatus !== 'PAID') return; const key = `dx.analytics.purchase.${order.id}`; if (sessionStorage.getItem(key)) return; if (trackAnalytics('purchase', { transaction_id: String(order.orderCode || order.id), currency: 'VND', value: Number(order.paymentAmount ?? order.totalAmount), items: (order.items || []).map(item => ({ item_id: String(item.productId), item_name: item.productNameVi, price: Number(item.sellingPrice || 0), quantity: item.quantity })) })) sessionStorage.setItem(key, '1') }, [analyticsConsent, order])
   return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Chi tiết đơn hàng', 'Order detail')}</span><h1>{order?.orderCode || pick(lang, 'Đơn hàng', 'Order')}</h1></div>{authLoading || query.isLoading ? <Loading text={pick(lang, 'Đang tải đơn hàng...', 'Loading order...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Vui lòng đăng nhập bằng tài khoản khách hàng.', 'Please sign in with a customer account.')}</Empty> : query.isError && query.error.status === 404 ? <Empty>{pick(lang, 'Không tìm thấy đơn hàng.', 'Order not found.')}</Empty> : query.isError ? <div className="state-box error" role="alert">{query.error.message}<button onClick={() => query.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : <div className="order-detail"><section><h3>{pick(lang, 'Thông tin nhận hàng', 'Recipient information')}</h3><p>{order.receiverName} · {order.phone}</p>{order.email && <p>{order.email}</p>}<p>{order.address}</p>{order.note && <p>{pick(lang, 'Ghi chú', 'Note')}: {order.note}</p>}<p>{pick(lang, 'Ngày tạo', 'Created at')}: {date(order.createdAt, lang)}</p><p>{pick(lang, 'Đơn hàng', 'Order')}: <b>{orderStatusLabel(order.orderStatus, lang)}</b></p><p>{pick(lang, 'Thanh toán', 'Payment')}: <b>{paymentStatusLabel(order.paymentStatus, lang)}</b></p>{pendingPayment && <small>{pick(lang, 'Trang này tự cập nhật trạng thái thanh toán mỗi 5 giây.', 'This page refreshes payment status every 5 seconds.')}</small>}<div className="payment-panel"><h3>{pick(lang, 'Thanh toán payOS', 'payOS payment')}</h3><div className="summary-line"><span>{pick(lang, 'Trạng thái', 'Status')}</span><b>{paymentStatusLabel(order.paymentStatus, lang)}</b></div><div className="summary-line"><span>{pick(lang, 'Số tiền thanh toán', 'Payment amount')}</span><b>{money(order.paymentAmount ?? order.totalAmount, lang)}</b></div>{order.expiresAt && <div className="summary-line"><span>{pick(lang, 'Hết hạn', 'Expires at')}</span><b>{date(order.expiresAt, lang)}</b></div>}{order.qrCode && <img className="payment-qr" src={order.qrCode} alt={pick(lang, 'Mã QR thanh toán payOS', 'payOS payment QR code')} />}{order.checkoutUrl ? <a className="button dark full" href={order.checkoutUrl} target="_blank" rel="noreferrer">{pick(lang, 'Thanh toán qua payOS', 'Pay with payOS')}</a> : pendingPayment && <p className="payment-note">{pick(lang, 'Cổng thanh toán đang chờ cấu hình hoặc thông tin thanh toán chưa khả dụng. Trạng thái đơn hàng vẫn được lấy từ hệ thống.', 'Payment gateway configuration or payment details are not available yet. Order state remains system-authoritative.')}</p>}</div></section><aside className="order-summary">{order.items.map(item => <div className="summary-line" key={item.productId}><span>{lang === 'vi' ? item.productNameVi : item.productNameEn} × {item.quantity}<small>{money(item.sellingPrice, lang)} / {pick(lang, 'sản phẩm', 'item')}</small></span><b>{money(item.totalPrice, lang)}</b></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(order.subtotal, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(order.totalAmount, lang)}</b></div></aside></div>}</main></Layout>
 }
 function Faq() {
