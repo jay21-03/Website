@@ -377,6 +377,20 @@ test('admin analytics tabs show verified source data without mobile overflow', a
   expect(pageErrors).toEqual([])
 })
 
+test('admin can open all recorded business history from visitor analytics', async ({ page, isMobile }) => {
+  await page.addInitScript(() => localStorage.setItem('dxLang', 'en'))
+  await mockApi(page, 'ADMIN')
+  const businessRequests = []
+  page.on('request', request => { if (request.url().includes('/admin/analytics/business')) businessRequests.push(new URL(request.url()).searchParams.get('days')) })
+  await page.goto('/admin?section=analytics')
+  await page.getByRole('button', { name: 'Business → All recorded history' }).click()
+  await expect(page.locator('.analytics-tabs').getByRole('button', { name: 'Business' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('combobox')).toHaveValue('0')
+  await expect(page.getByText('Order value by month')).toBeVisible()
+  await expect.poll(() => businessRequests.includes('0')).toBe(true)
+  if (isMobile) expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+})
+
 test('paid purchase event is not resent when the same customer opens a new tab', async ({ page }) => {
   await page.context().addInitScript(() => localStorage.setItem('dx.analytics.consent.v1', 'granted'))
   const paid = { ...order, paymentStatus: 'PAID' }

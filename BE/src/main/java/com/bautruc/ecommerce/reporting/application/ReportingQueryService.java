@@ -36,10 +36,10 @@ public class ReportingQueryService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> businessAnalytics(int days) {
-        if (days != 7 && days != 30 && days != 90) throw invalidRange("days must be 7, 30 or 90.");
+        if (days != 0 && days != 7 && days != 30 && days != 90) throw invalidRange("days must be 0, 7, 30 or 90.");
         LocalDate today = clock.businessNow().toLocalDate();
-        LocalDate from = today.minusDays(days - 1L);
-        Instant start = clock.startOfDay(from);
+        LocalDate from = days == 0 ? null : today.minusDays(days - 1L);
+        Instant start = from == null ? Instant.EPOCH : clock.startOfDay(from);
         Instant end = clock.startOfNextDay(today);
         Map<String, Object> metrics = new LinkedHashMap<>(reports.businessMetrics(start, end));
         long paidOrders = ((Number) metrics.get("completed_paid_orders")).longValue();
@@ -50,7 +50,11 @@ public class ReportingQueryService {
         result.put("source", "POSTGRESQL");
         result.put("status", "READY");
         result.put("timezone", clock.businessZone().getId());
-        result.put("period", Map.of("fromDate", from.toString(), "toDate", today.toString(), "includesToday", true));
+        Map<String, Object> period = new LinkedHashMap<>();
+        period.put("fromDate", from == null ? null : from.toString());
+        period.put("toDate", today.toString());
+        period.put("includesToday", true);
+        result.put("period", period);
         result.put("fetchedAt", clock.now().toString());
         result.put("dateBasis", Map.of("ordersCreated", "orders.created_at", "ordersCompletedAndRevenue", "orders.completed_at",
                 "paymentsPaid", "payments.paid_at", "paymentsRefunded", "payments.refunded_at",
@@ -60,7 +64,7 @@ public class ReportingQueryService {
                 "Completed paid order value is not net revenue; refunds and fees are separate.",
                 "Workshop bookings are not paid workshop revenue; average rating is unavailable without visible reviews."));
         result.put("metrics", metrics);
-        result.put("revenueTrend", reports.businessRevenueTrend(start, end, days == 90 ? ReportGroupBy.WEEK : ReportGroupBy.DAY));
+        result.put("revenueTrend", reports.businessRevenueTrend(start, end, days == 0 ? ReportGroupBy.MONTH : days == 90 ? ReportGroupBy.WEEK : ReportGroupBy.DAY));
         result.put("bestSelling", reports.bestSelling(start, end, 10));
         result.put("workshopInterest", reports.workshopInterest(start, end));
         return result;

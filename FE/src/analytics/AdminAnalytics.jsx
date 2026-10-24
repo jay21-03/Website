@@ -5,7 +5,7 @@ import BusinessAnalytics from './BusinessAnalytics'
 
 const formatNumber = value => Number(value || 0).toLocaleString('vi-VN')
 
-function HistoricalAnalytics({ lang = 'vi', view = 'overview' }) {
+function HistoricalAnalytics({ lang = 'vi', view = 'overview', onShowBusiness }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -31,6 +31,7 @@ function HistoricalAnalytics({ lang = 'vi', view = 'overview' }) {
       <div className="panel-head"><div><h2>{view === 'overview' ? t('Cửa hàng đang được quan tâm ra sao?', 'How is the store doing?') : view === 'audience' ? t('Khách đến từ đâu?', 'Where do visitors come from?') : t('Khách xem gì và làm gì?', 'What do visitors view and do?')}</h2><p>{t('Lượt truy cập chỉ gồm người đã đồng ý thống kê và được tổng hợp đến hết hôm qua.', 'Visits include people who consented to analytics and are counted through yesterday.')}</p></div><button type="button" onClick={() => { setLoading(true); setRefreshKey(key => key + 1) }}>{t('Làm mới', 'Refresh')}</button></div>
       <label className="analytics-range">{t('Xem', 'Show')} <select value={days} onChange={event => { setLoading(true); setDays(Number(event.target.value)) }}><option value={7}>7 {t('ngày', 'days')}</option><option value={30}>30 {t('ngày', 'days')}</option><option value={90}>90 {t('ngày', 'days')}</option></select> {t('gần nhất đã kết thúc', 'most recent finished days')}</label>
       {data?.fromDate && <small>{data.fromDate} – {data.toDate} · {data.timezone}</small>}
+      <p className="analytics-caption">{t('Số liệu truy cập chỉ có từ khi bật Google Analytics. Dữ liệu bán hàng cũ vẫn có thể xem trong', 'Visitor data starts when Google Analytics was enabled. Earlier store records remain available in')} <button type="button" onClick={onShowBusiness}>{t('Kinh doanh → Toàn bộ lịch sử', 'Business → All recorded history')}</button>.</p>
     </div>
     {loading && <div className="admin-state">{t('Đang tải...', 'Loading...')}</div>}
     {error && <div className="admin-state error" role="alert">{error}</div>}
@@ -80,10 +81,11 @@ function HistoricalAnalytics({ lang = 'vi', view = 'overview' }) {
 
 export default function AdminAnalytics({ lang = 'vi' }) {
   const [tab, setTab] = useState('overview')
+  const [businessDays, setBusinessDays] = useState(30)
   return <div>
     <nav className="analytics-tabs" aria-label={lang === 'en' ? 'Analytics views' : 'Chế độ thống kê'}>
       {[["overview", lang === 'en' ? 'Overview' : 'Tổng quan'], ["realtime", lang === 'en' ? 'Live visits' : 'Đang truy cập'], ["audience", lang === 'en' ? 'Visitors' : 'Khách truy cập'], ["behavior", lang === 'en' ? 'Pages & actions' : 'Trang & thao tác'], ["business", lang === 'en' ? 'Business' : 'Kinh doanh']].map(([key, label]) => <button type="button" key={key} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}
     </nav>
-    {tab === 'realtime' ? <RealtimeAnalytics lang={lang} /> : tab === 'business' ? <BusinessAnalytics lang={lang} /> : <HistoricalAnalytics lang={lang} view={tab} />}
+    {tab === 'realtime' ? <RealtimeAnalytics lang={lang} /> : tab === 'business' ? <BusinessAnalytics key={businessDays} lang={lang} rangeDays={businessDays} /> : <HistoricalAnalytics lang={lang} view={tab} onShowBusiness={() => { setBusinessDays(0); setTab('business') }} />}
   </div>
 }

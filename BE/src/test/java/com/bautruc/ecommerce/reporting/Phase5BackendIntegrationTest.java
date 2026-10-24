@@ -141,6 +141,14 @@ class Phase5BackendIntegrationTest {
         assertThat(interest).hasSize(1);
         assertThat(((java.util.Map<?, ?>) interest.getFirst()).get("bookings")).isEqualTo(1L);
         assertThat(((java.util.Map<?, ?>) interest.getFirst()).get("participants")).isEqualTo(3L);
+        Instant old = now.minusSeconds(120L * 24 * 60 * 60);
+        jdbc.update("""
+                INSERT INTO workshop_bookings(full_name,email,phone,preferred_at,participants,status,created_at,updated_at)
+                VALUES ('Earlier guest','earlier@example.invalid','0000000000',?,2,'NEW',?,?)
+                """, java.sql.Timestamp.from(old.plusSeconds(3600)), java.sql.Timestamp.from(old), java.sql.Timestamp.from(old));
+        assertThat(((java.util.Map<?, ?>) reporting.businessAnalytics(30).get("metrics")).get("workshop_bookings")).isEqualTo(1L);
+        assertThat(((java.util.Map<?, ?>) reporting.businessAnalytics(0).get("metrics")).get("workshop_bookings")).isEqualTo(2L);
+        assertThat(((java.util.Map<?, ?>) reporting.businessAnalytics(0).get("period")).get("fromDate")).isNull();
         long paidOrder = jdbc.queryForObject("SELECT nextval('app_global_id_seq')", Long.class);
         long cancelledOrder = jdbc.queryForObject("SELECT nextval('app_global_id_seq')", Long.class);
         for (long id : List.of(paidOrder, cancelledOrder)) {
@@ -180,6 +188,8 @@ class Phase5BackendIntegrationTest {
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/v1/admin/analytics/business?days=30").with(authentication(auth(admin))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.metrics.completed_paid_revenue").value("120000"));
+        mockMvc.perform(get("/api/v1/admin/analytics/business?days=0").with(authentication(auth(admin))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.metrics.workshop_bookings").value(2));
     }
 
     @Test void concurrentDedupCreatesOneNotificationAndOneRecipientSnapshot() throws Exception {

@@ -65,6 +65,7 @@
 .analytics-range select { min-height: 40px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--admin-surface); color: var(--foreground); font: inherit; }
 .analytics-range select:focus-visible, .analytics-toolbar button:focus-visible { outline: 3px solid var(--admin-primary); outline-offset: 2px; }
 .analytics-caption { max-width: 70ch; margin: 6px 0 16px; color: var(--foreground); font-size: 13px; line-height: 1.6; }
+.analytics-caption button { border: 0; padding: 0; background: none; color: var(--admin-primary); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .analytics-details { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--border); padding: 16px 0; margin-bottom: 20px; }
 .analytics-details summary { width: fit-content; color: var(--admin-primary); cursor: pointer; font-weight: 600; }
 .analytics-details summary:focus-visible { outline: 3px solid var(--admin-primary); outline-offset: 3px; }
