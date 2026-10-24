@@ -4,7 +4,7 @@ import { Bell } from 'lucide-react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import Admin from './Admin'
-import { trackAnalytics, useAnalyticsConsent } from './analytics/Analytics'
+import { setAnalyticsIdentity, trackAnalytics, useAnalyticsConsent } from './analytics/Analytics'
 import { ProductReviews } from './ProductReviews'
 import { ChatWidget } from './ChatWidget'
 import ReferenceHome from './design/Home'
@@ -97,6 +97,7 @@ function StoreProvider({ children }) {
   }, [preview, previewFocus])
   const [products, setProducts] = useState([]), [collections, setCollections] = useState([])
   const [cart, setCart] = useState({ items: [], totalAmount: 0 }), [user, setUser] = useState(null)
+  const updateUser = useCallback(next => { setAnalyticsIdentity(next); setUser(next) }, [])
   const [support, setSupport] = useState(contact)
   const [catalogLoading, setCatalogLoading] = useState(true), [toast, setToast] = useState('')
   const [authLoading, setAuthLoading] = useState(true)
@@ -117,13 +118,13 @@ function StoreProvider({ children }) {
       try { current = await api.me() } catch {
         const guestCart = await hydrateGuestCart(api.product)
         if (!active) return
-        setUser(null)
+        updateUser(null)
         setCart(guestCart)
         setAuthLoading(false)
         return
       }
       if (!active) return
-      setUser(current)
+      updateUser(current)
       if (current.role !== 'USER') setCart(emptyCart())
       else {
         try {
@@ -150,7 +151,7 @@ function StoreProvider({ children }) {
     }
     initializeCart()
     return () => { active = false }
-  }, [notify])
+  }, [notify, updateUser])
   useEffect(() => { if (!preview) localStorage.setItem('dxLang', lang); document.documentElement.lang = lang; window.dispatchEvent(new Event('dx-language-change')) }, [lang, preview])
   useEffect(() => {
     const root = document.documentElement
@@ -182,7 +183,7 @@ function StoreProvider({ children }) {
     const checkoutIntent = sessionStorage.getItem(CHECKOUT_INTENT_KEY) === 'checkout'
     try {
       const result = await api.googleLogin(credential)
-      setUser(result.user)
+      updateUser(result.user)
       if (result.user.role !== 'USER') {
         sessionStorage.removeItem(CHECKOUT_INTENT_KEY)
         setCart(emptyCart())
@@ -256,7 +257,7 @@ function StoreProvider({ children }) {
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
     try { setCart(await api.addCart(productId)); trackAdd(); notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.')); return true } catch (error) { notify(error.message); return false }
   }
-  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser, support, setSupport, homepage: homepageQuery.data, presentation, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
+  return <Store.Provider value={{ products, collections, cart, setCart, user, setUser: updateUser, support, setSupport, homepage: homepageQuery.data, presentation, catalogLoading, authLoading, googleReady, startGoogleLogin, prepareCheckoutLogin, add, notify, lang, setLang }}>{children}{toast && <div className="toast show">{toast}</div>}</Store.Provider>
 }
 const useStore = () => useContext(Store)
 

@@ -29,6 +29,40 @@ test('first visit asks for analytics consent before loading the Google tag', asy
   await expect.poll(() => page.evaluate(() => Array.from(window.dataLayer.at(-1))[2].analytics_storage)).toBe('denied')
 })
 
+test('signed-in admin is excluded from analytics on storefront pages', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dx.analytics.consent.v1', 'granted'))
+  await mockApi(page, 'ADMIN')
+  await page.route('**/api/v1/me', async route => { await new Promise(resolve => setTimeout(resolve, 250)); await route.fallback() })
+  const collects = []
+  page.on('request', request => { if (request.url().includes('/g/collect')) collects.push(request.url()) })
+  await page.goto('/')
+  await expect(page.locator('a[href="/admin"]').first()).toHaveText('Admin User')
+  await page.goto('/products/10')
+  await expect(page.getByRole('heading', { name: /Binh gom do/i })).toBeVisible()
+  await expect(page.locator('script[src*="googletagmanager.com/gtag/js"]')).toHaveCount(0)
+  expect(await page.evaluate(() => window.dataLayer?.filter(command => command[0] === 'event').length || 0)).toBe(0)
+  expect(collects).toHaveLength(0)
+})
+
+test('becoming an admin stops analytics already started as a guest', async ({ page, isMobile }) => {
+  await page.addInitScript(() => localStorage.setItem('dx.analytics.consent.v1', 'granted'))
+  await mockGoogleIdentity(page)
+  await mockApi(page, null)
+  await page.route('https://www.googletagmanager.com/gtag/js?*', route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }))
+  await page.route('**/api/v1/auth/google', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { user: { id: 1, fullName: 'Admin User', email: 'admin@example.com', role: 'ADMIN' } } }) }))
+  await page.goto('/')
+  await expect.poll(() => page.evaluate(() => window.dataLayer?.filter(command => command[0] === 'event' && command[1] === 'page_view').length || 0)).toBe(1)
+  if (isMobile) await page.getByRole('button', { name: 'Mở menu' }).click()
+  await page.locator('header').getByRole('button', { name: 'Đăng nhập' }).first().click()
+  await page.evaluate(() => window.__googleCredentialCallback({ credential: 'admin-google-credential' }))
+  await expect(page).toHaveURL(/\/admin$/)
+  await expect.poll(() => page.evaluate(() => Array.from(window.dataLayer.at(-1))[2].analytics_storage)).toBe('denied')
+  await page.locator('.admin-brand').click()
+  await expect(page).toHaveURL('/')
+  expect(await page.evaluate(() => window.dataLayer.filter(command => command[0] === 'event').length)).toBe(1)
+  await expect(page.getByRole('button', { name: 'Cài đặt quyền riêng tư' })).toHaveCount(0)
+})
+
 test('draft preview uses the real storefront with separate light and dark settings', async ({ page }) => {
   await mockApi(page, 'ADMIN')
   await page.goto('/?presentationPreview=1&mode=dark&lang=vi')
