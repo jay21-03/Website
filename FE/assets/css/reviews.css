@@ -76,3 +76,17 @@
   .analytics-consent-actions { margin-top: 16px; }
   .analytics-consent-actions button { flex: 1; }
 }
+
+/* Keep the contact buttons in one stack at every viewport scale. */
+.floating-chat .chat-widget { position: relative; right: auto; bottom: auto; z-index: auto; }
+.floating-chat .chat-toggle { display: grid; width: 48px; height: 48px; }
+.floating-chat .chat-box { right: 58px; bottom: -58px; width: min(380px, calc(100vw - 88px)); height: min(450px, calc(100dvh - 150px)); }
+.chat-box .chat-message.admin { background: transparent; color: var(--foreground); margin-right: 0; }
+.chat-box .chat-message.customer { margin-left: 0; }
+.chat-box .chat-message span { width: fit-content; }
+@media (max-width: 640px) {
+  .floating-chat .chat-toggle { width: 44px; height: 44px; }
+  .floating-chat .chat-box { right: 54px; bottom: -54px; height: min(420px, calc(100dvh - 220px)); }
+}
+.admin-chat-notifications { padding: 8px 20px; }
+.admin-chat-notifications .notification-popover { left: 0; right: auto; }

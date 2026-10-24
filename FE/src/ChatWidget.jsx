@@ -20,7 +20,7 @@ export function ChatWidget({ lang = 'vi', presentation, iconUrl, user }) {
   const chatColor = /^#[0-9a-fA-F]{6}$/.test(savedColor || '') ? savedColor : '#0877e8'
   const identity = user?.role === 'USER' ? `user:${user.id}` : user?.role === 'ADMIN' ? `admin:${user.id}` : 'guest'
   const chatKey = ['chat-session', identity]
-  const chat = useQuery({ queryKey: chatKey, queryFn: api.chatSession, enabled: open && user?.role !== 'ADMIN', refetchInterval: 5000, refetchIntervalInBackground: false, retry: 1 })
+  const chat = useQuery({ queryKey: chatKey, queryFn: api.chatSession, enabled: open && user?.role !== 'ADMIN', refetchInterval: 2000, refetchIntervalInBackground: false, retry: 1 })
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [chat.data?.messages?.length, open])
 
@@ -31,6 +31,7 @@ export function ChatWidget({ lang = 'vi', presentation, iconUrl, user }) {
     setError('')
     try {
       const thread = await api.chatSend({ body: body.trim(), guestName: name || undefined, guestEmail: email || undefined })
+      await client.cancelQueries({ queryKey: chatKey })
       client.setQueryData(chatKey, thread)
       setBody('')
     } catch (cause) {

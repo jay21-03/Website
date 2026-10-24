@@ -1,23 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { api } from './api'
 
 export default function AdminChatWorkspace({ lang = 'vi' }) {
+  const [searchParams] = useSearchParams()
+  const conversationId = searchParams.get('conversation')
   const [status, setStatus] = useState('OPEN')
   const [page, setPage] = useState(0)
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected] = useState(() => /^\d+$/.test(conversationId || '') ? Number(conversationId) : null)
   const [body, setBody] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const endRef = useRef(null)
   const client = useQueryClient()
   const copy = (vi, en) => lang === 'en' ? en : vi
-  const list = useQuery({ queryKey: ['admin-chat', status, page], queryFn: () => api.adminChatConversations(status, page), refetchInterval: 5000, refetchIntervalInBackground: false, retry: 1 })
-  const thread = useQuery({ queryKey: ['admin-chat-thread', selected], queryFn: () => api.adminChatThread(selected), enabled: selected != null, refetchInterval: selected != null ? 5000 : false, refetchIntervalInBackground: false, retry: 1 })
+  const list = useQuery({ queryKey: ['admin-chat', status, page], queryFn: () => api.adminChatConversations(status, page), refetchInterval: 2000, refetchIntervalInBackground: false, retry: 1 })
+  const thread = useQuery({ queryKey: ['admin-chat-thread', selected], queryFn: () => api.adminChatThread(selected), enabled: selected != null, refetchInterval: selected != null ? 2000 : false, refetchIntervalInBackground: false, retry: 1 })
   const conversation = thread.data?.conversation
   const label = item => item.guestName || (item.userId ? `${copy('Khách hàng', 'Customer')} #${item.userId}` : copy('Khách vãng lai', 'Guest'))
   const time = value => new Date(value).toLocaleString(lang === 'en' ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
+  useEffect(() => { if (/^\d+$/.test(conversationId || '')) setSelected(Number(conversationId)) }, [conversationId])
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [selected, thread.data?.messages?.length])
 
   async function act(action) {
@@ -25,6 +29,7 @@ export default function AdminChatWorkspace({ lang = 'vi' }) {
     setError('')
     try {
       const result = await action()
+      await client.cancelQueries({ queryKey: ['admin-chat-thread', selected] })
       client.setQueryData(['admin-chat-thread', selected], result)
       await client.invalidateQueries({ queryKey: ['admin-chat'] })
       return true

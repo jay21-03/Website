@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { formatNotification } from './notifications'
 
+it('formats new customer chat for Vietnamese admins', () => {
+  expect(formatNotification({ type: 'CHAT_MESSAGE', title: 'New chat message', message: 'A customer sent a chat message.' }, 'vi'))
+    .toEqual({ title: 'Tin nhắn khách hàng mới', message: 'Khách hàng vừa gửi tin nhắn chat.' })
+})
+
 const code = 'ORD-20261022-00000042'
 
 describe('admin notification translations', () => {

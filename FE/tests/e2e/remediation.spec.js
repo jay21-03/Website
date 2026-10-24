@@ -894,6 +894,16 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
       name: 'Chat with the store'
     }).click()
 
+    await page.setViewportSize({ width: 390, height: 500 })
+    const chatBox = await page.locator('.chat-box').boundingBox()
+    const chatToggle = await page.locator('.chat-toggle').boundingBox()
+    expect(chatBox.y).toBeGreaterThanOrEqual(0)
+    expect(chatToggle.y).toBeGreaterThanOrEqual(0)
+    for (const link of await page.locator('.floating-chat a').all()) {
+      const button = await link.boundingBox()
+      expect(chatToggle.y + chatToggle.height).toBeLessThanOrEqual(button.y)
+    }
+
     await page.getByRole('textbox', {
       name: 'Your name'
     }).fill('QA Guest')
@@ -916,7 +926,7 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
     expect(conversations).toHaveLength(1)
 
     // Admin reads the guest's message
-    await admin.goto('/admin?section=chat')
+    await admin.goto(`/admin?section=chat&conversation=${conversations[0].id}`)
 
     await expect(admin.locator('.chat-admin-item'))
       .toContainText('QA Guest')
@@ -924,6 +934,11 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
     await admin.locator('.chat-admin-item').first().click()
 
     await expect(admin.locator('.chat-admin-messages'))
+      .toContainText('I need help with a pottery order.')
+
+    await page.getByRole('button', { name: 'Close chat' }).click()
+    await page.getByRole('button', { name: 'Chat with the store' }).click()
+    await expect(page.locator('.chat-messages'))
       .toContainText('I need help with a pottery order.')
 
     // Admin replies; guest receives the reply by polling

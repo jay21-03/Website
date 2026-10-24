@@ -10,6 +10,8 @@ export function formatNotification(item, lang = 'vi') {
   const quantity = Number.isInteger(count) && count >= 0 ? count : null
 
   switch (item.type) {
+    case 'CHAT_MESSAGE':
+      return { title: 'Tin nhắn khách hàng mới', message: 'Khách hàng vừa gửi tin nhắn chat.' }
     case 'NEW_ORDER':
       return { title: 'Đơn hàng mới', message: orderCode ? `Đơn hàng ${orderCode} vừa được tạo.` : 'Có đơn hàng mới.' }
     case 'PAYMENT_SUCCESS':
