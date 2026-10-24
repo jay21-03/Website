@@ -1,5 +1,34 @@
 import { expect, test } from '@playwright/test'
 
+test('first visit asks for analytics consent before loading the Google tag', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dxLang', 'en'))
+  await mockApi(page, null)
+  await page.route('https://www.googletagmanager.com/gtag/js?*', route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }))
+
+  await page.goto('/')
+  const consent = page.getByRole('dialog', { name: 'Your privacy matters' })
+  await expect(consent).toBeVisible()
+  await expect(page.locator('script[src*="googletagmanager.com/gtag/js"]')).toHaveCount(0)
+
+  await consent.getByRole('button', { name: 'Decline' }).click()
+  await expect(consent).toBeHidden()
+  await page.reload()
+  await expect(consent).toBeHidden()
+  await expect(page.locator('script[src*="googletagmanager.com/gtag/js"]')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Privacy settings' }).click()
+  await consent.getByRole('button', { name: 'Allow analytics' }).click()
+  await expect(page.locator('script[src*="googletagmanager.com/gtag/js"]')).toHaveCount(1)
+  await expect.poll(() => page.evaluate(() => window.dataLayer.filter(command => command[0] === 'event' && command[1] === 'page_view').length)).toBe(1)
+  const commands = await page.evaluate(() => window.dataLayer.map(command => ({ isArguments: Object.prototype.toString.call(command) === '[object Arguments]', values: Array.from(command) })))
+  expect(commands.every(command => command.isArguments)).toBe(true)
+  expect(commands[0].values).toEqual(['consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' }])
+  expect(commands.some(command => command.values[0] === 'config' && command.values[1] === 'G-BB79X513WR')).toBe(true)
+  await page.getByRole('button', { name: 'Privacy settings' }).click()
+  await consent.getByRole('button', { name: 'Decline' }).click()
+  await expect.poll(() => page.evaluate(() => Array.from(window.dataLayer.at(-1))[2].analytics_storage)).toBe('denied')
+})
+
 test('draft preview uses the real storefront with separate light and dark settings', async ({ page }) => {
   await mockApi(page, 'ADMIN')
   await page.goto('/?presentationPreview=1&mode=dark&lang=vi')
@@ -775,7 +804,7 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
 
   // Xử lý Analytics Consent trước khi mở Chat
   const analyticsConsent = page.getByRole('dialog', {
-    name: 'Analytics preferences'
+    name: 'Your privacy matters'
   })
 
   await expect(analyticsConsent).toBeVisible()
