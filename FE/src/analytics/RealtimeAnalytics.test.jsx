@@ -14,7 +14,7 @@ test('polls once per 30 seconds only while visible and stops on unmount', async 
   const view = render(<RealtimeAnalytics lang="en" />)
   await act(async () => { await Promise.resolve() })
   expect(api.adminAnalyticsRealtime).toHaveBeenCalledTimes(1)
-  expect(screen.getByText('Active users')).toBeTruthy()
+  expect(screen.getByText('Active visitors')).toBeTruthy()
   await act(async () => { await vi.advanceTimersByTimeAsync(30000) })
   expect(api.adminAnalyticsRealtime).toHaveBeenCalledTimes(2)
   Object.defineProperty(document, 'hidden', { configurable: true, value: true })

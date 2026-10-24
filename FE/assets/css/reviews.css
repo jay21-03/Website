@@ -40,9 +40,11 @@
   }
 }
 
+.admin-analytics { font-size: 14px; line-height: 1.5; }
 .admin-analytics .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.admin-analytics .analytics-two-pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .analytics-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.analytics-tabs button { min-height: 40px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--admin-surface); color: var(--admin-primary); cursor: pointer; }
+.analytics-tabs button { min-height: 42px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--admin-surface); color: var(--admin-primary); cursor: pointer; font: 600 13px 'Be Vietnam Pro', sans-serif; }
 .analytics-tabs button[aria-current="page"] { background: var(--admin-primary); border-color: var(--admin-primary); color: #fff; }
 .analytics-tabs button:focus-visible { outline: 3px solid var(--admin-primary); outline-offset: 2px; }
 .analytics-facts { display: grid; gap: 0; margin: 0; }
@@ -51,6 +53,27 @@
 .analytics-facts dd { margin: 0; font-weight: 700; text-align: right; }
 .admin-analytics .metric { min-width: 0; }
 .admin-analytics .metric strong { overflow-wrap: anywhere; }
+.admin-analytics .metric span { color: var(--foreground); font-size: 13px; font-weight: 600; line-height: 1.45; }
+.admin-analytics .metric strong { font: 700 28px 'Be Vietnam Pro', sans-serif; line-height: 1.25; }
+.admin-analytics .metric small { display: block; margin-top: 10px; color: var(--foreground); font-size: 12px; line-height: 1.55; }
+.analytics-toolbar .panel-head { align-items: start; }
+.analytics-toolbar .panel-head h2 { text-wrap: balance; }
+.analytics-toolbar .panel-head p { max-width: 70ch; margin: 7px 0 0; line-height: 1.55; }
+.analytics-toolbar .panel-head button { flex: none; min-height: 40px; }
+.analytics-toolbar > small { display: block; margin-top: 10px; }
+.analytics-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 600; }
+.analytics-range select { min-height: 40px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--admin-surface); color: var(--foreground); font: inherit; }
+.analytics-range select:focus-visible, .analytics-toolbar button:focus-visible { outline: 3px solid var(--admin-primary); outline-offset: 2px; }
+.analytics-caption { max-width: 70ch; margin: 6px 0 16px; color: var(--foreground); font-size: 13px; line-height: 1.6; }
+.analytics-details { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--border); padding: 16px 0; margin-bottom: 20px; }
+.analytics-details summary { width: fit-content; color: var(--admin-primary); cursor: pointer; font-weight: 600; }
+.analytics-details summary:focus-visible { outline: 3px solid var(--admin-primary); outline-offset: 3px; }
+.analytics-details > :not(summary) { margin-top: 16px; }
+.analytics-details > .analytics-reports { margin-top: 20px; }
+.analytics-comparison .analytics-facts { max-width: 640px; }
+.admin-analytics .admin-state strong { display: block; margin-bottom: 8px; }
+.admin-analytics .admin-state p { max-width: 60ch; margin: 0 auto; line-height: 1.6; }
+.analytics-tabs button:hover { border-color: var(--admin-primary); }
 .analytics-reports { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 20px; align-items: start; }
 .analytics-reports .admin-panel { min-width: 0; }
 .analytics-reports .panel-head span { color: var(--muted-foreground); font-size: 12px; }
