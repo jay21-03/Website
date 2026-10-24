@@ -124,6 +124,64 @@ class Phase5BackendIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from notification_recipients", Long.class)).isEqualTo(2);
     }
 
+    @Test void businessAnalyticsUsesReadOnlyPeriodQueriesAndProtectsAdminRoute() throws Exception {
+        User admin = user("business-admin", UserRole.ADMIN, UserStatus.ACTIVE);
+        User buyer = user("business-buyer", UserRole.USER, UserStatus.ACTIVE);
+        var report = reporting.businessAnalytics(30);
+        assertThat(report).containsEntry("source", "POSTGRESQL");
+        var metrics = (java.util.Map<?, ?>) report.get("metrics");
+        assertThat(metrics.get("completed_paid_revenue")).isEqualTo("0");
+        assertThat(metrics.get("average_order_value")).isNull();
+        Instant now = clock.now();
+        jdbc.update("""
+                INSERT INTO workshop_bookings(full_name,email,phone,preferred_at,participants,status,created_at,updated_at)
+                VALUES ('Test guest','test@example.invalid','0000000000',?,3,'NEW',?,?)
+                """, java.sql.Timestamp.from(now.plusSeconds(3600)), java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
+        var interest = (java.util.List<?>) reporting.businessAnalytics(30).get("workshopInterest");
+        assertThat(interest).hasSize(1);
+        assertThat(((java.util.Map<?, ?>) interest.getFirst()).get("bookings")).isEqualTo(1L);
+        assertThat(((java.util.Map<?, ?>) interest.getFirst()).get("participants")).isEqualTo(3L);
+        long paidOrder = jdbc.queryForObject("SELECT nextval('app_global_id_seq')", Long.class);
+        long cancelledOrder = jdbc.queryForObject("SELECT nextval('app_global_id_seq')", Long.class);
+        for (long id : List.of(paidOrder, cancelledOrder)) {
+            jdbc.update("""
+                    INSERT INTO orders(id,order_code,user_id,receiver_name,phone,email,address,total_amount,status,completed_at,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    """, id, "BI-" + id, buyer.getId(), "Test", "0123456789", "test@example.test", "Test address",
+                    120000L, id == paidOrder ? "COMPLETED" : "CANCELLED",
+                    id == paidOrder ? java.sql.Timestamp.from(now) : null,
+                    java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
+        }
+        jdbc.update("""
+                INSERT INTO payments(order_id,provider,status,amount,created_at,expires_at,paid_at,updated_at)
+                VALUES (?,'PAYOS','PAID',120000,?,?,?,?)
+                """, paidOrder, java.sql.Timestamp.from(now), java.sql.Timestamp.from(now.plusSeconds(3600)),
+                java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
+        jdbc.update("""
+                INSERT INTO payments(order_id,provider,status,amount,created_at,expires_at,updated_at)
+                VALUES (?,'PAYOS','EXPIRED',120000,?,?,?)
+                """, cancelledOrder, java.sql.Timestamp.from(now), java.sql.Timestamp.from(now.plusSeconds(3600)), java.sql.Timestamp.from(now));
+        jdbc.update("""
+                INSERT INTO order_items(order_id,product_id,product_name_vi,product_name_en,base_price,selling_price,quantity,total_price)
+                VALUES (?,999,'Gốm thử','Test pottery',60000,60000,2,120000)
+                """, paidOrder);
+        metrics = (java.util.Map<?, ?>) reporting.businessAnalytics(30).get("metrics");
+        assertThat(metrics.get("orders_created")).isEqualTo(2L);
+        assertThat(metrics.get("completed_paid_revenue")).isEqualTo("120000");
+        assertThat(metrics.get("average_order_value")).isEqualTo("120000");
+        assertThat(metrics.get("sold_quantity")).isEqualTo(2L);
+        mockMvc.perform(get("/api/v1/admin/analytics/business").with(authentication(auth(buyer))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/admin/analytics/realtime").with(authentication(auth(buyer))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/admin/analytics/historical?days=30").with(authentication(auth(buyer))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/admin/analytics/business"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/admin/analytics/business?days=30").with(authentication(auth(admin))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.metrics.completed_paid_revenue").value("120000"));
+    }
+
     @Test void concurrentDedupCreatesOneNotificationAndOneRecipientSnapshot() throws Exception {
         user("dedup-admin", UserRole.ADMIN, UserStatus.ACTIVE);
         CountDownLatch ready = new CountDownLatch(2), start = new CountDownLatch(1);

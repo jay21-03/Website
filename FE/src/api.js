@@ -142,6 +142,9 @@ export const api = {
   readMyNotification: id => request(`/me/notifications/${id}/read`, { method: 'PATCH' }),
   adminDashboard: () => request('/admin/dashboard'),
   adminAnalytics: () => request('/admin/analytics'),
+  adminAnalyticsRealtime: signal => request('/admin/analytics/realtime', { signal }),
+  adminAnalyticsHistorical: (days, signal) => request(`/admin/analytics/historical?days=${days}`, { signal }),
+  adminAnalyticsBusiness: (days, signal) => request(`/admin/analytics/business?days=${days}`, { signal }),
   adminHome: () => request('/admin/home'),
   updateHomeSlogan: values => request('/admin/home/slogan', { method: 'PUT', body: JSON.stringify(values) }),
   uploadHomeMedia: (slot, file) => {

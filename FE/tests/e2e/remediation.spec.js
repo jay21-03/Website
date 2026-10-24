@@ -246,6 +246,9 @@ async function mockApi(page, role = 'USER') {
     if (path === '/workshops') return ok([{ id: 5, title: 'Lam gom co ban', description: 'Trai nghiem tao hinh gom.', priceAmount: 150000, durationMinutes: 120, maxParticipants: 10, imageUrl: '/assets/images/tour.jpg', status: 'ACTIVE' }])
     if (path === '/workshop/bookings') return created({ id: 9, status: 'NEW' })
     if (path === '/admin/dashboard') return ok({ totalOrders: 1, totalRevenue: 200000, newOrders: 1, lowStockProducts: [], recentOrders: [order], bestSellingProducts: [{ productNameVi: product.nameVi, totalQuantity: 2, totalRevenue: 400000 }] })
+    if (path === '/admin/analytics/realtime') return ok({ source: 'GA4_REALTIME', status: 'LIVE', fetchedAt: '2026-10-24T07:00:00Z', metrics: { activeUsers: 1, pageViews: 4, eventCount: 7, keyEvents: 0 }, trend: [{ minute: 20, activeUsers: 1 }, { minute: 0, activeUsers: 1 }], pages: [{ title: 'Trang chủ', pageViews: 4 }], events: [{ name: 'page_view', eventCount: 4 }], devices: [{ name: 'desktop', activeUsers: 1 }], countries: [{ name: 'Vietnam', activeUsers: 1 }] })
+    if (path === '/admin/analytics/historical') return ok({ source: 'GA4_CORE', status: 'READY', activeUsers: 2, sessions: 3, pageViews: 5, scrolledUsers: 1, engagementSeconds: 30, bounceRate: 0.25, daily: [{ date: '2026-10-23', activeUsers: 2, sessions: 3 }], channels: [{ channel: 'Direct', sessions: 3 }], sourceMedium: [{ name: '(direct) / (none)', sessions: 3 }], devices: [{ name: 'desktop', activeUsers: 2 }], browsers: [{ name: 'Edge', activeUsers: 2 }], operatingSystems: [{ name: 'Windows', activeUsers: 2 }], countries: [{ name: 'Vietnam', activeUsers: 2 }], pageTitles: [{ title: 'Trang chủ', pageViews: 5 }], pagePaths: [{ path: '/', pageViews: 5 }], events: [{ name: 'page_view', eventCount: 5 }] })
+    if (path === '/admin/analytics/business') return ok({ source: 'POSTGRESQL', status: 'READY', metrics: { orders_created: 2, completed_paid_orders: 1, completed_paid_revenue: '120000', average_order_value: '120000', sold_quantity: 2, new_customer_accounts: 1, orders_new: 0, orders_confirmed: 0, orders_completed_created: 1, orders_completed: 1, orders_cancelled: 1, payments_pending: 0, payments_paid: 1, payments_failed: 0, payments_expired: 1, payments_refunded: 0, workshop_bookings: 1, workshop_participants: 2, reviews_total: 0, reviews_visible: 0, visible_average_rating: null, low_stock_products: 1, out_of_stock_products: 0, open_chats: 1, notification_count: 2, notification_recipient_count: 3, notification_read_count: 1, paid_payment_amount: '120000', refunded_payment_amount: '0' }, revenueTrend: [{ periodStart: '2026-10-24', revenue: 120000 }], bestSelling: [{ productId: 10, productNameVi: 'Bình gốm', productNameEn: 'Pottery vase', soldQuantity: 2 }] })
     if (path === '/admin/home' && route.request().method() === 'GET') return ok(adminHome)
     if (path === '/admin/home/slogan' && route.request().method() === 'PUT') {
       adminHome = { ...adminHome, ...(await route.request().postDataJSON()) }
@@ -310,6 +313,50 @@ async function mockApi(page, role = 'USER') {
     return ok(null)
   })
 }
+
+test('admin analytics tabs show verified source data without mobile overflow', async ({ page, isMobile }) => {
+  const pageErrors = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  await mockApi(page, 'ADMIN')
+  await page.goto('/admin?section=analytics')
+  const tabs = page.locator('.analytics-tabs')
+  await expect(tabs.getByRole('button', { name: /Tổng quan|Overview/ })).toBeVisible()
+  await expect(page.getByText(/Xu hướng truy cập|Visit trend/)).toBeVisible()
+  await tabs.getByRole('button', { name: /Trực tiếp|Realtime/ }).click()
+  await expect(page.getByText(/Trong 30 phút qua|Last 30 minutes/)).toBeVisible()
+  await expect(page.getByText('page_view')).toBeVisible()
+  await tabs.getByRole('button', { name: /Đối tượng|Audience/ }).click()
+  await expect(page.getByText(/Nguồn \/ phương tiện|Source \/ medium/)).toBeVisible()
+  await tabs.getByRole('button', { name: /Hành vi|Behavior/ }).click()
+  await expect(page.getByText(/Đường dẫn trang|Page paths/)).toBeVisible()
+  await tabs.getByRole('button', { name: /Kinh doanh|Business/ }).click()
+  await expect(page.getByText(/120\.000 ₫|120,000 ₫/).first()).toBeVisible()
+  if (isMobile) expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+  await page.setViewportSize({ width: 768, height: 1024 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+  expect(pageErrors).toEqual([])
+})
+
+test('paid purchase event is not resent when the same customer opens a new tab', async ({ page }) => {
+  await page.context().addInitScript(() => localStorage.setItem('dx.analytics.consent.v1', 'granted'))
+  const paid = { ...order, paymentStatus: 'PAID' }
+  for (const tab of [page, await page.context().newPage()]) {
+    await mockApi(tab)
+    await tab.route('**/api/v1/me/orders/77', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: paid }) }))
+    await tab.route('**/www.googletagmanager.com/gtag/js**', route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }))
+    await tab.goto('/orders/77')
+    await expect(tab.getByText(/Đã thanh toán|Paid/).first()).toBeVisible()
+    if (tab === page) {
+      await expect.poll(() => tab.evaluate(() => (window.dataLayer || []).filter(command => command[0] === 'event' && command[1] === 'purchase').length)).toBe(1)
+      const payload = await tab.evaluate(() => Array.from((window.dataLayer || []).find(command => command[0] === 'event' && command[1] === 'purchase'))[2])
+      expect(payload).toMatchObject({ transaction_id: String(order.orderCode), currency: 'VND', value: order.paymentAmount ?? order.totalAmount })
+      expect(payload.items).toHaveLength(order.items.length)
+    } else {
+      await expect.poll(() => tab.evaluate(() => localStorage.getItem('dx.analytics.purchase.77'))).toBe('1')
+      expect(await tab.evaluate(() => (window.dataLayer || []).filter(command => command[0] === 'event' && command[1] === 'purchase').length)).toBe(0)
+    }
+  }
+})
 
 async function mockGoogleIdentity(page) {
   await page.addInitScript(() => {
