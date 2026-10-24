@@ -1,0 +1,29 @@
+# Analytics and Business Production deployment — 2026-10-24
+
+## Git and artifact
+
+- Branch: `feature/aws-deployment-iac`; starting HEAD `3109cd08227a6aa1e49c153d50dfb2f7f48c3c09`.
+- Deployed source commit: `c9342caab6f0a58771c6ce6cedd04f9aebc043e2`, pushed to `origin/feature/aws-deployment-iac` before deployment.
+- Backend Java 21 JAR SHA256: `c0f67d2a2ebe94313de5ea320bd4fc30fc797d09f51e12d7f8c1d8785037e48b` (87,315,322 bytes). Private staging object `s3://bautruc-single-node-prod-databasebackupbucket-skhu8wte81zs/release-staging/20261024/c9342ca-app.jar`; EC2 staged JAR `/opt/bautruc/releases/c9342ca-analytics-v2/app.jar`. Checksum matched locally, after download and after atomic activation.
+- Frontend from the same commit, with existing `VITE_GOOGLE_CLIENT_ID` and `VITE_GA4_MEASUREMENT_ID=G-BB79X513WR` verified in the compiled bundle. JS `assets/index-DhoNO3r0.js` SHA256 `d5d8f252234460540413f2b5367859efd44b781b497d4b665480e8dd198ec6d4`; CSS `assets/index-Bb-AdL4U.css` SHA256 `2b3c149e3ed9dd6e5237914382bd63404f39e674a199b162fe69b1035a5de930`; `index.html` SHA256 `806c1cceaecd36b32128021f0c4504b9ed78e2d35042b9a89cc3b9ba13a0aa15`.
+
+## Preflight and backup
+
+- AWS account `007561532703`, region `ap-southeast-1`, EC2 `i-00f29cdbd6345f237` matched expected targets. Backend was active and health HTTP 200; JAR before update SHA256 `f6a3a4e2fccc0e6171547b14503ff92e3b8d91dd388e72840df407355c6e669b`. PostgreSQL accepted connections, Flyway V22 successful with zero failed rows, disk had about 25 GB free. Process retained `GOOGLE_APPLICATION_CREDENTIALS`, `GA4_PROPERTY_ID`, and `GOOGLE_CLIENT_ID` variable names.
+- JAR backup: `/opt/bautruc/backups/app-before-20261024T112000Z-analytics-v2.jar`, SHA256 equal to the previous Production JAR.
+- PostgreSQL custom-format backup: `/opt/bautruc/backups/postgres-before-20261024T112000Z-analytics-v2.dump`, SHA256 `18f432a0c805ef1f66427b7545a1aaa26e7b9bdf6af8f2f00a45781398972912`. `pg_restore --list` passed. Private S3 copy: `s3://bautruc-single-node-prod-databasebackupbucket-skhu8wte81zs/database-backups/postgres-before-20261024T112000Z-analytics-v2.dump`, AES256; S3 readback SHA matched. Restore into a temporary database succeeded, Flyway V22 and representative orders/chat tables were readable; temporary database was removed. No migration was added in this release.
+- Frontend backup: `s3://bautruc-single-node-prod-databasebackupbucket-skhu8wte81zs/frontend-backups/20261024T113000Z-analytics-v2/`, 47 objects and 5,521,632 bytes, AES256. Manifest: `s3://bautruc-single-node-prod-databasebackupbucket-skhu8wte81zs/frontend-backups/20261024T113000Z-analytics-v2-sha256.json`. Backup `index.html` readback SHA256 `3a26d5eee1dfe9a1ba58ee8eb261ce00a65c99462bb73ba3cb87667f2dd61e7b`.
+
+## Activation and verification
+
+- Backend JAR was copied to a `.next` path, checksum verified, atomically renamed to `/opt/bautruc/current/app.jar`, and `bautruc-backend.service` restarted. Main PID changed from `1968256` to `1992005`; service active, health 200, Flyway V22 success, zero failed migrations. Product API HTTP 200; unauthenticated Analytics and Chat Admin routes HTTP 401. No new systemd error-level entries in the smoke window.
+- An exact read-only execution of the new Business aggregate SQL against Production completed successfully: one created/cancelled order, zero completed paid revenue, five customer accounts, six notifications, 30 recipients, one open Chat and one low-stock product. No customer identity or message content was read.
+- Backend process WIF directly read GA4 Property/stream, Metadata, `runRealtimeReport`, `runReport` and Core compatibility with HTTP 200 after restart. Realtime returned zero rows in the later 30-minute window; historical Core still returned zero rows. Earlier observed Realtime rows and the user's ordinary-browser GA4 verification are recorded in the Metric Catalog. The protected HTTP endpoint's authenticated payload still requires a genuine Admin session for final acceptance.
+- Frontend bucket `bautruc-edge-prod-frontendbucket-sra3i9amgip6`: assets uploaded first, JS/CSS readback SHA256 matched, prior `index.html` was unchanged before uploading the new index last. The image-only distribution `E2FWZZAMFCXF30` was untouched. CloudFront distribution `E3QMIX18974EDK` invalidation `IDB1CHTGR4AR93B9Q05L9GZSE2` completed. Website HTML, JS and CSS returned HTTP 200 with byte-for-byte SHA256 matches to the new build.
+- Browser smoke on Production Chromium at 1440 px and 390 px: home and product pages HTTP 200, three floating buttons did not overlap, Chat popup fit viewport, zero page errors, no GA4 collect before consent. This smoke made no purchase, booking, or Chat message.
+
+## Rollback and acceptance boundary
+
+The release added no database migration and kept Flyway V22, so the prior JAR remains schema-compatible. If a Backend regression is confirmed, first preserve logs and current database state, then atomically replace the JAR with the verified backup and restart/check health. Frontend rollback can restore the saved 47-object backup to the live bucket with assets first and its saved `index.html` last, followed by CloudFront invalidation; do not delete current assets or restore the database automatically. Database backup is for controlled recovery only and must not overwrite new orders/messages without incident analysis.
+
+The deployment is live and infrastructure smoke passed. Authenticated Admin API payloads, all five tabs in an actual Admin session, and live Business values shown in that session remain to be confirmed; see [ANALYTICS_PRODUCTION_ACCEPTANCE.md](ANALYTICS_PRODUCTION_ACCEPTANCE.md).
