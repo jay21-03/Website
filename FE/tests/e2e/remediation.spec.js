@@ -927,6 +927,24 @@ test('QA-02B guest and admin exchange messages, close and reopen chat', async ({
 
     // Admin reads the guest's message
     await admin.goto(`/admin?section=chat&conversation=${conversations[0].id}`)
+    const bell = admin.locator('.admin-topbar-actions .notification-bell')
+    await expect(bell).toBeVisible()
+    await bell.getByRole('button', { name: 'Notifications' }).click()
+    const popover = bell.locator('.notification-popover')
+    await expect(popover).toBeVisible()
+    const popupColors = await popover.evaluate(element => ({
+      foreground: getComputedStyle(element).color,
+      surface: getComputedStyle(element).backgroundColor,
+      shellForeground: getComputedStyle(element.closest('.admin-shell')).color
+    }))
+    expect(popupColors.foreground).toBe(popupColors.shellForeground)
+    expect(popupColors.surface).not.toBe('rgba(0, 0, 0, 0)')
+    const popupBounds = await popover.boundingBox()
+    const adminViewport = admin.viewportSize()
+    expect(popupBounds.x).toBeGreaterThanOrEqual(0)
+    expect(popupBounds.x + popupBounds.width).toBeLessThanOrEqual(adminViewport.width)
+    await bell.getByRole('button', { name: 'Notifications' }).click()
+    await expect(popover).toBeHidden()
 
     await expect(admin.locator('.chat-admin-item'))
       .toContainText('QA Guest')

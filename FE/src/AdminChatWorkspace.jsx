@@ -45,8 +45,8 @@ export default function AdminChatWorkspace({ lang = 'vi' }) {
     if (await act(() => api.adminChatReply(selected, { body: body.trim() }))) setBody('')
   }
 
-  return <main className="admin-main chat-admin">
-    <header className="chat-admin-heading"><div><h1>{copy('Hội thoại khách hàng', 'Customer conversations')}</h1><p>{copy('Chọn hội thoại để xem và trả lời.', 'Select a conversation to read and reply.')}</p></div><span>{list.data?.totalElements ?? 0} {status === 'OPEN' ? copy('đang mở', 'open') : copy('đã đóng', 'closed')}</span></header>
+  return <div className="chat-admin">
+    <header className="chat-admin-heading"><p>{copy('Chọn hội thoại để xem và trả lời.', 'Select a conversation to read and reply.')}</p><span>{list.data?.totalElements ?? 0} {status === 'OPEN' ? copy('đang mở', 'open') : copy('đã đóng', 'closed')}</span></header>
     <div className="chat-admin-workspace">
       <section className="chat-admin-list" aria-label={copy('Danh sách hội thoại', 'Conversation list')}>
         <div className="chat-admin-tabs" role="group" aria-label={copy('Trạng thái hội thoại', 'Conversation status')}>
@@ -65,5 +65,5 @@ export default function AdminChatWorkspace({ lang = 'vi' }) {
         </>}
       </section>
     </div>
-  </main>
+  </div>
 }

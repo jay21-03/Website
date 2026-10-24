@@ -146,6 +146,9 @@
   .admin-shell .admin-main { padding-inline: 16px; }
 }
 @media (max-width: 560px) {
+  .admin-shell .admin-topbar { position: relative; }
+  .admin-shell .admin-topbar-actions .notification-bell { position: static; }
+  .admin-shell .admin-topbar-actions .notification-popover { top: 100%; right: 0; max-height: 60vh; overflow-y: auto; }
   .admin-shell .admin-panel { padding: 18px; }
   .admin-shell .admin-search :is(input, select) { flex: 1 1 140px; width: 100%; }
   .admin-shell .admin-fieldset { grid-template-columns: 1fr; padding: 12px; }
