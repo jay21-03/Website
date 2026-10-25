@@ -14,11 +14,22 @@ const names = {
   mobile: ['Điện thoại', 'Phone'],
   tablet: ['Máy tính bảng', 'Tablet'],
   page_view: ['Xem trang', 'Page view'],
+  first_visit: ['Lần đầu ghé thăm', 'First visit'],
+  session_start: ['Bắt đầu lượt truy cập', 'Visit started'],
+  user_engagement: ['Tương tác với trang', 'Page engagement'],
   view_item: ['Xem sản phẩm', 'Product view'],
   add_to_cart: ['Thêm vào giỏ', 'Added to cart'],
   begin_checkout: ['Bắt đầu thanh toán', 'Checkout started'],
   purchase: ['Đơn đã thanh toán', 'Paid purchase'],
-  scroll: ['Cuộn gần hết trang', 'Scrolled near the end']
+  scroll: ['Cuộn gần hết trang', 'Scrolled near the end'],
+  click: ['Nhấp liên kết ngoài', 'External link click'],
+  search: ['Tìm kiếm trên trang', 'Site search'],
+  file_download: ['Tải tệp', 'File download'],
+  form_start: ['Bắt đầu điền biểu mẫu', 'Form started'],
+  form_submit: ['Gửi biểu mẫu', 'Form submitted'],
+  video_start: ['Bắt đầu xem video', 'Video started'],
+  video_progress: ['Xem tiếp video', 'Video progress'],
+  video_complete: ['Xem hết video', 'Video completed']
 }
 
 export const friendlyName = (value, lang) => names[value]?.[lang === 'en' ? 1 : 0] || value
