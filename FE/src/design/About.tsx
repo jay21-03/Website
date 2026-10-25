@@ -5,24 +5,38 @@ import { Reveal } from "./Reveal";
 import { PageHero, SectionTitle } from "./PageHero";
 import { useI18n } from "./i18n";
 import { aboutDefaults } from "./aboutDefaults";
+import { fontPresets } from "./sitePresentation";
+import { useTheme } from "./theme";
 import portrait from "./assets/portrait.jpg";
 
-type TextPair = { vi: string; en: string };
+type TextPair = { vi: string; en: string; font?: string; color?: string; darkFont?: string; darkColor?: string };
 type TimelineEntry = { year: string; text: TextPair };
 type ValueEntry = { title: TextPair; description: TextPair };
 
 export default function About() {
   const { t } = useI18n();
+  const { theme } = useTheme();
+  const preview = new URLSearchParams(window.location.search).get("presentationPreview") === "1";
+  const [draft, setDraft] = useState<{ content: typeof aboutDefaults; media: { heroUrl?: string | null; portraitUrl?: string | null; certificateUrl?: string | null } } | null>(null);
+
+  useEffect(() => {
+    if (!preview) return;
+    const receive = (event: MessageEvent) => {
+      if (event.origin === window.location.origin && event.source === window.parent && event.data?.type === "site-presentation-preview") setDraft(event.data.about || null);
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, [preview]);
 
   const query = useQuery({
     queryKey: ["about"],
     queryFn: api.about
   });
 
-  const content = query.data?.content || aboutDefaults;
-  const heroUrl = query.data?.heroUrl || null;
-  const portraitUrl = query.data?.portraitUrl || portrait;
-  const certificateUrl = query.data?.certificateUrl || null;
+  const content = draft?.content || query.data?.content || aboutDefaults;
+  const heroUrl = (draft ? draft.media.heroUrl : query.data?.heroUrl) || null;
+  const portraitUrl = (draft ? draft.media.portraitUrl : query.data?.portraitUrl) || portrait;
+  const certificateUrl = (draft ? draft.media.certificateUrl : query.data?.certificateUrl) || null;
 
   const [certificateError, setCertificateError] = useState(false);
 
@@ -32,12 +46,17 @@ export default function About() {
 
   const text = (value: { vi: string; en: string }) =>
     t(value.vi, value.en);
+  const styled = (value: TextPair, key: string) => {
+    const font = theme === "dark" ? value.darkFont || value.font : value.font;
+    const color = theme === "dark" ? value.darkColor || value.color : value.color;
+    return <span data-preview-target={`about:${key}`} style={{ ...(font ? { fontFamily: `"${fontPresets[font as keyof typeof fontPresets]?.heading || fontPresets.heritage.heading}", "Be Vietnam Pro", sans-serif` } : {}), ...(color ? { color } : {}) }}>{text(value)}</span>;
+  };
 
   return (
     <main>
       <PageHero
-        title={text(content.heroTitle)}
-        subtitle={text(content.heroSubtitle)}
+        title={styled(content.heroTitle, "heroTitle")}
+        subtitle={styled(content.heroSubtitle, "heroSubtitle")}
         seed="about-hero"
         imageUrl={heroUrl}
       />
@@ -66,8 +85,8 @@ export default function About() {
           </Reveal>
 
           <Reveal delay={100}>
-            <SectionTitle eyebrow={text(content.storyEyebrow)}>
-              {text(content.storyTitle)}
+            <SectionTitle eyebrow={styled(content.storyEyebrow, "storyEyebrow")}>
+              {styled(content.storyTitle, "storyTitle")}
             </SectionTitle>
 
             <ol className="border-l border-primary/35">
@@ -81,7 +100,7 @@ export default function About() {
                     {item.year}
                   </p>
                   <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                    {text(item.text)}
+                    {styled(item.text, `timeline.${index}.text`)}
                   </p>
                 </li>
               ))}
@@ -93,8 +112,8 @@ export default function About() {
       <section className="bg-card">
         <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
           <Reveal>
-            <SectionTitle eyebrow={text(content.valuesEyebrow)}>
-              {text(content.valuesTitle)}
+            <SectionTitle eyebrow={styled(content.valuesEyebrow, "valuesEyebrow")}>
+              {styled(content.valuesTitle, "valuesTitle")}
             </SectionTitle>
           </Reveal>
 
@@ -103,10 +122,10 @@ export default function About() {
               <Reveal key={index} delay={index * 70}>
                 <div className="border-t border-primary/40 pt-5">
                   <h3 className="font-display text-xl">
-                    {text(item.title)}
+                    {styled(item.title, `values.${index}.title`)}
                   </h3>
                   <p className="mt-2.5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                    {text(item.description)}
+                    {styled(item.description, `values.${index}.description`)}
                   </p>
                 </div>
               </Reveal>
@@ -119,10 +138,10 @@ export default function About() {
         <div className="mx-auto max-w-3xl px-5 py-24 text-center lg:px-8">
           <Reveal>
             <h2 className="font-display text-3xl leading-snug sm:text-4xl">
-              {text(content.heritageTitle)}
+              {styled(content.heritageTitle, "heritageTitle")}
             </h2>
             <p className="mt-6 whitespace-pre-line text-base leading-loose opacity-95">
-              {text(content.heritageBody)}
+              {styled(content.heritageBody, "heritageBody")}
             </p>
           </Reveal>
         </div>
@@ -131,12 +150,12 @@ export default function About() {
       <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
         <div className="grid items-center gap-14 lg:grid-cols-2">
           <Reveal>
-            <SectionTitle eyebrow={text(content.certificateEyebrow)}>
-              {text(content.certificateTitle)}
+            <SectionTitle eyebrow={styled(content.certificateEyebrow, "certificateEyebrow")}>
+              {styled(content.certificateTitle, "certificateTitle")}
             </SectionTitle>
 
             <p className="whitespace-pre-line text-base leading-loose text-muted-foreground">
-              {text(content.certificateBody)}
+              {styled(content.certificateBody, "certificateBody")}
             </p>
           </Reveal>
 
@@ -154,20 +173,20 @@ export default function About() {
             ) : (
               <div className="rounded-sm border border-primary/40 bg-paper p-10 text-center">
                 <p className="text-[11px] uppercase tracking-[0.28em] text-primary">
-                  {text(content.certificateTitle)}
+                  {styled(content.certificateTitle, "certificateTitle")}
                 </p>
                 <p className="mt-5 font-display text-2xl">
-                  {text(content.certificateMockTitle)}
+                  {styled(content.certificateMockTitle, "certificateMockTitle")}
                 </p>
                 <div className="mx-auto my-6 h-px w-24 bg-primary/50" />
                 <p className="text-sm text-muted-foreground">
-                  {text(content.certificateMockPiece)}
+                  {styled(content.certificateMockPiece, "certificateMockPiece")}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {text(content.certificateMockMaker)}
+                  {styled(content.certificateMockMaker, "certificateMockMaker")}
                 </p>
                 <p className="mt-8 font-serif text-lg italic text-wood">
-                  {text(content.certificateMockSlogan)}
+                  {styled(content.certificateMockSlogan, "certificateMockSlogan")}
                 </p>
                 <small className="mt-5 block text-muted-foreground">
                   {t(

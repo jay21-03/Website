@@ -211,11 +211,15 @@
 .admin-about-entry > button {
   justify-self: start;
 }
+.presentation-editor .admin-about-entry { background: var(--admin-surface); border-color: var(--border); border-radius: 8px; }
+.presentation-editor .admin-about-entry [data-preview-target] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.presentation-editor .admin-about-entry [data-preview-target] > b { grid-column: 1 / -1; }
 
 @media (max-width: 640px) {
   .admin-about-entry {
     padding: 14px;
   }
+  .presentation-editor .admin-about-entry [data-preview-target] { grid-template-columns: 1fr; }
 }
 .storefront-admin-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .storefront-admin-tabs button{border:1px solid var(--border);border-radius:6px;background:var(--admin-surface);color:var(--foreground);padding:10px 16px;font:600 13px 'Be Vietnam Pro',sans-serif;cursor:pointer}

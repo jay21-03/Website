@@ -80,13 +80,13 @@ export default function Admin({ user, notify, onLogout, lang = 'vi' }) {
   const requestedSection = searchParams.get('section') || 'dashboard'
   const section = ['homepage', 'about'].includes(requestedSection) ? 'presentation' : adminSectionIds.has(requestedSection) ? requestedSection : 'dashboard'
   const requestedView = searchParams.get('view')
-  const appearanceView = ['home', 'about', 'site'].includes(requestedView) ? requestedView : requestedSection === 'homepage' ? 'home' : requestedSection === 'about' ? 'about' : 'site'
+  const appearanceView = ['home', 'site'].includes(requestedView) ? requestedView : requestedSection === 'homepage' ? 'home' : 'site'
   useEffect(() => {
     if (requestedSection !== section) setSearchParams(section === 'presentation' ? { section, view: appearanceView } : { section }, { replace: true })
   }, [requestedSection, section, appearanceView, setSearchParams])
   if (!user) return <Navigate to="/" replace />
   if (user.role !== 'ADMIN') return <Navigate to="/" replace />
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams(id === 'presentation' ? { section: id, view: 'home' } : { section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'chat' && <AdminChatWorkspace lang={lang} />}{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'analytics' && <AdminAnalytics lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'presentation' && <><nav className="storefront-admin-tabs" aria-label={adminText(lang, 'Quản lý giao diện', 'Storefront management')}>{[['home', 'Trang chủ', 'Homepage'], ['site', 'Toàn website', 'Site-wide']].map(([id, vi, en]) => <button key={id} type="button" aria-current={(id === 'site' ? appearanceView !== 'home' : appearanceView === 'home') ? 'page' : undefined} onClick={() => setSearchParams({ section: 'presentation', view: id })}>{adminText(lang, vi, en)}</button>)}</nav>{appearanceView !== 'home' && <nav className="presentation-page-nav" aria-label={adminText(lang, 'Nội dung toàn website', 'Site-wide content')}>{[['site', 'Giao diện các trang', 'Page appearance'], ['about', 'Về chúng tôi', 'About us']].map(([id, vi, en]) => <button key={id} type="button" aria-current={appearanceView === id ? 'page' : undefined} onClick={() => setSearchParams({ section: 'presentation', view: id })}>{adminText(lang, vi, en)}</button>)}</nav>}{appearanceView === 'home' && <HomepageContent notify={notify} lang={lang} />}{appearanceView === 'about' && <AboutContent notify={notify} lang={lang} />}{appearanceView === 'site' && <SitePresentationEditor notify={notify} lang={lang} />}</>}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'reviews' && (<AdminProductReviews lang={lang} notify={notify} />)}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams(id === 'presentation' ? { section: id, view: 'home' } : { section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'chat' && <AdminChatWorkspace lang={lang} />}{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'analytics' && <AdminAnalytics lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'presentation' && <><nav className="storefront-admin-tabs" aria-label={adminText(lang, 'Quản lý giao diện', 'Storefront management')}>{[['home', 'Trang chủ', 'Homepage'], ['site', 'Toàn website', 'Site-wide']].map(([id, vi, en]) => <button key={id} type="button" aria-current={appearanceView === id ? 'page' : undefined} onClick={() => setSearchParams({ section: 'presentation', view: id })}>{adminText(lang, vi, en)}</button>)}</nav>{appearanceView === 'home' && <HomepageContent notify={notify} lang={lang} />}{appearanceView === 'site' && <SitePresentationEditor notify={notify} lang={lang} initialPage={requestedView === 'about' || requestedSection === 'about' ? 'about' : 'brand'} />}</>}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'reviews' && (<AdminProductReviews lang={lang} notify={notify} />)}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
 }
 
 function LoadState({ loading, error, empty, children, lang = 'vi' }) {
@@ -965,9 +965,10 @@ const aboutMediaConfig = [
   }
 ]
 
-function SitePresentationEditor({ notify, lang = 'vi' }) {
+function SitePresentationEditor({ notify, lang = 'vi', initialPage = 'brand' }) {
   const queryClient = useQueryClient()
-  const [page, setPage] = useState('brand')
+  const [page, setPage] = useState(initialPage)
+  const [aboutPreview, setAboutPreview] = useState(null)
   const previewProduct = useQuery({ queryKey: ['presentation-preview-product'], queryFn: () => api.products({ page: 0, size: 1 }), enabled: page === 'detail' })
   const contentPage = page === 'detail' ? 'catalog' : page
   const [settings, setSettings] = useState(null)
@@ -984,7 +985,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   const [previewScale, setPreviewScale] = useState(0.3)
   const [previewFocus, setPreviewFocus] = useState(null)
   const focusSequence = useRef(0)
-  const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['catalog', 'Sản phẩm', 'Products'], ['detail', 'Chi tiết sản phẩm', 'Product detail'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
+  const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['about', 'Về chúng tôi', 'About us'], ['catalog', 'Sản phẩm', 'Products'], ['detail', 'Chi tiết sản phẩm', 'Product detail'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
   const mediaSlots = [
     { slot: 'SITE_LOGO', vi: 'Logo thương hiệu', en: 'Brand logo', fallbackIcon: true, shape: 'wide' },
     { slot: 'CATALOG_HERO', vi: 'Ảnh bìa Sản phẩm', en: 'Products hero image', fallback: pVase, shape: 'wide' },
@@ -1056,7 +1057,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   }, [loading, error])
   useEffect(() => {
     const send = () => {
-      if (settings) previewFrame.current?.contentWindow?.postMessage({ type: 'site-presentation-preview', content: settings, media, focus: previewFocus }, window.location.origin)
+      if (settings) previewFrame.current?.contentWindow?.postMessage({ type: 'site-presentation-preview', content: settings, media, about: aboutPreview, focus: previewFocus }, window.location.origin)
     }
     const ready = event => {
       if (event.origin === window.location.origin && event.source === previewFrame.current?.contentWindow && event.data?.type === 'site-presentation-preview-ready') send()
@@ -1064,7 +1065,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     window.addEventListener('message', ready)
     send()
     return () => window.removeEventListener('message', ready)
-  }, [settings, media, previewMode, previewLang, page, previewFocus])
+  }, [settings, media, aboutPreview, previewMode, previewLang, page, previewFocus])
 
   function focusPreview(target) {
     setPreviewFocus({ target, seq: ++focusSequence.current })
@@ -1133,8 +1134,8 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   const active = previewMode === 'dark' ? settings.dark : settings
   const pageName = adminText(lang, ...pages.find(([key]) => key === page).slice(1))
   const paletteColors = colorNames.map(key => active.colors[key])
-  const fields = page === 'detail' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => !['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : page === 'catalog' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => ['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : presentationFields[page]
-  const previewRoute = page === 'detail' ? (previewProduct.data?.content?.[0]?.id ? `/products/${previewProduct.data.content[0].id}` : '') : { brand: '/', home: '/', catalog: '/san-pham', cart: '/cart', checkout: '/checkout', orders: '/orders', workshop: '/trai-nghiem', support: '/lien-he', faq: '/faq', policy: '/policy' }[page]
+  const fields = page === 'detail' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => !['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : page === 'catalog' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => ['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : presentationFields[page] || {}
+  const previewRoute = page === 'detail' ? (previewProduct.data?.content?.[0]?.id ? `/products/${previewProduct.data.content[0].id}` : '') : { brand: '/', home: '/', about: '/ve-chung-toi', catalog: '/san-pham', cart: '/cart', checkout: '/checkout', orders: '/orders', workshop: '/trai-nghiem', support: '/lien-he', faq: '/faq', policy: '/policy' }[page]
   const previewUrl = previewRoute ? `${previewRoute}?${new URLSearchParams({ presentationPreview: '1', mode: previewMode, lang: previewLang })}` : ''
   const dirty = savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings)
 
@@ -1146,6 +1147,8 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     <div className="presentation-editor">
     <h3>{adminText(lang, 'Chữ trên trang', 'Page text')} · {pageName}</h3>
     {page === 'detail' && <p className="admin-help">{adminText(lang, 'Tên, giá và mô tả riêng của từng sản phẩm được sửa trong mục Sản phẩm.', 'Edit each product’s name, price and description in Products.')}</p>}
+    {page === 'about' && <AboutContent notify={notify} lang={lang} previewMode={previewMode} defaultColor={paletteColors[3]} draft={aboutPreview} onDraft={setAboutPreview} onFocusPreview={focusPreview} />}
+    {page !== 'about' && <>
     <form className="admin-form" onSubmit={save} onFocusCapture={event => { const target = event.target.closest('[data-preview-target]')?.dataset.previewTarget; if (target) focusPreview(target) }}>
       {Object.entries(fields).map(([key, fallback]) => <fieldset className="admin-fieldset wide" data-preview-target={`field:${contentPage}.${key}`} key={key}>
         <legend>{({ trust1Icon: 'Biểu tượng thủ công', trust2Icon: 'Biểu tượng nguyên liệu', trust3Icon: 'Biểu tượng di sản', chatIcon: 'Biểu tượng Chat', zaloLabel: 'Ký hiệu Zalo', facebookLabel: 'Ký hiệu Facebook' })[key] || adminText(lang, fallback.vi, fallback.en).slice(0, 90)}</legend>
@@ -1170,6 +1173,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     </form>
     {iconSlots[page] && <section className="presentation-images"><h3>{adminText(lang, 'Biểu tượng tải lên', 'Uploaded icons')}</h3><p>{adminText(lang, 'Ảnh tải lên sẽ thay biểu tượng đã chọn ở trên. Đặt lại để dùng biểu tượng có sẵn. Dùng PNG/WebP nền trong suốt để hiển thị đẹp trên cả hai chế độ; màu ảnh không đổi theo bộ chọn màu.', 'An uploaded image replaces the selected icon above. Reset it to use the built-in icon. A transparent PNG/WebP works best in both modes; the color picker does not recolor uploaded images.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{iconSlots[page].map(([slot, vi, en]) => <HomepageMediaCard key={slot} config={{ slot, vi, en, shape: 'icon', emptyVi: 'Đang dùng biểu tượng có sẵn', emptyEn: 'Using the built-in icon' }} media={{ url: media[slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} compact />)}</div></section>}
     {['brand', 'catalog', 'workshop', 'support', 'checkout'].includes(page) && <section className="presentation-images"><h3>{adminText(lang, 'Hình ảnh trên trang', 'Page images')}</h3><p>{adminText(lang, 'Ảnh được lưu ngay khi tải lên. Chế độ tối dùng ảnh riêng nếu bạn tải lên; nếu để trống sẽ dùng ảnh chế độ sáng.', 'Images save when uploaded. Dark mode uses its own image if uploaded; otherwise it uses the light mode image.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{mediaSlots.filter(item => item.slot.startsWith(page === 'brand' ? 'SITE_' : page.toUpperCase())).map(config => { const slot = previewMode === 'dark' ? `${config.slot}_DARK` : config.slot; return <HomepageMediaCard key={slot} config={{ ...config, slot, fallback: previewMode === 'dark' ? media[config.slot] || config.fallback : config.fallback }} media={{ url: media[slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} /> })}</div></section>}
+    </>}
     </div>
     <aside className="presentation-preview" aria-label={adminText(lang, 'Xem trước', 'Preview')}>
       <div className="presentation-preview-head"><div><strong>{adminText(lang, 'Xem trước trang khách', 'Live storefront preview')}</strong><small>{adminText(lang, 'Đang xem', 'Viewing')}: {pageName} · {previewMode === 'dark' ? adminText(lang, 'Tối', 'Dark') : adminText(lang, 'Sáng', 'Light')}</small></div><div className="presentation-language" role="group" aria-label={adminText(lang, 'Ngôn ngữ xem trước', 'Preview language')}><button type="button" aria-pressed={previewLang === 'vi'} onClick={() => setPreviewLang('vi')}>Việt</button><button type="button" aria-pressed={previewLang === 'en'} onClick={() => setPreviewLang('en')}>English</button></div></div>
@@ -1202,6 +1206,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
                 type: 'site-presentation-preview',
                 content: settings,
                 media,
+                about: aboutPreview,
                 focus: previewFocus
               },
               window.location.origin
@@ -1215,10 +1220,12 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   </Panel>
 }
 
-function AboutContent({ notify, lang = 'vi' }) {
+function AboutContent({ notify, lang = 'vi', previewMode, defaultColor, draft, onDraft, onFocusPreview }) {
   const queryClient = useQueryClient()
+  const initialDraft = useRef(draft)
   const [about, setAbout] = useState(null)
   const [content, setContent] = useState(null)
+  const [savedContent, setSavedContent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [busySlot, setBusySlot] = useState('')
@@ -1231,9 +1238,8 @@ function AboutContent({ notify, lang = 'vi' }) {
     try {
       const response = await api.adminAbout()
       setAbout(response)
-      setContent(
-        structuredClone(response.content || aboutDefaults)
-      )
+      setContent(structuredClone(initialDraft.current?.content || response.content || aboutDefaults))
+      setSavedContent(response.content || aboutDefaults)
     } catch (exception) {
       setError(exception.message)
     } finally {
@@ -1244,6 +1250,10 @@ function AboutContent({ notify, lang = 'vi' }) {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (content && about) onDraft({ content, media: { heroUrl: about.heroUrl, portraitUrl: about.portraitUrl, certificateUrl: about.certificateUrl } })
+  }, [content, about, onDraft])
 
   function updatePair(key, language, value) {
     setContent(current => ({
@@ -1324,6 +1334,7 @@ function AboutContent({ notify, lang = 'vi' }) {
       const response = await api.updateAboutContent(content)
       setAbout(response)
       setContent(structuredClone(response.content))
+      setSavedContent(response.content)
       await queryClient.invalidateQueries({
         queryKey: ['about']
       })
@@ -1406,6 +1417,18 @@ function AboutContent({ notify, lang = 'vi' }) {
     }
   }
 
+  function pairControls(value, onChange) {
+    const fontKey = previewMode === 'dark' ? 'darkFont' : 'font'
+    const colorKey = previewMode === 'dark' ? 'darkColor' : 'color'
+    const font = value[fontKey] || (previewMode === 'dark' ? value.font : '') || ''
+    const color = value[colorKey] || (previewMode === 'dark' ? value.color : '') || defaultColor
+    return <>
+      {['vi', 'en'].map(language => <label key={language}>{language === 'vi' ? adminText(lang, 'Tiếng Việt', 'Vietnamese') : adminText(lang, 'Tiếng Anh', 'English')}<textarea value={value[language]} maxLength={5000} required onChange={event => onChange(language, event.target.value)} /></label>)}
+      <label>{adminText(lang, 'Phông chữ riêng', 'Individual font')}<select value={font} onChange={event => onChange(fontKey, event.target.value || null)}><option value="">{adminText(lang, 'Theo phông chung', 'Use store font')}</option>{Object.entries(fontPresets).map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}</select></label>
+      <label>{adminText(lang, 'Màu chữ riêng', 'Individual text color')}<span className="presentation-color-control"><input type="color" value={color} onChange={event => onChange(colorKey, event.target.value)} /><button type="button" disabled={!value[colorKey]} onClick={() => onChange(colorKey, null)}>{adminText(lang, 'Dùng màu chung', 'Use store color')}</button></span></label>
+    </>
+  }
+
   if (loading) {
     return <div className="admin-state">
       {adminText(lang, 'Đang tải...', 'Loading...')}
@@ -1423,61 +1446,16 @@ function AboutContent({ notify, lang = 'vi' }) {
 
   if (!content) return null
 
+  const dirty = JSON.stringify(content) !== JSON.stringify(savedContent)
   return (
-    <Panel
-      title={adminText(
-        lang,
-        'Quản lý trang Về chúng tôi',
-        'Manage About page'
-      )}
-    >
-      <form className="admin-form" onSubmit={save}>
-        <h3 className="wide">
-          {adminText(lang, 'Nội dung song ngữ', 'Bilingual content')}
-        </h3>
+    <>
+      <form className="admin-form" onSubmit={save} onFocusCapture={event => { const target = event.target.closest('[data-preview-target]')?.dataset.previewTarget; if (target) onFocusPreview(target) }}>
 
         {aboutTextFields.map(([key, vi, en]) => {
-          const longText =
-            key.endsWith('Body') ||
-            key === 'heroSubtitle'
-
           return (
-            <fieldset className="admin-fieldset wide" key={key}>
+            <fieldset className="admin-fieldset wide" data-preview-target={`about:${key}`} key={key}>
               <legend>{adminText(lang, vi, en)}</legend>
-
-              {['vi', 'en'].map(language => (
-                <label key={language}>
-                  {language.toUpperCase()}
-
-                  {longText ? (
-                    <textarea
-                      value={content[key][language]}
-                      maxLength={5000}
-                      required
-                      onChange={event =>
-                        updatePair(
-                          key,
-                          language,
-                          event.target.value
-                        )
-                      }
-                    />
-                  ) : (
-                    <input
-                      value={content[key][language]}
-                      maxLength={5000}
-                      required
-                      onChange={event =>
-                        updatePair(
-                          key,
-                          language,
-                          event.target.value
-                        )
-                      }
-                    />
-                  )}
-                </label>
-              ))}
+              {pairControls(content[key], (property, value) => updatePair(key, property, value))}
             </fieldset>
           )
         })}
@@ -1510,24 +1488,7 @@ function AboutContent({ notify, lang = 'vi' }) {
                 />
               </label>
 
-              {['vi', 'en'].map(language => (
-                <label key={language}>
-                  {language.toUpperCase()}
-                  <textarea
-                    value={entry.text[language]}
-                    required
-                    maxLength={5000}
-                    onChange={event =>
-                      updateEntry(
-                        'timeline',
-                        index,
-                        `text.${language}`,
-                        event.target.value
-                      )
-                    }
-                  />
-                </label>
-              ))}
+              <div data-preview-target={`about:timeline.${index}.text`}>{pairControls(entry.text, (property, value) => updateEntry('timeline', index, `text.${property}`, value))}</div>
 
               <button
                 type="button"
@@ -1563,28 +1524,9 @@ function AboutContent({ notify, lang = 'vi' }) {
                 ['title', 'Tiêu đề', 'Title'],
                 ['description', 'Mô tả', 'Description']
               ].map(([field, vi, en]) => (
-                <div key={field}>
+                <div key={field} data-preview-target={`about:values.${index}.${field}`}>
                   <b>{adminText(lang, vi, en)}</b>
-
-                  {['vi', 'en'].map(language => (
-                    <label key={language}>
-                      {language.toUpperCase()}
-
-                      <textarea
-                        value={entry[field][language]}
-                        maxLength={5000}
-                        required
-                        onChange={event =>
-                          updateEntry(
-                            'values',
-                            index,
-                            `${field}.${language}`,
-                            event.target.value
-                          )
-                        }
-                      />
-                    </label>
-                  ))}
+                  {pairControls(entry[field], (property, value) => updateEntry('values', index, `${field}.${property}`, value))}
                 </div>
               ))}
 
@@ -1607,21 +1549,10 @@ function AboutContent({ notify, lang = 'vi' }) {
           </button>
         </fieldset>
 
-        <button
-          className="admin-primary wide"
-          disabled={saving}
-        >
-          {saving
-            ? adminText(lang, 'Đang lưu...', 'Saving...')
-            : adminText(
-                lang,
-                'Lưu nội dung Về chúng tôi',
-                'Save About content'
-              )}
-        </button>
+        <div className="presentation-save wide"><span role="status">{dirty ? adminText(lang, 'Có thay đổi chưa lưu', 'Unsaved changes') : adminText(lang, 'Đã lưu nội dung', 'Content saved')}</span><button className="admin-primary" disabled={saving || !dirty}>{saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu thay đổi', 'Save changes')}</button></div>
       </form>
 
-      <section className="homepage-media-section">
+      <section className="presentation-images">
         <div className="homepage-media-section-head">
           <h3>
             {adminText(lang, 'Quản lý hình ảnh', 'Manage images')}
@@ -1645,7 +1576,7 @@ function AboutContent({ notify, lang = 'vi' }) {
           ))}
         </div>
       </section>
-    </Panel>
+    </>
   )
 }
 

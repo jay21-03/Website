@@ -27,7 +27,11 @@ public record AboutContentRequest(
 ) {
     public record TextPair(
             @NotBlank @Size(max = 5000) String vi,
-            @NotBlank @Size(max = 5000) String en
+            @NotBlank @Size(max = 5000) String en,
+            @Pattern(regexp = "heritage|vietnamese|editorial|commerce|minimal|modern") String font,
+            @Pattern(regexp = "#[0-9a-fA-F]{6}") String color,
+            @Pattern(regexp = "heritage|vietnamese|editorial|commerce|minimal|modern") String darkFont,
+            @Pattern(regexp = "#[0-9a-fA-F]{6}") String darkColor
     ) {}
 
     public record TimelineEntry(

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { aboutDefaults } from '../../src/design/aboutDefaults'
 
 test('first visit asks for analytics consent before loading the Google tag', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('dxLang', 'en'))
@@ -123,17 +124,52 @@ test('product detail copy is edited under site-wide appearance and previews the 
     body: JSON.stringify({ success: true, data: { content: null, media: {} } })
   }))
   await page.goto('/admin?section=presentation&view=site')
-  const siteTabs = page.getByRole('navigation', { name: 'Nội dung toàn website' })
-  await expect(siteTabs.getByRole('button', { name: 'Về chúng tôi' })).toBeVisible()
-  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Chi tiết sản phẩm' }).click()
+  const pageNav = page.getByRole('navigation', { name: 'Chọn trang' })
+  await expect(pageNav.getByRole('button', { name: 'Về chúng tôi' })).toBeVisible()
+  await pageNav.getByRole('button', { name: 'Chi tiết sản phẩm' }).click()
   const field = page.locator('[data-preview-target="field:catalog.relatedTitle"]')
   await field.getByRole('textbox', { name: 'Tiếng Việt' }).fill('Sản phẩm tương tự')
   const frame = page.frameLocator('iframe[title="Trang khách xem trước"]')
   await expect(frame.locator('[data-preview-target="field:catalog.relatedTitle"]')).toHaveText('Sản phẩm tương tự')
   await expect.poll(() => frame.locator('body').evaluate(() => window.location.pathname)).toBe('/products/10')
-  await siteTabs.getByRole('button', { name: 'Về chúng tôi' }).click()
-  await expect(page).toHaveURL(/view=about/)
+  await pageNav.getByRole('button', { name: 'Về chúng tôi' }).click()
+  await expect(pageNav.getByRole('button', { name: 'Về chúng tôi' })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('navigation', { name: 'Quản lý giao diện' }).getByRole('button', { name: 'Toàn website' })).toHaveAttribute('aria-current', 'page')
+})
+
+test('About is edited inside the shared appearance editor with a live bilingual draft', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  let aboutContent = structuredClone(aboutDefaults)
+  let saved = null
+  const respond = (route, content) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: content }) })
+  await page.route('**/api/v1/admin/site/presentation', route => respond(route, { content: null, media: {} }))
+  await page.route('**/api/v1/admin/about', async route => {
+    if (route.request().method() === 'PUT') saved = aboutContent = await route.request().postDataJSON()
+    return respond(route, { content: aboutContent, heroUrl: null, portraitUrl: null, certificateUrl: null })
+  })
+  await page.route('**/api/v1/about', route => respond(route, { content: aboutContent, heroUrl: null, portraitUrl: null, certificateUrl: null }))
+  await page.goto('/admin?section=presentation&view=site')
+  await expect(page.getByRole('navigation', { name: 'Nội dung toàn website' })).toHaveCount(0)
+  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Về chúng tôi' }).click()
+  const field = page.locator('.presentation-editor [data-preview-target="about:heroTitle"]')
+  await field.getByRole('textbox', { name: 'Tiếng Việt' }).fill('Câu chuyện Bàu Trúc')
+  await field.getByRole('combobox', { name: 'Phông chữ riêng' }).selectOption('editorial')
+  const frame = page.frameLocator('iframe[title="Trang khách xem trước"]')
+  await expect(frame.locator('[data-preview-target="about:heroTitle"]')).toHaveText('Câu chuyện Bàu Trúc')
+  await expect.poll(() => frame.locator('body').evaluate(() => location.pathname)).toBe('/ve-chung-toi')
+  const pageNav = page.getByRole('navigation', { name: 'Chọn trang' })
+  await pageNav.getByRole('button', { name: 'Thương hiệu' }).click()
+  await pageNav.getByRole('button', { name: 'Về chúng tôi' }).click()
+  await expect(field.getByRole('textbox', { name: 'Tiếng Việt' })).toHaveValue('Câu chuyện Bàu Trúc')
+  await page.getByRole('group', { name: 'Chọn chế độ để chỉnh sửa' }).getByRole('button', { name: 'Chỉnh chế độ tối' }).click()
+  await field.locator('input[type="color"]').fill('#f5e9db')
+  await expect(frame.locator('[data-preview-target="about:heroTitle"]')).toHaveCSS('color', 'rgb(245, 233, 219)')
+  await expect(frame.locator('[data-preview-target="about:heroTitle"]')).toHaveCSS('font-family', /Lora/)
+  await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
+  await expect.poll(() => saved?.heroTitle.vi).toBe('Câu chuyện Bàu Trúc')
+  expect(saved.heroTitle.font).toBe('editorial')
+  expect(saved.heroTitle.darkColor).toBe('#f5e9db')
+  expect(saved.timeline).toHaveLength(aboutDefaults.timeline.length)
 })
 
 test('product detail controls and tabs use readable theme colors in light and dark modes', async ({ page }) => {

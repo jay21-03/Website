@@ -158,6 +158,31 @@ WHERE slot LIKE 'ABOUT_%' OR slot IN ('CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_
     }
 
     @Test
+    void aboutTextAppearanceRoundTripsAndRejectsInvalidColor() throws Exception {
+        Cookie admin = access(user("appearance-editor", UserRole.ADMIN));
+        String styled = validContent().replace(
+                "\"en\":\"English title\"",
+                "\"en\":\"English title\",\"font\":\"editorial\",\"color\":\"#563820\",\"darkColor\":\"#F5E9DB\""
+        );
+
+        mvc.perform(put("/api/v1/admin/about")
+                        .cookie(admin).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON).content(styled))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/about"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.heroTitle.font").value("editorial"))
+                .andExpect(jsonPath("$.data.content.heroTitle.color").value("#563820"))
+                .andExpect(jsonPath("$.data.content.heroTitle.darkColor").value("#F5E9DB"));
+
+        mvc.perform(put("/api/v1/admin/about")
+                        .cookie(admin).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(styled.replace("#F5E9DB", "invalid")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void blankTranslationsAreRejected() throws Exception {
         Cookie admin = access(user("invalid", UserRole.ADMIN));
 
