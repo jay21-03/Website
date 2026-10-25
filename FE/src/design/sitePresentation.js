@@ -90,7 +90,16 @@ export const presentationFields = {
     addToCart: pair('Thêm vào giỏ hàng', 'Add to cart'),
     buyNow: pair('Mua ngay', 'Buy Now'),
     descriptionTab: pair('Mô tả sản phẩm', 'Description'),
-    specificationsTab: pair('Thông số kỹ thuật', 'Specifications')
+    specificationsTab: pair('Thông số kỹ thuật', 'Specifications'),
+    detailEyebrow: pair('Chi tiết sản phẩm', 'Product detail'),
+    backToProducts: pair('Quay lại danh sách', 'Back to products'),
+    detailFallback: pair('Sản phẩm gốm Bàu Trúc được tạo hình thủ công.', 'A handcrafted Bau Truc pottery piece.'),
+    descriptionFallback: pair('Mô tả chi tiết đang được cập nhật.', 'Detailed description is being updated.'),
+    sizeLabel: pair('Kích thước', 'Size'),
+    weightLabel: pair('Cân nặng', 'Weight'),
+    notAvailable: pair('Chưa cập nhật', 'Not available'),
+    relatedTitle: pair('Sản phẩm liên quan', 'Related products'),
+    relatedEmpty: pair('Chưa có sản phẩm liên quan.', 'No related products available.')
   },
   cart: {
     title: pair('Giỏ hàng của bạn', 'Your cart'),

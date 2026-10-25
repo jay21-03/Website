@@ -110,10 +110,47 @@ test('appearance preview follows the edited field on the selected storefront pag
   await expect(frame.locator('[data-preview-target="field:home.storyTitle"]')).toHaveText('Câu chuyện bản nháp')
   await expect(frame.locator('[data-preview-target="field:home.storyTitle"]')).toHaveAttribute('data-preview-active', 'true')
   await expect.poll(() => frame.locator('body').evaluate(() => window.scrollY)).toBeGreaterThan(0)
-  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Sản phẩm' }).click()
+  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Sản phẩm', exact: true }).click()
   await page.locator('[data-preview-target="field:catalog.title"]').getByRole('textbox', { name: 'Tiếng Việt' }).fill('Sản phẩm bản nháp')
   await expect(frame.locator('[data-preview-target="field:catalog.title"]')).toHaveText('Sản phẩm bản nháp')
   await expect.poll(() => frame.locator('body').evaluate(() => window.location.pathname)).toBe('/san-pham')
+})
+
+test('product detail copy is edited under site-wide appearance and previews the real product', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  await page.route('**/api/v1/admin/site/presentation', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ success: true, data: { content: null, media: {} } })
+  }))
+  await page.goto('/admin?section=presentation&view=site')
+  const siteTabs = page.getByRole('navigation', { name: 'Nội dung toàn website' })
+  await expect(siteTabs.getByRole('button', { name: 'Về chúng tôi' })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Chi tiết sản phẩm' }).click()
+  const field = page.locator('[data-preview-target="field:catalog.relatedTitle"]')
+  await field.getByRole('textbox', { name: 'Tiếng Việt' }).fill('Sản phẩm tương tự')
+  const frame = page.frameLocator('iframe[title="Trang khách xem trước"]')
+  await expect(frame.locator('[data-preview-target="field:catalog.relatedTitle"]')).toHaveText('Sản phẩm tương tự')
+  await expect.poll(() => frame.locator('body').evaluate(() => window.location.pathname)).toBe('/products/10')
+  await siteTabs.getByRole('button', { name: 'Về chúng tôi' }).click()
+  await expect(page).toHaveURL(/view=about/)
+  await expect(page.getByRole('navigation', { name: 'Quản lý giao diện' }).getByRole('button', { name: 'Toàn website' })).toHaveAttribute('aria-current', 'page')
+})
+
+test('product detail controls and tabs use readable theme colors in light and dark modes', async ({ page }) => {
+  await mockApi(page)
+  for (const mode of ['light', 'dark']) {
+    await page.goto(`/products/10?presentationPreview=1&mode=${mode}&lang=vi`)
+    await expect(page.getByRole('heading', { name: 'Binh gom do' })).toBeVisible()
+    if (mode === 'dark') await page.evaluate(() => window.postMessage({ type: 'site-presentation-preview', content: { colorPreset: 'clay', dark: { colorPreset: 'night', colors: { background: '#1D1713', card: '#30251E', primary: '#D18B5A', text: '#F5E9DB', secondary: '#AE8A72', accent: '#E2B976' } } }, media: {} }, window.location.origin))
+    await expect.poll(() => page.locator('.product-detail-tabs button:not(.active)').evaluate(node => getComputedStyle(node).color !== getComputedStyle(document.querySelector('.product-detail-panel')).backgroundColor)).toBe(true)
+    const colors = await page.evaluate(() => ({
+      background: getComputedStyle(document.querySelector('.product-detail-panel')).backgroundColor,
+      text: getComputedStyle(document.querySelector('.product-detail-panel')).color,
+      zoom: getComputedStyle(document.querySelector('.gallery-controls span')).color
+    }))
+    expect(colors.text).not.toBe(colors.background)
+    expect(colors.zoom).not.toBe(colors.background)
+  }
 })
 
 const product = {

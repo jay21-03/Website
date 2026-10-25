@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import AdminChatWorkspace from './AdminChatWorkspace'
@@ -86,7 +86,7 @@ export default function Admin({ user, notify, onLogout, lang = 'vi' }) {
   }, [requestedSection, section, appearanceView, setSearchParams])
   if (!user) return <Navigate to="/" replace />
   if (user.role !== 'ADMIN') return <Navigate to="/" replace />
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams(id === 'presentation' ? { section: id, view: 'home' } : { section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'chat' && <AdminChatWorkspace lang={lang} />}{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'analytics' && <AdminAnalytics lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'presentation' && <><nav className="storefront-admin-tabs" aria-label={adminText(lang, 'Quản lý giao diện', 'Storefront management')}>{[['home', 'Trang chủ', 'Homepage'], ['about', 'Về chúng tôi', 'About us'], ['site', 'Toàn website', 'Site-wide']].map(([id, vi, en]) => <button key={id} type="button" aria-current={appearanceView === id ? 'page' : undefined} onClick={() => setSearchParams({ section: 'presentation', view: id })}>{adminText(lang, vi, en)}</button>)}</nav>{appearanceView === 'home' && <HomepageContent notify={notify} lang={lang} />}{appearanceView === 'about' && <AboutContent notify={notify} lang={lang} />}{appearanceView === 'site' && <SitePresentationEditor notify={notify} lang={lang} />}</>}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'reviews' && (<AdminProductReviews lang={lang} notify={notify} />)}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link className="admin-brand" to="/">Đàng Xem<small>ADMIN CONSOLE</small></Link><nav>{adminSections.map(([id, labelVi, labelEn]) => <button type="button" className={section === id ? 'active' : ''} onClick={() => setSearchParams(id === 'presentation' ? { section: id, view: 'home' } : { section: id })} key={id}>{adminText(lang, labelVi, labelEn)}</button>)}</nav><div className="admin-profile"><b>{user.fullName}</b><small>{user.email}</small><button type="button" onClick={onLogout}>{adminText(lang, 'Đăng xuất', 'Sign out')}</button></div></aside><main className="admin-main"><header className="admin-topbar"><div><span>{adminText(lang, 'QUẢN TRỊ CỬA HÀNG', 'STORE ADMIN')}</span><h1>{adminSectionTitle(lang, section)}</h1></div><div className="admin-topbar-actions"><NotificationBell notify={notify} onOpenList={() => setSearchParams({ section: 'notifications' })} lang={lang} /><button type="button" onClick={() => navigate(-1)}>{adminText(lang, 'Lùi', 'Back')}</button><Link to="/">{adminText(lang, 'Xem cửa hàng', 'View store')}</Link></div></header>{section === 'chat' && <AdminChatWorkspace lang={lang} />}{section === 'dashboard' && <Dashboard lang={lang} />}{section === 'analytics' && <AdminAnalytics lang={lang} />}{section === 'products' && <Products notify={notify} lang={lang} />}{section === 'collections' && <Collections notify={notify} lang={lang} />}{section === 'presentation' && <><nav className="storefront-admin-tabs" aria-label={adminText(lang, 'Quản lý giao diện', 'Storefront management')}>{[['home', 'Trang chủ', 'Homepage'], ['site', 'Toàn website', 'Site-wide']].map(([id, vi, en]) => <button key={id} type="button" aria-current={(id === 'site' ? appearanceView !== 'home' : appearanceView === 'home') ? 'page' : undefined} onClick={() => setSearchParams({ section: 'presentation', view: id })}>{adminText(lang, vi, en)}</button>)}</nav>{appearanceView !== 'home' && <nav className="presentation-page-nav" aria-label={adminText(lang, 'Nội dung toàn website', 'Site-wide content')}>{[['site', 'Giao diện các trang', 'Page appearance'], ['about', 'Về chúng tôi', 'About us']].map(([id, vi, en]) => <button key={id} type="button" aria-current={appearanceView === id ? 'page' : undefined} onClick={() => setSearchParams({ section: 'presentation', view: id })}>{adminText(lang, vi, en)}</button>)}</nav>}{appearanceView === 'home' && <HomepageContent notify={notify} lang={lang} />}{appearanceView === 'about' && <AboutContent notify={notify} lang={lang} />}{appearanceView === 'site' && <SitePresentationEditor notify={notify} lang={lang} />}</>}{section === 'workshop' && <WorkshopBookings notify={notify} lang={lang} />}{section === 'inventory' && <Inventory notify={notify} lang={lang} />}{section === 'orders' && <Orders notify={notify} lang={lang} />}{section === 'users' && <Users notify={notify} currentId={user.id} lang={lang} />}{section === 'notifications' && <Notifications notify={notify} lang={lang} />}{section === 'reviews' && (<AdminProductReviews lang={lang} notify={notify} />)}{section === 'settings' && <SupportSettings notify={notify} lang={lang} />}</main></div>
 }
 
 function LoadState({ loading, error, empty, children, lang = 'vi' }) {
@@ -968,6 +968,8 @@ const aboutMediaConfig = [
 function SitePresentationEditor({ notify, lang = 'vi' }) {
   const queryClient = useQueryClient()
   const [page, setPage] = useState('brand')
+  const previewProduct = useQuery({ queryKey: ['presentation-preview-product'], queryFn: () => api.products({ page: 0, size: 1 }), enabled: page === 'detail' })
+  const contentPage = page === 'detail' ? 'catalog' : page
   const [settings, setSettings] = useState(null)
   const [media, setMedia] = useState({})
   const [loading, setLoading] = useState(true)
@@ -982,7 +984,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   const [previewScale, setPreviewScale] = useState(0.3)
   const [previewFocus, setPreviewFocus] = useState(null)
   const focusSequence = useRef(0)
-  const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['catalog', 'Sản phẩm', 'Products'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
+  const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['catalog', 'Sản phẩm', 'Products'], ['detail', 'Chi tiết sản phẩm', 'Product detail'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
   const mediaSlots = [
     { slot: 'SITE_LOGO', vi: 'Logo thương hiệu', en: 'Brand logo', fallbackIcon: true, shape: 'wide' },
     { slot: 'CATALOG_HERO', vi: 'Ảnh bìa Sản phẩm', en: 'Products hero image', fallback: pVase, shape: 'wide' },
@@ -1074,10 +1076,10 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
       : { ...current, ...change(current) })
   }
   function updateText(key, language, value) {
-    updateMode(current => ({ pages: { ...current.pages, [page]: { ...current.pages[page], [key]: { ...current.pages[page][key], [language]: value } } } }))
+    updateMode(current => ({ pages: { ...current.pages, [contentPage]: { ...current.pages[contentPage], [key]: { ...current.pages[contentPage][key], [language]: value } } } }))
   }
   function updateAppearance(key, property, value) {
-    updateMode(current => ({ pages: { ...current.pages, [page]: { ...current.pages[page], [key]: { ...current.pages[page][key], [property]: value || null } } } }))
+    updateMode(current => ({ pages: { ...current.pages, [contentPage]: { ...current.pages[contentPage], [key]: { ...current.pages[contentPage][key], [property]: value || null } } } }))
   }
   function move(section, index, direction) {
     updateMode(current => {
@@ -1131,8 +1133,9 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
   const active = previewMode === 'dark' ? settings.dark : settings
   const pageName = adminText(lang, ...pages.find(([key]) => key === page).slice(1))
   const paletteColors = colorNames.map(key => active.colors[key])
-  const previewRoute = { brand: '/', home: '/', catalog: '/san-pham', cart: '/cart', checkout: '/checkout', orders: '/orders', workshop: '/trai-nghiem', support: '/lien-he', faq: '/faq', policy: '/policy' }[page]
-  const previewUrl = `${previewRoute}?${new URLSearchParams({ presentationPreview: '1', mode: previewMode, lang: previewLang })}`
+  const fields = page === 'detail' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => !['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : page === 'catalog' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => ['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : presentationFields[page]
+  const previewRoute = page === 'detail' ? (previewProduct.data?.content?.[0]?.id ? `/products/${previewProduct.data.content[0].id}` : '') : { brand: '/', home: '/', catalog: '/san-pham', cart: '/cart', checkout: '/checkout', orders: '/orders', workshop: '/trai-nghiem', support: '/lien-he', faq: '/faq', policy: '/policy' }[page]
+  const previewUrl = previewRoute ? `${previewRoute}?${new URLSearchParams({ presentationPreview: '1', mode: previewMode, lang: previewLang })}` : ''
   const dirty = savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings)
 
   return <Panel className="presentation-panel" title={adminText(lang, 'Tùy chỉnh giao diện', 'Site appearance')}>
@@ -1142,12 +1145,13 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
     <div className="presentation-workspace">
     <div className="presentation-editor">
     <h3>{adminText(lang, 'Chữ trên trang', 'Page text')} · {pageName}</h3>
+    {page === 'detail' && <p className="admin-help">{adminText(lang, 'Tên, giá và mô tả riêng của từng sản phẩm được sửa trong mục Sản phẩm.', 'Edit each product’s name, price and description in Products.')}</p>}
     <form className="admin-form" onSubmit={save} onFocusCapture={event => { const target = event.target.closest('[data-preview-target]')?.dataset.previewTarget; if (target) focusPreview(target) }}>
-      {Object.entries(presentationFields[page]).map(([key, fallback]) => <fieldset className="admin-fieldset wide" data-preview-target={`field:${page}.${key}`} key={key}>
+      {Object.entries(fields).map(([key, fallback]) => <fieldset className="admin-fieldset wide" data-preview-target={`field:${contentPage}.${key}`} key={key}>
         <legend>{({ trust1Icon: 'Biểu tượng thủ công', trust2Icon: 'Biểu tượng nguyên liệu', trust3Icon: 'Biểu tượng di sản', chatIcon: 'Biểu tượng Chat', zaloLabel: 'Ký hiệu Zalo', facebookLabel: 'Ký hiệu Facebook' })[key] || adminText(lang, fallback.vi, fallback.en).slice(0, 90)}</legend>
-        {key.endsWith('Icon') || key === 'chatIcon' ? <label>{adminText(lang, 'Biểu tượng', 'Icon')}<select value={active.pages[page][key].vi} onChange={event => { updateText(key, 'vi', event.target.value); updateText(key, 'en', event.target.value) }}>{(key === 'chatIcon' ? [['message', 'Chat'], ['bubble', 'Bong bóng chat'], ['help', 'Hỗ trợ']] : [['pot', 'Bình gốm'], ['leaf', 'Lá'], ['landmark', 'Di sản'], ['heart', 'Trái tim'], ['sparkles', 'Lấp lánh']]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label> : ['vi', 'en'].map(language => <label key={language}>{language === 'vi' ? adminText(lang, 'Tiếng Việt', 'Vietnamese') : adminText(lang, 'Tiếng Anh', 'English')}{['zaloLabel', 'facebookLabel'].includes(key) ? <input value={active.pages[page][key][language]} maxLength={2} required onChange={event => updateText(key, language, event.target.value)} /> : <textarea value={active.pages[page][key][language]} maxLength={5000} required onChange={event => updateText(key, language, event.target.value)} />}</label>)}
-        <label>{adminText(lang, 'Phông chữ riêng', 'Individual font')}<select value={active.pages[page][key].font || ''} onChange={event => updateAppearance(key, 'font', event.target.value)}><option value="">{adminText(lang, 'Theo phông chung', 'Use store font')}</option>{Object.entries(fontPresets).filter(([id]) => id !== 'modern').map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}</select></label>
-        <label>{['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? adminText(lang, 'Màu nền nút', 'Button background') : key.endsWith('Icon') ? adminText(lang, 'Màu biểu tượng có sẵn', 'Built-in icon color') : adminText(lang, 'Màu chữ riêng', 'Individual text color')}<span className="presentation-color-control"><input type="color" value={active.pages[page][key].color || paletteColors[['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? 2 : 3]} onChange={event => updateAppearance(key, 'color', event.target.value)} /><button type="button" disabled={!active.pages[page][key].color} onClick={() => updateAppearance(key, 'color', '')}>{adminText(lang, 'Dùng màu chung', 'Use store color')}</button></span></label>
+        {key.endsWith('Icon') || key === 'chatIcon' ? <label>{adminText(lang, 'Biểu tượng', 'Icon')}<select value={active.pages[contentPage][key].vi} onChange={event => { updateText(key, 'vi', event.target.value); updateText(key, 'en', event.target.value) }}>{(key === 'chatIcon' ? [['message', 'Chat'], ['bubble', 'Bong bóng chat'], ['help', 'Hỗ trợ']] : [['pot', 'Bình gốm'], ['leaf', 'Lá'], ['landmark', 'Di sản'], ['heart', 'Trái tim'], ['sparkles', 'Lấp lánh']]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label> : ['vi', 'en'].map(language => <label key={language}>{language === 'vi' ? adminText(lang, 'Tiếng Việt', 'Vietnamese') : adminText(lang, 'Tiếng Anh', 'English')}{['zaloLabel', 'facebookLabel'].includes(key) ? <input value={active.pages[contentPage][key][language]} maxLength={2} required onChange={event => updateText(key, language, event.target.value)} /> : <textarea value={active.pages[contentPage][key][language]} maxLength={5000} required onChange={event => updateText(key, language, event.target.value)} />}</label>)}
+        <label>{adminText(lang, 'Phông chữ riêng', 'Individual font')}<select value={active.pages[contentPage][key].font || ''} onChange={event => updateAppearance(key, 'font', event.target.value)}><option value="">{adminText(lang, 'Theo phông chung', 'Use store font')}</option>{Object.entries(fontPresets).filter(([id]) => id !== 'modern').map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}</select></label>
+        <label>{['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? adminText(lang, 'Màu nền nút', 'Button background') : key.endsWith('Icon') ? adminText(lang, 'Màu biểu tượng có sẵn', 'Built-in icon color') : adminText(lang, 'Màu chữ riêng', 'Individual text color')}<span className="presentation-color-control"><input type="color" value={active.pages[contentPage][key].color || paletteColors[['chatIcon', 'zaloLabel', 'facebookLabel'].includes(key) ? 2 : 3]} onChange={event => updateAppearance(key, 'color', event.target.value)} /><button type="button" disabled={!active.pages[contentPage][key].color} onClick={() => updateAppearance(key, 'color', '')}>{adminText(lang, 'Dùng màu chung', 'Use store color')}</button></span></label>
       </fieldset>)}
       {page === 'brand' && <fieldset className="admin-fieldset wide" data-preview-target="page:brand"><legend>{adminText(lang, 'Màu và phông chữ của cửa hàng', 'Store colors and fonts')}</legend>
         <label>{adminText(lang, 'Bộ màu cửa hàng', 'Store color palette')}<select value={active.colorPreset} onChange={event => updateMode(() => ({ colorPreset: event.target.value, colors: presetColors(event.target.value) }))}>{Object.entries(colorPresets).map(([id, option]) => <option key={id} value={id}>{option.name}</option>)}{!colorPresets[active.colorPreset] && <option value={active.colorPreset}>{active.colorPreset}</option>}</select></label>
@@ -1176,7 +1180,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
           height: `${Math.ceil(800 * previewScale) + 2}px`
         }}
       >
-        <iframe
+        {previewUrl ? <iframe
           ref={previewFrame}
           key={previewUrl}
           title={adminText(
@@ -1203,7 +1207,7 @@ function SitePresentationEditor({ notify, lang = 'vi' }) {
               window.location.origin
             )
           }}
-        />
+        /> : <p className="admin-help">{adminText(lang, 'Chưa có sản phẩm để xem trước.', 'No product available for preview.')}</p>}
       </div>
       <p className="presentation-preview-note">{adminText(lang, 'Đây là trang khách thật ở chế độ đang chỉnh. Thay đổi chỉ được đăng sau khi lưu. Ảnh tải lên được lưu ngay.', 'This is the real storefront in the selected mode. Text and colors publish only after saving. Uploaded images publish immediately.')}</p>
     </aside>

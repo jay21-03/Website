@@ -15,8 +15,8 @@ h1, h2, h3, h4, .brand { font-family: var(--font-display); }
 header nav a.active { color: var(--primary); }
 header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
 .site-header, .header-tools, .product-detail-info, .checkout-item, .checkout-item > div, .page-title { min-width: 0; }
-.product-detail-info { color: #2c1a0e; }
-.product-detail-info h1 { color: #2c1a0e; }
+.product-detail-info { color: var(--foreground); }
+.product-detail-info h1 { color: var(--foreground); }
 .button { height: auto; min-height: 48px; line-height: 1.35; white-space: normal; text-align: center; }
 .site-footer { margin-top: 96px; background: var(--card); border-top: 1px solid var(--primary); padding: 64px max(20px, calc((100vw - 1216px)/2)); color: var(--foreground); }
 .footer-grid { max-width: 1216px; margin: auto; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 48px; }
@@ -76,3 +76,12 @@ header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
 :root[data-font-preset] :is(.font-serif,.footer-slogan) { font-family:var(--font-serif) }
 :root[data-color-preset="night"] :is(.state-box,.contact-card,.order-row,.order-detail>section,.order-detail>.order-summary,.product-detail-info,.product-detail-panel,.workshop-cards article,.workshop-form,.workshop-info,.collection-card,.checkout-form textarea,.checkout-item button,.product-thumbs button,.gallery-controls button,.gallery-step button) { background:var(--card);color:var(--foreground);border-color:var(--border) }
 :root[data-color-preset="night"] .product-detail-info :is(h1,h2,h3) { color:var(--foreground) }
+.product-detail-page :is(.product-detail-info,.product-detail-panel,.product-thumbs button,.gallery-controls button,.gallery-step button) { background:var(--card);color:var(--foreground);border-color:var(--border) }
+.product-detail-page .product-detail-info p,
+.product-detail-page .product-specifications dd,
+.product-detail-page .gallery-controls span,
+.product-detail-page .product-detail-tabs button { color:var(--muted-foreground) }
+.product-detail-page .product-detail-tabs button[aria-selected="true"] { color:var(--foreground) }
+.product-detail-page .product-detail-tabs button:hover,
+.product-detail-page :is(.gallery-controls button,.gallery-step button):not(:disabled):hover { color:var(--foreground) }
+.product-detail-page .detail-price { color:var(--clay) }
