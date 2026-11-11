@@ -13,6 +13,7 @@ public enum SiteMediaSlot {
     HOME_SOCIAL_6("social-6"),
     ABOUT_HERO("hero"),
     ABOUT_PORTRAIT("portrait"),
+    ABOUT_VISION("vision"),
     ABOUT_CERTIFICATE("certificate"),
     CATALOG_HERO("hero"),
     CATALOG_HERO_DARK("hero-dark"),

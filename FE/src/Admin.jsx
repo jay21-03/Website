@@ -9,7 +9,7 @@ import { businessDateTimeLocal, businessLocalDateTimeToOffset, formatBusinessDat
 import heroPottery from './design/assets/hero-pottery.jpg'
 import artisan from './design/assets/artisan.jpg'
 import portrait from './design/assets/portrait.jpg'
-import { aboutDefaults } from './design/aboutDefaults'
+import { withAboutDefaults } from './design/aboutDefaults'
 import { presentationDefaults, presentationFields, colorPresets, colorNames, presetColors, fontPresets } from './design/sitePresentation'
 import { PotIcon } from './design/PotIcon'
 import pVase from './design/assets/p-vase.jpg'
@@ -923,6 +923,12 @@ const aboutTextFields = [['heroTitle', 'Tiêu đề Hero', 'Hero title'],
   ['heroSubtitle', 'Phụ đề Hero', 'Hero subtitle'],
   ['storyEyebrow', 'Nhãn hành trình', 'Story eyebrow'],
   ['storyTitle', 'Tiêu đề câu chuyện', 'Story title'],
+  ['visionTitle', 'Tiêu đề Tầm nhìn', 'Vision title'],
+  ['visionBody', 'Nội dung Tầm nhìn', 'Vision description'],
+  ['missionTitle', 'Tiêu đề Sứ mệnh', 'Mission title'],
+  ['missionBody', 'Nội dung Sứ mệnh', 'Mission description'],
+  ['coreValuesTitle', 'Tiêu đề Giá trị cốt lõi', 'Core values title'],
+  ['coreValuesBody', 'Nội dung Giá trị cốt lõi', 'Core values description'],
   ['valuesEyebrow', 'Nhãn giá trị', 'Values eyebrow'],
   ['valuesTitle', 'Tiêu đề giá trị', 'Values title'],
   ['heritageTitle', 'Tiêu đề di sản', 'Heritage title'],
@@ -961,6 +967,14 @@ const aboutMediaConfig = [
     helpVi: 'Chưa tải ảnh hoặc đã xóa: website hiện khung minh họa.',
     helpEn: 'Missing or cleared image: the website shows an illustration.',
     fallback: null,
+    shape: 'wide'
+  },
+  {
+    slot: 'ABOUT_VISION',
+    field: 'visionUrl',
+    vi: 'Ảnh Tầm nhìn, Sứ mệnh và Giá trị cốt lõi',
+    en: 'Vision, mission and core values image',
+    fallback: artisan,
     shape: 'wide'
   }
 ]
@@ -1238,8 +1252,8 @@ function AboutContent({ notify, lang = 'vi', previewMode, defaultColor, draft, o
     try {
       const response = await api.adminAbout()
       setAbout(response)
-      setContent(structuredClone(initialDraft.current?.content || response.content || aboutDefaults))
-      setSavedContent(response.content || aboutDefaults)
+      setContent(structuredClone(withAboutDefaults(initialDraft.current?.content || response.content)))
+      setSavedContent(withAboutDefaults(response.content))
     } catch (exception) {
       setError(exception.message)
     } finally {
@@ -1252,7 +1266,7 @@ function AboutContent({ notify, lang = 'vi', previewMode, defaultColor, draft, o
   }, [load])
 
   useEffect(() => {
-    if (content && about) onDraft({ content, media: { heroUrl: about.heroUrl, portraitUrl: about.portraitUrl, certificateUrl: about.certificateUrl } })
+    if (content && about) onDraft({ content, media: { heroUrl: about.heroUrl, portraitUrl: about.portraitUrl, certificateUrl: about.certificateUrl, visionUrl: about.visionUrl } })
   }, [content, about, onDraft])
 
   function updatePair(key, language, value) {
@@ -1450,8 +1464,7 @@ function AboutContent({ notify, lang = 'vi', previewMode, defaultColor, draft, o
   return (
     <>
       <form className="admin-form" onSubmit={save} onFocusCapture={event => { const target = event.target.closest('[data-preview-target]')?.dataset.previewTarget; if (target) onFocusPreview(target) }}>
-
-        {aboutTextFields.map(([key, vi, en]) => {
+        {aboutTextFields.filter(([key]) => !['visionTitle', 'visionBody', 'missionTitle', 'missionBody', 'coreValuesTitle', 'coreValuesBody'].includes(key)).map(([key, vi, en]) => {
           return (
             <fieldset className="admin-fieldset wide" data-preview-target={`about:${key}`} key={key}>
               <legend>{adminText(lang, vi, en)}</legend>
@@ -1507,6 +1520,11 @@ function AboutContent({ notify, lang = 'vi', previewMode, defaultColor, draft, o
           >
             + {adminText(lang, 'Thêm mốc', 'Add timeline entry')}
           </button>
+        </fieldset>
+
+        <fieldset className="admin-fieldset wide">
+          <legend>{adminText(lang, 'Tầm nhìn · Sứ mệnh · Giá trị cốt lõi', 'Vision · Mission · Core values')}</legend>
+          {aboutTextFields.filter(([key]) => ['visionTitle', 'visionBody', 'missionTitle', 'missionBody', 'coreValuesTitle', 'coreValuesBody'].includes(key)).map(([key, vi, en]) => <div key={key} data-preview-target={`about:${key}`}><h4>{adminText(lang, vi, en)}</h4>{pairControls(content[key], (property, value) => updatePair(key, property, value))}</div>)}
         </fieldset>
 
         <fieldset className="admin-fieldset wide">

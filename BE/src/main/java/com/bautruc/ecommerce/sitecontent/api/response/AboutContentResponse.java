@@ -6,5 +6,6 @@ public record AboutContentResponse(
         AboutContentRequest content,
         String heroUrl,
         String portraitUrl,
-        String certificateUrl
+        String certificateUrl,
+        String visionUrl
 ) {}

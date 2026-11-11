@@ -9,6 +9,12 @@ public record AboutContentRequest(
         @NotNull @Valid TextPair heroSubtitle,
         @NotNull @Valid TextPair storyEyebrow,
         @NotNull @Valid TextPair storyTitle,
+        @Valid TextPair visionTitle,
+        @Valid TextPair visionBody,
+        @Valid TextPair missionTitle,
+        @Valid TextPair missionBody,
+        @Valid TextPair coreValuesTitle,
+        @Valid TextPair coreValuesBody,
         @NotNull @Size(min = 1, max = 10)
         List<@NotNull @Valid TimelineEntry> timeline,
         @NotNull @Valid TextPair valuesEyebrow,

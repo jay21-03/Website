@@ -11,6 +11,12 @@ export const aboutDefaults = {
   ),
   storyEyebrow: pair('Hành trình', 'Journey'),
   storyTitle: pair('Câu Chuyện Của Chúng Tôi', 'Our Story'),
+  visionTitle: pair('Tầm nhìn', 'Vision'),
+  visionBody: pair('Nội dung đang được cập nhật.', 'Content coming soon.'),
+  missionTitle: pair('Sứ mệnh', 'Mission'),
+  missionBody: pair('Nội dung đang được cập nhật.', 'Content coming soon.'),
+  coreValuesTitle: pair('Giá trị cốt lõi', 'Core Values'),
+  coreValuesBody: pair('Nội dung đang được cập nhật.', 'Content coming soon.'),
   timeline: [
     {
       year: '2009',
@@ -107,7 +113,7 @@ export const aboutDefaults = {
   ),
   certificateEyebrow: pair('Chứng nhận', 'Certification'),
   certificateTitle: pair(
-    'Certificate of Authenticity',
+    'Chứng nhận tính nguyên bản',
     'Certificate of Authenticity'
   ),
   certificateBody: pair(
@@ -130,4 +136,12 @@ export const aboutDefaults = {
     'Tinh hoa gốm Chăm - Gìn giữ hồn di sản',
     'The essence of Cham pottery - preserving heritage soul'
   )
+}
+
+export const withAboutDefaults = content => {
+  const merged = { ...aboutDefaults, ...content }
+  if (merged.certificateTitle?.vi === 'Certificate of Authenticity') {
+    merged.certificateTitle = { ...merged.certificateTitle, vi: aboutDefaults.certificateTitle.vi }
+  }
+  return merged
 }

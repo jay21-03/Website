@@ -70,7 +70,8 @@ public class AboutContentService {
                 content,
                 url(SiteMediaSlot.ABOUT_HERO),
                 url(SiteMediaSlot.ABOUT_PORTRAIT),
-                url(SiteMediaSlot.ABOUT_CERTIFICATE)
+                url(SiteMediaSlot.ABOUT_CERTIFICATE),
+                url(SiteMediaSlot.ABOUT_VISION)
         );
     }
 

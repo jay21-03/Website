@@ -4,10 +4,11 @@ import { api } from "../api";
 import { Reveal } from "./Reveal";
 import { PageHero, SectionTitle } from "./PageHero";
 import { useI18n } from "./i18n";
-import { aboutDefaults } from "./aboutDefaults";
+import { aboutDefaults, withAboutDefaults } from "./aboutDefaults";
 import { fontPresets } from "./sitePresentation";
 import { useTheme } from "./theme";
 import portrait from "./assets/portrait.jpg";
+import artisan from "./assets/artisan.jpg";
 
 type TextPair = { vi: string; en: string; font?: string; color?: string; darkFont?: string; darkColor?: string };
 type TimelineEntry = { year: string; text: TextPair };
@@ -17,7 +18,7 @@ export default function About() {
   const { t } = useI18n();
   const { theme } = useTheme();
   const preview = new URLSearchParams(window.location.search).get("presentationPreview") === "1";
-  const [draft, setDraft] = useState<{ content: typeof aboutDefaults; media: { heroUrl?: string | null; portraitUrl?: string | null; certificateUrl?: string | null } } | null>(null);
+  const [draft, setDraft] = useState<{ content: typeof aboutDefaults; media: { heroUrl?: string | null; portraitUrl?: string | null; certificateUrl?: string | null; visionUrl?: string | null } } | null>(null);
 
   useEffect(() => {
     if (!preview) return;
@@ -33,10 +34,11 @@ export default function About() {
     queryFn: api.about
   });
 
-  const content = draft?.content || query.data?.content || aboutDefaults;
+  const content = withAboutDefaults(draft?.content || query.data?.content);
   const heroUrl = (draft ? draft.media.heroUrl : query.data?.heroUrl) || null;
   const portraitUrl = (draft ? draft.media.portraitUrl : query.data?.portraitUrl) || portrait;
   const certificateUrl = (draft ? draft.media.certificateUrl : query.data?.certificateUrl) || null;
+  const visionUrl = (draft ? draft.media.visionUrl : query.data?.visionUrl) || artisan;
 
   const [certificateError, setCertificateError] = useState(false);
 
@@ -61,10 +63,10 @@ export default function About() {
         imageUrl={heroUrl}
       />
 
-      <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
-        <div className="grid gap-14 lg:grid-cols-[1fr_1.1fr]">
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:py-24 lg:px-8">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start lg:gap-20">
           <Reveal>
-            <div className="aspect-3/4 overflow-hidden rounded-sm border border-primary/25">
+            <div className="aspect-4/5 overflow-hidden rounded-sm bg-card lg:sticky lg:top-24">
               <img
                 src={portraitUrl}
                 alt={t(
@@ -89,17 +91,16 @@ export default function About() {
               {styled(content.storyTitle, "storyTitle")}
             </SectionTitle>
 
-            <ol className="border-l border-primary/35">
+            <ol className="space-y-2">
               {content.timeline.map((item: TimelineEntry, index: number) => (
                 <li
                   key={`${item.year}-${index}`}
-                  className="relative pb-10 pl-8 last:pb-0"
+                  className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-4 border-t border-border py-5 last:border-b sm:grid-cols-[6rem_minmax(0,1fr)]"
                 >
-                  <span className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-primary" />
-                  <p className="font-display text-2xl text-primary">
+                  <p className="font-display text-xl text-primary sm:text-2xl">
                     {item.year}
                   </p>
-                  <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                  <p className="whitespace-pre-line text-base leading-relaxed text-foreground/80">
                     {styled(item.text, `timeline.${index}.text`)}
                   </p>
                 </li>
@@ -109,22 +110,36 @@ export default function About() {
         </div>
       </section>
 
+      <section className="border-y border-border px-5 py-16 sm:py-24 lg:px-8" style={{ backgroundColor: 'color-mix(in srgb, var(--background) 50%, var(--card))' }}>
+        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-center lg:gap-20">
+          <img src={visionUrl} alt={t('Hình minh họa tầm nhìn và sứ mệnh', 'Vision and mission illustration')} width={800} height={1060} loading="lazy" className="aspect-4/5 w-full rounded-sm object-cover" onError={event => { if (event.currentTarget.src !== new URL(artisan, window.location.href).href) event.currentTarget.src = artisan; }} />
+          <div className="divide-y divide-border">
+            {([['visionTitle', 'visionBody'], ['missionTitle', 'missionBody'], ['coreValuesTitle', 'coreValuesBody']] as const).map(([title, body]) => (
+              <div key={title} className="py-6 first:pt-0 last:pb-0">
+                <h2 className="font-display text-2xl text-foreground sm:text-3xl">{styled(content[title] || aboutDefaults[title], title)}</h2>
+                <p className="mt-3 max-w-prose whitespace-pre-line text-base leading-relaxed text-foreground/80">{styled(content[body] || aboutDefaults[body], body)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="bg-card">
-        <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
+        <div className="mx-auto max-w-7xl px-5 py-16 sm:py-24 lg:px-8">
           <Reveal>
             <SectionTitle eyebrow={styled(content.valuesEyebrow, "valuesEyebrow")}>
               {styled(content.valuesTitle, "valuesTitle")}
             </SectionTitle>
           </Reveal>
 
-          <div className="grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-x-12 gap-y-0 sm:grid-cols-2 lg:grid-cols-3">
             {content.values.map((item: ValueEntry, index: number) => (
               <Reveal key={index} delay={index * 70}>
-                <div className="border-t border-primary/40 pt-5">
-                  <h3 className="font-display text-xl">
+                <div className="min-h-44 border-t border-border py-6">
+                  <h3 className="font-display text-xl text-primary sm:text-2xl">
                     {styled(item.title, `values.${index}.title`)}
                   </h3>
-                  <p className="mt-2.5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                  <p className="mt-3 max-w-prose whitespace-pre-line text-base leading-relaxed text-foreground/80">
                     {styled(item.description, `values.${index}.description`)}
                   </p>
                 </div>
@@ -147,8 +162,8 @@ export default function About() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
-        <div className="grid items-center gap-14 lg:grid-cols-2">
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:py-24 lg:px-8">
+        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-20">
           <Reveal>
             <SectionTitle eyebrow={styled(content.certificateEyebrow, "certificateEyebrow")}>
               {styled(content.certificateTitle, "certificateTitle")}
