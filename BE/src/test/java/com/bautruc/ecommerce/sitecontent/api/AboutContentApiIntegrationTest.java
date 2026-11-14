@@ -254,6 +254,30 @@ WHERE slot LIKE 'ABOUT_%' OR slot IN ('CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_
     }
 
     @Test
+    void adminCanUploadAndClearVisionImage() throws Exception {
+        Cookie admin = access(user("vision-media", UserRole.ADMIN));
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "vision.png", "image/png",
+                new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}
+        );
+
+        mvc.perform(multipart("/api/v1/admin/about/media/ABOUT_VISION")
+                        .file(file).cookie(admin).with(csrf().asHeader())
+                        .with(request -> { request.setMethod("PUT"); return request; }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.slot").value("ABOUT_VISION"));
+        mvc.perform(get("/api/v1/about"))
+                .andExpect(jsonPath("$.data.visionUrl").value(
+                        org.hamcrest.Matchers.startsWith("https://cdn.example/site/about/vision/")));
+
+        mvc.perform(delete("/api/v1/admin/about/media/ABOUT_VISION")
+                        .cookie(admin).with(csrf().asHeader()))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/about"))
+                .andExpect(jsonPath("$.data.visionUrl").doesNotExist());
+    }
+
+    @Test
     void aboutMediaEndpointRejectsHomepageSlots()
             throws Exception {
         Cookie admin = access(user("slot", UserRole.ADMIN));
