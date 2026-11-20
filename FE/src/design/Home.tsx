@@ -1,4 +1,5 @@
 import type { SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Leaf, Landmark, Heart, Sparkles } from "lucide-react";
 import { Reveal } from "./Reveal";
@@ -13,6 +14,8 @@ import pApsara from "./assets/p-apsara.jpg";
 import wsFamily from "./assets/ws-family.jpg";
 import wsTour from "./assets/ws-tour.jpg";
 import { presentationNode } from "./sitePresentation";
+import { trackAnalytics, useAnalyticsConsent } from "../analytics/Analytics";
+import { analyticsItem, whenVisible } from "../analytics/ecommerce";
 
 
 const TRUST = { pot: PotIcon, leaf: Leaf, landmark: Landmark, heart: Heart, sparkles: Sparkles };
@@ -30,6 +33,7 @@ type HomepageProduct = {
   descriptionVi?: string | null;
   descriptionEn?: string | null;
   thumbnailUrl?: string | null;
+  sellingPrice?: number;
 };
 
 type HomepageData = {
@@ -60,8 +64,20 @@ function imageFallback(event: SyntheticEvent<HTMLImageElement>, fallback: string
 export default function Home({ home, fallbackProducts = [], presentation, media }: HomeProps) {
   const { t, lang } = useI18n();
   const copy = (key: string) => presentationNode(presentation, "home", key, lang);
-  const managedFeatured = [...(home?.featuredProducts ?? [])].sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
-  const featuredProducts = managedFeatured.length === 3 ? managedFeatured : fallbackProducts.slice(0, 3);
+  const featuredProducts = useMemo(() => {
+    const managed = [...(home?.featuredProducts ?? [])].sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+    return managed.length === 3 ? managed : fallbackProducts.slice(0, 3);
+  }, [home?.featuredProducts, fallbackProducts]);
+  const analyticsConsent = useAnalyticsConsent();
+  const lastFeatured = useRef<string | null>(null);
+  const featuredGrid = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const key = featuredProducts.map(product => product.id).join(',');
+    if (home === undefined || !analyticsConsent || !key || lastFeatured.current === key) return;
+    return whenVisible(featuredGrid.current, () => {
+      if (trackAnalytics('view_item_list', { item_list_id: 'home_featured', items: featuredProducts.map((product, index) => analyticsItem(product, 1, undefined, index)) })) lastFeatured.current = key;
+    });
+  }, [home, analyticsConsent, featuredProducts]);
   const socialBySlot = new Map((home?.socialImages ?? []).map(item => [item.slot, item.url]));
 
   return (
@@ -185,7 +201,7 @@ export default function Home({ home, fallbackProducts = [], presentation, media 
           </SectionTitle>
         </Reveal>
         {featuredProducts.length > 0 ? (
-          <div className="grid gap-8 md:grid-cols-3">
+          <div ref={featuredGrid} className="grid gap-8 md:grid-cols-3">
             {featuredProducts.map((product, i) => {
               const name = t(product.nameVi, product.nameEn || product.nameVi);
               const description = t(
@@ -211,6 +227,7 @@ export default function Home({ home, fallbackProducts = [], presentation, media 
                       <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
                       <Link
                         to={`/products/${product.id}`}
+                        onClick={() => trackAnalytics('select_item', { item_list_id: 'home_featured', items: [analyticsItem(product, 1, undefined, i)] })}
                         className="mt-6 inline-flex w-fit items-center gap-2 rounded-sm border border-primary px-5 py-2.5 text-sm text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                       >
                         {copy("detailsAction")} <ArrowRight className="h-4 w-4" />

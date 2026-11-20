@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import App from './App'
@@ -17,9 +17,11 @@ vi.mock('./analytics/Analytics', () => ({ setAnalyticsIdentity: vi.fn(), trackAn
 
 beforeEach(() => {
   vi.clearAllMocks()
+  api.workshops.mockResolvedValue([])
   window.matchMedia = vi.fn(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   window.scrollTo = vi.fn()
 })
+afterEach(() => cleanup())
 
 function mount() {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={['/workshop']}><App /></MemoryRouter></QueryClientProvider>)
@@ -33,6 +35,14 @@ async function submit() {
 }
 
 describe('workshop lead', () => {
+  it('tracks a genuine offering selection without treating it as a booking', async () => {
+    api.workshops.mockResolvedValue([{ id: 7, title: 'Gốm Chăm', description: '', priceAmount: 100000, durationMinutes: 60, maxParticipants: 5 }])
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Chọn gói này' }))
+    expect(trackAnalytics).toHaveBeenCalledWith('select_content', { content_type: 'workshop', content_id: 'workshop_7' })
+    expect(trackAnalytics).not.toHaveBeenCalledWith('generate_lead', expect.anything())
+  })
+
   it('tracks exactly once after the booking API succeeds', async () => {
     api.workshopBooking.mockResolvedValue({ id: 123 })
     mount()
@@ -40,7 +50,7 @@ describe('workshop lead', () => {
     await waitFor(() => expect(trackAnalytics).toHaveBeenCalledWith('generate_lead', { lead_type: 'workshop_booking' }))
     expect(trackAnalytics).toHaveBeenCalledTimes(1)
     expect(api.workshopBooking).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('status').textContent).toContain('123')
+    expect((await screen.findByRole('status')).textContent).toContain('123')
   })
 
   it('does not track a failed request', async () => {

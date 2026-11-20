@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
 import { HelpCircle, MessageCircle, MessageSquare } from 'lucide-react'
 import { contrastText } from './design/sitePresentation'
+import { trackAnalytics } from './analytics/Analytics'
 
 export function ChatWidget({ lang = 'vi', presentation, iconUrl, user }) {
   const [open, setOpen] = useState(false)
@@ -31,6 +32,7 @@ export function ChatWidget({ lang = 'vi', presentation, iconUrl, user }) {
     setError('')
     try {
       const thread = await api.chatSend({ body: body.trim(), guestName: name || undefined, guestEmail: email || undefined })
+      trackAnalytics('chat_message_sent')
       await client.cancelQueries({ queryKey: chatKey })
       client.setQueryData(chatKey, thread)
       setBody('')
@@ -40,8 +42,12 @@ export function ChatWidget({ lang = 'vi', presentation, iconUrl, user }) {
   }
 
   if (user?.role === 'ADMIN') return null
+  const toggle = () => {
+    if (!open) trackAnalytics('chat_open')
+    setOpen(value => !value)
+  }
   return <div className="chat-widget" style={{ '--chat-color': chatColor, '--chat-foreground': contrastText(chatColor) }}>
-    <button data-preview-target="field:brand.chatIcon" className={`chat-toggle${open ? ' is-open' : ''}`} type="button" aria-expanded={open} aria-controls="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')} onClick={() => setOpen(value => !value)}><ChatIcon aria-hidden="true" size={23} />{iconUrl && <img className="chat-custom-icon" src={iconUrl} alt="" onError={event => { event.currentTarget.hidden = true }} />}</button>
+    <button data-preview-target="field:brand.chatIcon" className={`chat-toggle${open ? ' is-open' : ''}`} type="button" aria-expanded={open} aria-controls="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')} onClick={toggle}><ChatIcon aria-hidden="true" size={23} />{iconUrl && <img className="chat-custom-icon" src={iconUrl} alt="" onError={event => { event.currentTarget.hidden = true }} />}</button>
     {open && <section className="chat-box" id="store-chat-panel" aria-label={copy('Chat với cửa hàng', 'Chat with the store')}>
       <header className="chat-box-header"><div><strong>{copy('Đàng Xem hỗ trợ', 'Đàng Xem support')}</strong><span>{copy('Gửi tin nhắn, cửa hàng sẽ phản hồi tại đây', 'Send a message and we’ll reply here')}</span></div><button type="button" onClick={() => setOpen(false)} aria-label={copy('Đóng chat', 'Close chat')}>×</button></header>
       <div className="chat-messages" role="log" aria-live="polite" aria-relevant="additions text">
