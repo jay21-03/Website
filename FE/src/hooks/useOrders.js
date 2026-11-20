@@ -2,12 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { cartKeys, orderKeys } from '../lib/queryClient'
 import { checkoutOrder, completeCheckoutAttempt, clearFailedCheckoutAttempt, getMyOrder, getMyOrders } from '../services/orderService'
 import { shouldClearCheckoutIdempotencyKey } from '../services/checkoutIdempotency'
+import { trackAnalytics } from '../analytics/Analytics'
 
 export function useCheckout() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: checkoutOrder,
     onSuccess: (result, values) => {
+      const key = `dx.analytics.order_created.${result.orderId}`
+      try {
+        if (!localStorage.getItem(key) && trackAnalytics('order_created', { checkout_type: values.productId != null ? 'buy_now' : 'cart' })) localStorage.setItem(key, '1')
+      } catch { /* Browser storage failure must not block a created order. */ }
       completeCheckoutAttempt(values)
       return Promise.all([
         client.invalidateQueries({ queryKey: cartKeys.all }),
