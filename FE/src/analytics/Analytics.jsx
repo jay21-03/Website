@@ -34,6 +34,14 @@ function startTag() {
   const script = document.createElement('script'); script.async = true; script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`; document.head.appendChild(script); tagStarted = true; return true
 }
 export function trackAnalytics(eventName, params = {}) { if (!startTag()) return false; window.gtag('event', eventName, params); return true }
+export function trackPaidPurchase(order) {
+  if (order?.paymentStatus !== 'PAID') return false
+  const key = `dx.analytics.purchase.${order.id}`
+  if (localStorage.getItem(key)) return false
+  const sent = trackAnalytics('purchase', { transaction_id: String(order.orderCode || order.id), currency: 'VND', value: Number(order.paymentAmount ?? order.totalAmount), items: (order.items || []).map(item => ({ item_id: String(item.productId), item_name: item.productNameVi, price: Number(item.sellingPrice || 0), quantity: item.quantity })) })
+  if (sent) localStorage.setItem(key, '1')
+  return sent
+}
 export function useAnalyticsConsent() { const [allowed, setAllowed] = useState(isAnalyticsAllowed); useEffect(() => { const update = () => setAllowed(isAnalyticsAllowed()); window.addEventListener('dx-analytics-consent', update); window.addEventListener('storage', update); return () => { window.removeEventListener('dx-analytics-consent', update); window.removeEventListener('storage', update) } }, []); return allowed }
 function useAnalyticsAudience() { const [current, setCurrent] = useState(audience); useEffect(() => { const update = () => setCurrent(audience); window.addEventListener('dx-analytics-identity', update); update(); return () => window.removeEventListener('dx-analytics-identity', update) }, []); return current }
 function ConsentBanner({ currentAudience }) {
@@ -64,4 +72,29 @@ function ConsentBanner({ currentAudience }) {
     </div>
   </section>
 }
-export function AnalyticsRoot({ children }) { const location = useLocation(); const allowed = useAnalyticsConsent(); const currentAudience = useAnalyticsAudience(); useEffect(() => { const path = location.pathname; if (!allowed || currentAudience !== 'visitor' || path.startsWith('/admin') || isPreview()) { updateTagConsent(false); lastPage = null; return } if (lastPage === path) return; if (trackAnalytics('page_view', { page_path: path, page_location: `${window.location.origin}${path}`, page_title: document.title })) lastPage = path }, [location.pathname, location.search, allowed, currentAudience]); return <>{children}<ConsentBanner currentAudience={currentAudience} /></> }
+export function AnalyticsRoot({ children }) {
+  const location = useLocation()
+  const allowed = useAnalyticsConsent()
+  const currentAudience = useAnalyticsAudience()
+  useEffect(() => {
+    const path = location.pathname
+    if (!allowed || currentAudience !== 'visitor' || path.startsWith('/admin') || isPreview()) {
+      updateTagConsent(false)
+      lastPage = null
+      return
+    }
+    if (lastPage === path) return
+    if (trackAnalytics('page_view', { page_path: path, page_location: `${window.location.origin}${path}`, page_title: document.title })) lastPage = path
+  }, [location.pathname, location.search, allowed, currentAudience])
+  useEffect(() => {
+    const click = event => {
+      const link = event.target.closest?.('a[href]')
+      if (!link) return
+      if (link.href.startsWith('tel:')) trackAnalytics('click_phone')
+      else if (new URL(link.href).hostname === 'zalo.me') trackAnalytics('click_zalo')
+    }
+    document.addEventListener('click', click)
+    return () => document.removeEventListener('click', click)
+  }, [])
+  return <>{children}<ConsentBanner currentAudience={currentAudience} /></>
+}
