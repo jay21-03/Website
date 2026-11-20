@@ -4,7 +4,8 @@ import { Bell } from 'lucide-react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import Admin from './Admin'
-import { setAnalyticsIdentity, trackAnalytics, trackPaidPurchase, useAnalyticsConsent } from './analytics/Analytics'
+import { safeSearchTerm, setAnalyticsIdentity, trackAnalytics, trackPaidPurchase, useAnalyticsConsent } from './analytics/Analytics'
+import { analyticsItem, whenVisible } from './analytics/ecommerce'
 import { ProductReviews } from './ProductReviews'
 import { ChatWidget } from './ChatWidget'
 import ReferenceHome from './design/Home'
@@ -192,6 +193,7 @@ function StoreProvider({ children }) {
         navigate('/admin', { replace: true })
         return
       }
+      trackAnalytics('login', { method: 'Google' })
       const merged = await mergeStoredCart()
       setCart(merged.cart)
       if (merged.failed) {
@@ -244,7 +246,7 @@ function StoreProvider({ children }) {
     })
   }
   async function add(product) {
-    const trackAdd = () => trackAnalytics('add_to_cart', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [{ item_id: String(product.id), item_name: product.nameVi, price: Number(product.sellingPrice || 0), quantity: 1 }] })
+    const trackAdd = () => trackAnalytics('add_to_cart', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [analyticsItem(product)] })
     const productId = product.id
     if (!user) {
       const entries = addGuestQuantity(readGuestCart(), productId)
@@ -313,16 +315,18 @@ function BilingualFooter() {
 function Loading({ text = 'Đang tải dữ liệu...' }) { return <div className="state-box">{text}</div> }
 function Empty({ children }) { return <div className="state-box">{children}</div> }
 
-function CatalogCard({ product }) {
-  const { lang } = useStore()
+function CatalogCard({ product, listId, index }) {
+  const { lang, collections } = useStore()
   const name = lang === 'vi' ? product.nameVi : product.nameEn
+  const category = collections.find(item => item.id === product.collectionId)?.nameVi
+  const select = () => trackAnalytics('select_item', { item_list_id: listId, items: [analyticsItem(product, 1, category, index)] })
   return <article className="product-card catalog-card">
-    <Link className="product-image" to={`/products/${product.id}`}><img src={product.thumbnailUrl || fallbackImage} alt={name} loading="lazy" width="700" height="700" onError={event => { if (!event.currentTarget.src.endsWith(fallbackImage)) event.currentTarget.src = fallbackImage }} /></Link>
+    <Link className="product-image" to={`/products/${product.id}`} onClick={select}><img src={product.thumbnailUrl || fallbackImage} alt={name} loading="lazy" width="700" height="700" onError={event => { if (!event.currentTarget.src.endsWith(fallbackImage)) event.currentTarget.src = fallbackImage }} /></Link>
     <div className="product-info">
       <h3>{name}</h3><p className="catalog-translation">{lang === 'vi' ? product.nameEn : product.nameVi}</p>
       <p className="catalog-description">{(lang === 'vi' ? product.descriptionVi : product.descriptionEn) || pick(lang, 'Gốm Bàu Trúc được tạo hình bằng tay theo kỹ thuật truyền thống của người Chăm.', 'Bau Truc pottery shaped by hand using traditional Cham techniques.')}</p>
       <p className="catalog-price">{money(product.sellingPrice, lang)}{product.sellingPrice < product.basePrice && <s>{money(product.basePrice, lang)}</s>}</p>
-      <Link className="catalog-more" to={`/products/${product.id}`}>{pick(lang, 'Tìm Hiểu Thêm', 'Learn More')} <span aria-hidden="true">→</span></Link>
+      <Link className="catalog-more" to={`/products/${product.id}`} onClick={select}>{pick(lang, 'Tìm Hiểu Thêm', 'Learn More')} <span aria-hidden="true">→</span></Link>
     </div>
   </article>
 }
@@ -334,9 +338,44 @@ function Products() {
   const { collections, lang, presentation } = useStore(); const [searchParams] = useSearchParams(); const [filters, setFilters] = useState(() => ({ keyword: searchParams.get('keyword') || '', collectionId: searchParams.get('collectionId') || '', minPrice: searchParams.get('minPrice') || '', maxPrice: searchParams.get('maxPrice') || '', page: Number(searchParams.get('page') || 0), size: 20, sort: searchParams.get('sort') || 'createdAt,desc' }))
   const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
   const updateFilter = changes => setFilters(value => ({ ...value, ...changes, page: changes.page ?? 0 }))
-  const catalog = useQuery({ queryKey: ['products', filters], queryFn: () => api.products(filters), placeholderData: previous => previous })
+  const [settledKeyword, setSettledKeyword] = useState(filters.keyword)
+  const analyticsConsent = useAnalyticsConsent()
+  const lastList = useRef(null)
+  const lastSearch = useRef(null)
+  const lastPrice = useRef(`${filters.minPrice}:${filters.maxPrice}`)
+  const catalogGrid = useRef(null)
+  useEffect(() => { const timer = setTimeout(() => setSettledKeyword(filters.keyword.trim()), 500); return () => clearTimeout(timer) }, [filters.keyword])
+  const queryFilters = useMemo(() => ({ ...filters, keyword: settledKeyword }), [filters, settledKeyword])
+  const catalog = useQuery({ queryKey: ['products', queryFilters], queryFn: () => api.products(queryFilters), placeholderData: previous => previous })
   const page = catalog.data
-  return <Layout><main className="page catalog-page"><section className="catalog-hero" style={presentation?.media?.CATALOG_HERO ? { backgroundImage: `linear-gradient(rgba(251,246,236,.86), rgba(251,246,236,.86)), url("${presentation.media.CATALOG_HERO}")` } : undefined}><div><h1>{copy('title')}</h1><p>{copy('subtitle')}</p></div></section><div className="catalog-content"><nav className="collection-tabs" aria-label={pick(lang, 'Lọc bộ sưu tập', 'Filter collections')}><button type="button" aria-pressed={!filters.collectionId} onClick={() => updateFilter({ collectionId: '' })}>{pick(lang, 'Tất Cả', 'All')}</button>{collections.map(item => <button type="button" key={item.id} aria-pressed={String(filters.collectionId) === String(item.id)} onClick={() => updateFilter({ collectionId: String(item.id) })}>{lang === 'vi' ? item.nameVi : item.nameEn}</button>)}</nav><section className="catalog-layout"><details className="catalog-advanced"><summary>{pick(lang, 'Tìm kiếm & bộ lọc', 'Search & filters')}</summary><aside className="filters open"><label>{pick(lang, 'Tìm kiếm', 'Search')}</label><input value={filters.keyword} onChange={event => updateFilter({ keyword: event.target.value })} placeholder={pick(lang, 'Tên sản phẩm...', 'Product name...')} /><label>{pick(lang, 'Bộ sưu tập', 'Collection')}</label><select value={filters.collectionId} onChange={event => updateFilter({ collectionId: event.target.value })}><option value="">{pick(lang, 'Tất cả', 'All')}</option>{collections.map(item => <option key={item.id} value={item.id}>{lang === 'vi' ? item.nameVi : item.nameEn}</option>)}</select><label>{pick(lang, 'Giá từ', 'Min price')}</label><input inputMode="numeric" value={filters.minPrice} onChange={event => updateFilter({ minPrice: event.target.value.replace(/\D/g, '') })} /><label>{pick(lang, 'Giá đến', 'Max price')}</label><input inputMode="numeric" value={filters.maxPrice} onChange={event => updateFilter({ maxPrice: event.target.value.replace(/\D/g, '') })} /><label>{pick(lang, 'Sắp xếp', 'Sort')}</label><select value={filters.sort} onChange={event => updateFilter({ sort: event.target.value })}><option value="createdAt,desc">{pick(lang, 'Mới nhất', 'Newest')}</option><option value="sellingPrice,asc">{pick(lang, 'Giá thấp → cao', 'Price low → high')}</option><option value="sellingPrice,desc">{pick(lang, 'Giá cao → thấp', 'Price high → low')}</option><option value="nameVi,asc">{pick(lang, 'Tên A → Z', 'Name A → Z')}</option></select></aside></details><div>{catalog.isLoading ? <Loading text={pick(lang, 'Đang tải dữ liệu...', 'Loading data...')} /> : catalog.isError ? <div className="state-box error" role="alert">{catalog.error.message}<button onClick={() => catalog.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !page?.content.length ? <Empty>{pick(lang, 'Không tìm thấy sản phẩm phù hợp.', 'No matching products found.')}</Empty> : <><div className="results-bar"><span>{page.totalElements} {pick(lang, 'sản phẩm', 'products')}</span>{catalog.isFetching && <span>{pick(lang, 'Đang cập nhật...', 'Refreshing...')}</span>}</div><div className="product-grid">{page.content.map(product => <CatalogCard key={product.id} product={product} />)}</div>{page.totalPages > 1 && <nav className="pagination" aria-label={pick(lang, 'Phân trang sản phẩm', 'Product pagination')}><button disabled={page.first || catalog.isFetching} onClick={() => updateFilter({ page: page.page - 1 })}>{pick(lang, 'Trang trước', 'Previous')}</button><span>{pick(lang, 'Trang', 'Page')} {page.page + 1}/{page.totalPages}</span><button disabled={page.last || catalog.isFetching} onClick={() => updateFilter({ page: page.page + 1 })}>{pick(lang, 'Trang sau', 'Next')}</button></nav>}</>}</div></section><div className="catalog-contact"><p>{copy('contactBody')}</p><Link className="button dark" to="/ve-chung-toi">{copy('contactAction')}</Link></div></div></main></Layout>
+  useEffect(() => {
+    if (!analyticsConsent || !catalog.isSuccess || catalog.isFetching || catalog.isPlaceholderData) return
+    const key = JSON.stringify([queryFilters, page?.content?.map(product => product.id)])
+    const stop = page?.content?.length && lastList.current !== key ? whenVisible(catalogGrid.current, () => {
+      if (trackAnalytics('view_item_list', { item_list_id: 'catalog', items: page.content.map((product, index) => analyticsItem(product, 1, collections.find(item => item.id === product.collectionId)?.nameVi, index + queryFilters.page * queryFilters.size)) })) lastList.current = key
+    }) : undefined
+    const term = queryFilters.keyword
+    if (!term) lastSearch.current = null
+    else if (safeSearchTerm(term) && lastSearch.current !== term && trackAnalytics('view_search_results', { search_term: term })) lastSearch.current = term
+    return stop
+  }, [analyticsConsent, catalog.isSuccess, catalog.isFetching, catalog.isPlaceholderData, page, queryFilters, collections])
+  const changeCollection = value => {
+    if (filters.collectionId === value) return
+    trackAnalytics('filter_products', { filter_type: 'collection', filter_value: value || 'all' })
+    updateFilter({ collectionId: value })
+  }
+  const changeSort = value => {
+    if (filters.sort === value) return
+    trackAnalytics('sort_products', { sort_order: value })
+    updateFilter({ sort: value })
+  }
+  const finishPrice = () => {
+    const next = `${filters.minPrice}:${filters.maxPrice}`
+    if (lastPrice.current === next) return
+    lastPrice.current = next
+    trackAnalytics('filter_products', { filter_type: 'price', filter_value: filters.minPrice || filters.maxPrice ? 'active' : 'cleared' })
+  }
+  return <Layout><main className="page catalog-page"><section className="catalog-hero" style={presentation?.media?.CATALOG_HERO ? { backgroundImage: `linear-gradient(rgba(251,246,236,.86), rgba(251,246,236,.86)), url("${presentation.media.CATALOG_HERO}")` } : undefined}><div><h1>{copy('title')}</h1><p>{copy('subtitle')}</p></div></section><div className="catalog-content"><nav className="collection-tabs" aria-label={pick(lang, 'Lọc bộ sưu tập', 'Filter collections')}><button type="button" aria-pressed={!filters.collectionId} onClick={() => changeCollection('')}>{pick(lang, 'Tất Cả', 'All')}</button>{collections.map(item => <button type="button" key={item.id} aria-pressed={String(filters.collectionId) === String(item.id)} onClick={() => changeCollection(String(item.id))}>{lang === 'vi' ? item.nameVi : item.nameEn}</button>)}</nav><section className="catalog-layout"><details className="catalog-advanced"><summary>{pick(lang, 'Tìm kiếm & bộ lọc', 'Search & filters')}</summary><aside className="filters open"><label>{pick(lang, 'Tìm kiếm', 'Search')}</label><input value={filters.keyword} onChange={event => updateFilter({ keyword: event.target.value })} placeholder={pick(lang, 'Tên sản phẩm...', 'Product name...')} /><label>{pick(lang, 'Bộ sưu tập', 'Collection')}</label><select value={filters.collectionId} onChange={event => changeCollection(event.target.value)}><option value="">{pick(lang, 'Tất cả', 'All')}</option>{collections.map(item => <option key={item.id} value={item.id}>{lang === 'vi' ? item.nameVi : item.nameEn}</option>)}</select><label>{pick(lang, 'Giá từ', 'Min price')}</label><input inputMode="numeric" value={filters.minPrice} onChange={event => updateFilter({ minPrice: event.target.value.replace(/\D/g, '') })} onBlur={finishPrice} /><label>{pick(lang, 'Giá đến', 'Max price')}</label><input inputMode="numeric" value={filters.maxPrice} onChange={event => updateFilter({ maxPrice: event.target.value.replace(/\D/g, '') })} onBlur={finishPrice} /><label>{pick(lang, 'Sắp xếp', 'Sort')}</label><select value={filters.sort} onChange={event => changeSort(event.target.value)}><option value="createdAt,desc">{pick(lang, 'Mới nhất', 'Newest')}</option><option value="sellingPrice,asc">{pick(lang, 'Giá thấp → cao', 'Price low → high')}</option><option value="sellingPrice,desc">{pick(lang, 'Giá cao → thấp', 'Price high → low')}</option><option value="nameVi,asc">{pick(lang, 'Tên A → Z', 'Name A → Z')}</option></select></aside></details><div>{catalog.isLoading ? <Loading text={pick(lang, 'Đang tải dữ liệu...', 'Loading data...')} /> : catalog.isError ? <div className="state-box error" role="alert">{catalog.error.message}<button onClick={() => catalog.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !page?.content.length ? <Empty>{pick(lang, 'Không tìm thấy sản phẩm phù hợp.', 'No matching products found.')}</Empty> : <><div className="results-bar"><span>{page.totalElements} {pick(lang, 'sản phẩm', 'products')}</span>{catalog.isFetching && <span>{pick(lang, 'Đang cập nhật...', 'Refreshing...')}</span>}</div><div ref={catalogGrid} className="product-grid">{page.content.map((product, index) => <CatalogCard key={product.id} product={product} listId="catalog" index={index + queryFilters.page * queryFilters.size} />)}</div>{page.totalPages > 1 && <nav className="pagination" aria-label={pick(lang, 'Phân trang sản phẩm', 'Product pagination')}><button disabled={page.first || catalog.isFetching} onClick={() => updateFilter({ page: page.page - 1 })}>{pick(lang, 'Trang trước', 'Previous')}</button><span>{pick(lang, 'Trang', 'Page')} {page.page + 1}/{page.totalPages}</span><button disabled={page.last || catalog.isFetching} onClick={() => updateFilter({ page: page.page + 1 })}>{pick(lang, 'Trang sau', 'Next')}</button></nav>}</>}</div></section><div className="catalog-contact"><p>{copy('contactBody')}</p><Link className="button dark" to="/ve-chung-toi">{copy('contactAction')}</Link></div></div></main></Layout>
 }
 function Account() {
   const { user, setUser, setCart, lang } = useStore(); const navigate = useNavigate()
@@ -354,8 +393,18 @@ function ProductDetail() {
   const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
   const analyticsConsent = useAnalyticsConsent()
   const trackedProductId = useRef(null)
-  useEffect(() => { if (!analyticsConsent || !product || trackedProductId.current === product.id) return; if (trackAnalytics('view_item', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [{ item_id: String(product.id), item_name: product.nameVi, price: Number(product.sellingPrice || 0), quantity: 1 }] })) trackedProductId.current = product.id }, [product, analyticsConsent])
+  useEffect(() => { if (!analyticsConsent || !product || trackedProductId.current === product.id) return; if (trackAnalytics('view_item', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [analyticsItem(product)] })) trackedProductId.current = product.id }, [product, analyticsConsent])
   const relatedQuery = useQuery({ queryKey: ['related-products', product?.collectionId], queryFn: () => api.products({ collectionId: product.collectionId, page: 0, size: 5, sort: 'createdAt,desc' }), enabled: Boolean(product?.collectionId) })
+  const relatedProducts = useMemo(() => (relatedQuery.data?.content || []).filter(item => item.id !== product?.id).slice(0, 4), [relatedQuery.data, product?.id])
+  const lastRelated = useRef(null)
+  const relatedGrid = useRef(null)
+  useEffect(() => {
+    const key = `${product?.id}:${relatedProducts.map(item => item.id).join(',')}`
+    if (!analyticsConsent || !relatedQuery.isSuccess || relatedQuery.isFetching || !relatedProducts.length || lastRelated.current === key) return
+    return whenVisible(relatedGrid.current, () => {
+      if (trackAnalytics('view_item_list', { item_list_id: 'related_products', items: relatedProducts.map((item, index) => analyticsItem(item, 1, undefined, index)) })) lastRelated.current = key
+    })
+  }, [analyticsConsent, product?.id, relatedQuery.isSuccess, relatedQuery.isFetching, relatedProducts])
   useEffect(() => { setSelected(0); setZoom(1); setTouchStart(null); setActiveTab('description') }, [id])
   const images = product?.images?.length ? product.images : [{ id: 'fallback', url: product?.thumbnailUrl || fallbackImage, thumbnail: true }]
   const activeImage = images[Math.min(selected, images.length - 1)] || images[0]
@@ -379,7 +428,6 @@ function ProductDetail() {
   if (!product) return <Layout><main className="page"><Empty>{pick(lang, 'Không tìm thấy sản phẩm.', 'Product not found.')}</Empty></main></Layout>
   const name = lang === 'vi' ? product.nameVi : product.nameEn
   const description = lang === 'vi' ? product.descriptionVi : product.descriptionEn
-  const relatedProducts = (relatedQuery.data?.content || []).filter(item => item.id !== product.id).slice(0, 4)
   return <Layout><main className="page product-detail-page"><div className="product-detail-layout"><section><div className="product-detail-image" onTouchStart={event => setTouchStart(event.changedTouches[0].clientX)} onTouchEnd={handleTouchEnd}><img style={{ transform: `scale(${zoom})` }} src={activeImage?.url || fallbackImage} alt={name} onError={event => { event.currentTarget.src = fallbackImage }} /></div><div className="gallery-controls"><button type="button" aria-label={pick(lang, 'Thu nhỏ ảnh', 'Zoom out')} disabled={zoom <= 1} onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))}>−</button><span>{Math.round(zoom * 100)}%</span><button type="button" aria-label={pick(lang, 'Phóng to ảnh', 'Zoom in')} disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, Number((value + 0.25).toFixed(2))))}>+</button></div>{images.length > 1 && <><div className="gallery-step"><button type="button" aria-label={pick(lang, 'Ảnh trước', 'Previous image')} onClick={() => moveImage(-1)}>‹</button><button type="button" aria-label={pick(lang, 'Ảnh sau', 'Next image')} onClick={() => moveImage(1)}>›</button></div><div className="product-thumbs">{images.map((image, index) => <button key={image.id} className={index === selected ? 'active' : ''} onClick={() => selectImage(index)} aria-label={`${pick(lang, 'Chọn ảnh', 'Select image')} ${index + 1}`}><img src={image.url} alt="" /></button>)}</div></>}</section><section className="product-detail-info"><span className="kicker">{copy('detailEyebrow')}</span><h1>{name}</h1><p>{description || copy('detailFallback')}</p><b className="detail-price">{money(product.sellingPrice, lang)}</b>{product.sellingPrice < product.basePrice && <p><s>{money(product.basePrice, lang)}</s></p>}<button className="button dark full" onClick={() => add(product)}>{copy('addToCart')}</button><button type="button" className="button light full" onClick={() => navigate(`/checkout?buyNow=${product.id}`)}>{copy('buyNow')}</button><Link className="button light full" to="/products">{copy('backToProducts')}</Link></section></div>
     <section className="product-detail-extra">
       <div className="product-detail-tabs" role="tablist" aria-label={pick(lang, 'Thông tin sản phẩm', 'Product information')} onKeyDown={handleTabKeyDown}>
@@ -392,20 +440,36 @@ function ProductDetail() {
     </section>
     <ProductReviews productId={product.id} user={user} lang={lang} />
     <section className="product-related"><h2>{copy('relatedTitle')}</h2>
-      {relatedQuery.isLoading ? <Loading text={pick(lang, 'Đang tải sản phẩm liên quan...', 'Loading related products...')} /> : relatedQuery.isError ? <div className="state-box error" role="alert">{pick(lang, 'Không thể tải sản phẩm liên quan.', 'Unable to load related products.')}<button type="button" onClick={() => relatedQuery.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : relatedProducts.length ? <div className="product-related-grid">{relatedProducts.map(item => <CatalogCard key={item.id} product={item} />)}</div> : <p>{copy('relatedEmpty')}</p>}
+      {relatedQuery.isLoading ? <Loading text={pick(lang, 'Đang tải sản phẩm liên quan...', 'Loading related products...')} /> : relatedQuery.isError ? <div className="state-box error" role="alert">{pick(lang, 'Không thể tải sản phẩm liên quan.', 'Unable to load related products.')}<button type="button" onClick={() => relatedQuery.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : relatedProducts.length ? <div ref={relatedGrid} className="product-related-grid">{relatedProducts.map((item, index) => <CatalogCard key={item.id} product={item} listId="related_products" index={index} />)}</div> : <p>{copy('relatedEmpty')}</p>}
     </section></main></Layout>
+}
+function trackCartReduction(item, updatedCart) {
+  if (!Array.isArray(updatedCart?.items)) return
+  const remaining = updatedCart.items.find(next => Number(next.productId) === Number(item.productId))?.quantity || 0
+  const removed = Math.max(0, item.quantity - remaining)
+  if (removed) trackAnalytics('remove_from_cart', { currency: 'VND', value: Number(item.sellingPrice) * removed, items: [analyticsItem(item, removed)] })
 }
 function Cart() {
   const { cart, setCart, user, notify, lang, authLoading, startGoogleLogin, presentation } = useStore()
   const copy = key => presentationNode(presentation?.content, 'cart', key, lang)
+  const analyticsConsent = useAnalyticsConsent()
+  const viewedCart = useRef(false)
+  useEffect(() => {
+    if (analyticsConsent && cart.items.length && !viewedCart.current && trackAnalytics('view_cart', { currency: 'VND', value: Number(cart.totalAmount), items: cart.items.map(item => analyticsItem(item, item.quantity)) })) viewedCart.current = true
+  }, [analyticsConsent, cart])
   async function change(item, quantity) {
     if (!user) {
       const entries = setGuestQuantity(readGuestCart(), item.productId, quantity)
       writeGuestCart(entries)
       setCart(current => guestCartFromProducts(entries, current.items))
+      trackCartReduction(item, { items: entries })
       return
     }
-    try { setCart(quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)) } catch (error) { notify(error.message) }
+    try {
+      const updated = quantity < 1 ? await api.removeCart(item.id) : await api.updateCart(item.id, quantity)
+      setCart(updated)
+      trackCartReduction(item, updated)
+    } catch (error) { notify(error.message) }
   }
   return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Giỏ hàng', 'Cart')}</span><h1>{copy('title')}</h1></div>{authLoading ? <Loading text={pick(lang, 'Đang kiểm tra tài khoản...', 'Checking account...')} /> : user?.role === 'ADMIN' ? <Empty>{pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')}</Empty> : !cart.items.length ? <Empty>{copy('empty')} <Link to="/products">{pick(lang, 'Tiếp tục mua sắm', 'Continue shopping')}</Link></Empty> : <div className="checkout-grid"><section className="order-summary cart-panel">{cart.items.map(item => <div className="checkout-item" key={item.id}><img src={item.thumbnailUrl || fallbackImage} alt="" /><div><b>{lang === 'vi' ? item.nameVi : item.nameEn}</b>{user && <span>{pick(lang, 'Còn có thể đặt', 'Available to order')}: {item.availableQuantity}</span>}<span><button type="button" aria-label={pick(lang, 'Giảm số lượng', 'Decrease quantity')} onClick={() => change(item, item.quantity - 1)}>−</button> {item.quantity} <button type="button" aria-label={pick(lang, 'Tăng số lượng', 'Increase quantity')} disabled={item.quantity >= item.availableQuantity} onClick={() => change(item, item.quantity + 1)}>+</button></span><button type="button" className="link-danger" onClick={() => change(item, 0)}>{pick(lang, 'Xóa', 'Remove')}</button></div><div><small>{money(item.sellingPrice, lang)} × {item.quantity}</small><b>{money(item.lineTotal, lang)}</b></div></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(cart.totalAmount, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(cart.totalAmount, lang)}</b></div>{user ? <Link className="button dark full" to="/checkout">{copy('checkoutAction')}</Link> : <><button className="button dark full" type="button" onClick={() => startGoogleLogin(true)}>{pick(lang, 'Đăng nhập để thanh toán', 'Sign in to checkout')}</button><small className="cart-signin-note">{pick(lang, 'Giỏ hàng đang được lưu tạm trên thiết bị này. Giá và tồn kho sẽ được kiểm tra khi đăng nhập.', 'This cart is saved on this device. Price and inventory will be checked after sign-in.')}</small></>}</section></div>}</main></Layout>
 }
@@ -465,7 +529,7 @@ function Checkout() {
     : cart.totalAmount
   const analyticsConsent = useAnalyticsConsent()
   const checkoutTracked = useRef(false)
-  useEffect(() => { if (!analyticsConsent || !items.length || checkoutTracked.current) return; if (trackAnalytics('begin_checkout', { currency: 'VND', value: Number(total || 0), items: items.map(item => ({ item_id: String(item.productId), item_name: item.nameVi, price: Number(item.sellingPrice || 0), quantity: item.quantity })) })) checkoutTracked.current = true }, [analyticsConsent, items, total])
+  useEffect(() => { if (!analyticsConsent || !items.length || checkoutTracked.current) return; if (trackAnalytics('begin_checkout', { currency: 'VND', value: Number(total || 0), items: items.map(item => analyticsItem(item, item.quantity)) })) checkoutTracked.current = true }, [analyticsConsent, items, total])
 
   async function change(item, quantity) {
     if (isBuyNow) return
@@ -476,6 +540,7 @@ function Checkout() {
         : await api.updateCart(item.id, quantity)
 
       setCart(updated)
+      trackCartReduction(item, updated)
     } catch (error) {
       notify(error.message)
     }
@@ -830,6 +895,10 @@ function Workshop() {
   useEffect(() => { api.workshops().then(setWorkshops).catch(error => notify(error.message)) }, [notify])
   const defaultName = user?.fullName || ''
   const defaultEmail = user?.email || ''
+  const chooseWorkshop = value => {
+    if (value && value !== selectedId) trackAnalytics('select_content', { content_type: 'workshop', content_id: `workshop_${value}` })
+    setSelectedId(value)
+  }
   async function submit(event) {
     event.preventDefault()
     if (submitting) return
@@ -847,7 +916,7 @@ function Workshop() {
       notify(pick(lang, 'Đã gửi yêu cầu đặt lịch workshop.', 'Workshop booking request sent.'))
     } catch (error) { notify(error.message) } finally { setSubmitting(false) }
   }
-  return <Layout><main className="page workshop-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="experience-hero" imageUrl={presentation?.media?.WORKSHOP_HERO} /><ExperienceIntro presentation={presentation?.content} /></div>{workshops.length > 0 && <section className="workshop-cards">{workshops.map(item => <article className={String(item.id) === String(selectedId) ? 'selected' : ''} key={item.id}><img src={item.imageUrl || '/assets/images/tour.jpg'} alt={item.title} /><div><h2>{item.title}</h2><p>{item.description}</p><b>{money(item.priceAmount, lang)}</b><span>{item.durationMinutes} {pick(lang, 'phút', 'minutes')} · {pick(lang, 'tối đa', 'up to')} {item.maxParticipants} {pick(lang, 'khách', 'guests')}</span><button className="button light full" onClick={() => setSelectedId(String(item.id))}>{pick(lang, 'Chọn gói này', 'Select this offering')}</button></div></article>)}</section>}<section className="workshop-layout"><form className="workshop-form" onSubmit={submit}><h2>{copy('bookingTitle')}</h2>{created && <div className="form-success" role="status">{pick(lang, `Yêu cầu #${created.id} đã được ghi nhận. Cửa hàng sẽ liên hệ xác nhận.`, `Request #${created.id} has been recorded. The store will contact you to confirm.`)}</div>}<label className="wide">{pick(lang, 'Gói workshop', 'Workshop offering')}<select name="workshopId" value={selectedId} onChange={e => setSelectedId(e.target.value)}><option value="">{pick(lang, 'Tư vấn chọn gói', 'Help me choose')}</option>{workshops.map(item => <option key={item.id} value={item.id}>{item.title} · {money(item.priceAmount, lang)}</option>)}</select></label><label>{pick(lang, 'Họ và tên', 'Full name')}<input name="fullName" defaultValue={defaultName} maxLength="255" required /></label><label>Email<input name="email" type="email" defaultValue={defaultEmail} maxLength="320" required /></label><label>{pick(lang, 'Số điện thoại', 'Phone number')}<input name="phone" maxLength="32" required /></label><label>{pick(lang, 'Ngày giờ mong muốn', 'Preferred date and time')}<input name="preferredAt" type="datetime-local" required /></label><label>{pick(lang, 'Số người', 'Participants')}<input name="participants" type="number" min="1" max="30" defaultValue="2" required /></label><label>{pick(lang, 'Ghi chú', 'Note')}<textarea name="note" maxLength="1000" placeholder={pick(lang, 'Ví dụ: có trẻ em đi cùng, cần tư vấn gói trải nghiệm...', 'Example: children joining, need help choosing an offering...')} /></label><button className="button dark full" disabled={submitting}>{submitting ? pick(lang, 'Đang gửi...', 'Sending...') : pick(lang, 'Gửi yêu cầu đặt lịch', 'Submit booking request')}</button></form><aside className="workshop-info"><h2>{copy('informationTitle')}</h2><p><b>{pick(lang, 'Địa điểm', 'Location')}:</b> {support.address}</p><p><b>{pick(lang, 'Liên hệ', 'Contact')}:</b> {support.phones.join(' · ')}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}<p><b>{pick(lang, 'Lưu ý', 'Note')}:</b> {pick(lang, 'Đây là yêu cầu đặt lịch. Admin sẽ xác nhận lại thời gian qua điện thoại hoặc email.', 'This is a booking request. Admin will confirm the time by phone or email.')}</p><Link className="button light full" to="/support">{pick(lang, 'Cần tư vấn thêm', 'Need more help')}</Link></aside></section></main></Layout>
+  return <Layout><main className="page workshop-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="experience-hero" imageUrl={presentation?.media?.WORKSHOP_HERO} /><ExperienceIntro presentation={presentation?.content} /></div>{workshops.length > 0 && <section className="workshop-cards">{workshops.map(item => <article className={String(item.id) === String(selectedId) ? 'selected' : ''} key={item.id}><img src={item.imageUrl || '/assets/images/tour.jpg'} alt={item.title} /><div><h2>{item.title}</h2><p>{item.description}</p><b>{money(item.priceAmount, lang)}</b><span>{item.durationMinutes} {pick(lang, 'phút', 'minutes')} · {pick(lang, 'tối đa', 'up to')} {item.maxParticipants} {pick(lang, 'khách', 'guests')}</span><button className="button light full" onClick={() => chooseWorkshop(String(item.id))}>{pick(lang, 'Chọn gói này', 'Select this offering')}</button></div></article>)}</section>}<section className="workshop-layout"><form className="workshop-form" onSubmit={submit}><h2>{copy('bookingTitle')}</h2>{created && <div className="form-success" role="status">{pick(lang, `Yêu cầu #${created.id} đã được ghi nhận. Cửa hàng sẽ liên hệ xác nhận.`, `Request #${created.id} has been recorded. The store will contact you to confirm.`)}</div>}<label className="wide">{pick(lang, 'Gói workshop', 'Workshop offering')}<select name="workshopId" value={selectedId} onChange={e => chooseWorkshop(e.target.value)}><option value="">{pick(lang, 'Tư vấn chọn gói', 'Help me choose')}</option>{workshops.map(item => <option key={item.id} value={item.id}>{item.title} · {money(item.priceAmount, lang)}</option>)}</select></label><label>{pick(lang, 'Họ và tên', 'Full name')}<input name="fullName" defaultValue={defaultName} maxLength="255" required /></label><label>Email<input name="email" type="email" defaultValue={defaultEmail} maxLength="320" required /></label><label>{pick(lang, 'Số điện thoại', 'Phone number')}<input name="phone" maxLength="32" required /></label><label>{pick(lang, 'Ngày giờ mong muốn', 'Preferred date and time')}<input name="preferredAt" type="datetime-local" required /></label><label>{pick(lang, 'Số người', 'Participants')}<input name="participants" type="number" min="1" max="30" defaultValue="2" required /></label><label>{pick(lang, 'Ghi chú', 'Note')}<textarea name="note" maxLength="1000" placeholder={pick(lang, 'Ví dụ: có trẻ em đi cùng, cần tư vấn gói trải nghiệm...', 'Example: children joining, need help choosing an offering...')} /></label><button className="button dark full" disabled={submitting}>{submitting ? pick(lang, 'Đang gửi...', 'Sending...') : pick(lang, 'Gửi yêu cầu đặt lịch', 'Submit booking request')}</button></form><aside className="workshop-info"><h2>{copy('informationTitle')}</h2><p><b>{pick(lang, 'Địa điểm', 'Location')}:</b> {support.address}</p><p><b>{pick(lang, 'Liên hệ', 'Contact')}:</b> {support.phones.join(' · ')}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}<p><b>{pick(lang, 'Lưu ý', 'Note')}:</b> {pick(lang, 'Đây là yêu cầu đặt lịch. Admin sẽ xác nhận lại thời gian qua điện thoại hoặc email.', 'This is a booking request. Admin will confirm the time by phone or email.')}</p><Link className="button light full" to="/support">{pick(lang, 'Cần tư vấn thêm', 'Need more help')}</Link></aside></section></main></Layout>
 }
 function AboutPage() { return <Layout><div className="reference-page"><About /></div></Layout> }
 
