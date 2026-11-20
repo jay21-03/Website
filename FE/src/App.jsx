@@ -18,7 +18,7 @@ import { ThemeProvider, useTheme } from './design/theme'
 import { DesignContext } from './design/i18n'
 import { validateCheckout } from './domain/checkout'
 import { useCheckout, useMyOrder, useMyOrders } from './hooks/useOrders'
-import { addGuestQuantity, guestCartFromProducts, hydrateGuestCart, mergeGuestCart, readGuestCart, setGuestQuantity, writeGuestCart } from './services/guestCart'
+import { addGuestQuantity, GUEST_CART_MAX_QUANTITY, guestCartFromProducts, hydrateGuestCart, mergeGuestCart, readGuestCart, setGuestQuantity, writeGuestCart } from './services/guestCart'
 import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
@@ -251,10 +251,16 @@ function StoreProvider({ children }) {
     if (!user) {
       const previous = readGuestCart()
       const entries = addGuestQuantity(previous, productId)
+      const previousQuantity = previous.find(item => item.productId === productId)?.quantity || 0
+      const nextQuantity = entries.find(item => item.productId === productId)?.quantity || 0
+      if (nextQuantity === previousQuantity) {
+        notify(pick(lang, `Sản phẩm đã đạt tối đa ${GUEST_CART_MAX_QUANTITY} sản phẩm.`, `This product is already at the ${GUEST_CART_MAX_QUANTITY}-item limit.`))
+        return false
+      }
       writeGuestCart(entries)
       setCart(current => guestCartFromProducts(entries, [...current.items, product]))
       notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.'))
-      if ((entries.find(item => item.productId === productId)?.quantity || 0) > (previous.find(item => item.productId === productId)?.quantity || 0)) trackAdd()
+      trackAdd()
       return true
     }
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }

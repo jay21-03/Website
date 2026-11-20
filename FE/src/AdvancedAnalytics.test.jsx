@@ -54,6 +54,7 @@ describe('catalog and cart analytics', () => {
     const add = await screen.findByRole('button', { name: 'Thêm vào giỏ hàng' })
     fireEvent.click(add)
     expect(events('add_to_cart')).toHaveLength(0)
+    expect(screen.getByText('Sản phẩm đã đạt tối đa 99 sản phẩm.')).toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem(GUEST_CART_KEY))[0].quantity).toBe(99)
     localStorage.setItem(GUEST_CART_KEY, JSON.stringify([{ productId: 7, quantity: 98 }]))
     fireEvent.click(add)
