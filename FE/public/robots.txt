@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin
+Disallow: /cart
+Disallow: /orders
+
+Sitemap: https://dangxembautruc.com/sitemap.xml
