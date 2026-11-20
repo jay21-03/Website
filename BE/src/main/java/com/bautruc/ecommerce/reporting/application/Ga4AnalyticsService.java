@@ -160,7 +160,7 @@ public class Ga4AnalyticsService {
             body.put("dimensions", List.of(Map.of("name", dimension)));
             if (orderMetric != null) {
                 body.put("orderBys", List.of(Map.of("metric", Map.of("metricName", orderMetric), "desc", true)));
-                body.put("limit", "10");
+                body.put("limit", "eventName".equals(dimension) ? "50" : "10");
             }
         }
         return client.post().uri("https://analyticsdata.googleapis.com/v1beta/properties/{id}:runRealtimeReport", propertyId)
@@ -222,7 +222,7 @@ public class Ga4AnalyticsService {
             if ("date".equals(dimension)) body.put("orderBys", List.of(Map.of("dimension", Map.of("dimensionName", "date"))));
             else {
                 body.put("orderBys", List.of(Map.of("metric", Map.of("metricName", metrics.getFirst()), "desc", true)));
-                body.put("limit", "10");
+                body.put("limit", "eventName".equals(dimension) ? "50" : "10");
             }
         }
         return client.post().uri("https://analyticsdata.googleapis.com/v1beta/properties/{id}:runReport", propertyId)

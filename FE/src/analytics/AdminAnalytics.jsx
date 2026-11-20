@@ -4,6 +4,11 @@ import RealtimeAnalytics, { Breakdown, friendlyName } from './RealtimeAnalytics'
 import BusinessAnalytics from './BusinessAnalytics'
 
 const formatNumber = value => Number(value || 0).toLocaleString('vi-VN')
+const eventGroups = [
+  [['Khám phá sản phẩm', 'Product discovery'], ['view_item_list', 'select_item', 'view_item', 'view_search_results', 'filter_products', 'sort_products']],
+  [['Giỏ hàng và đơn', 'Cart and orders'], ['add_to_cart', 'view_cart', 'remove_from_cart', 'begin_checkout', 'order_created', 'purchase']],
+  [['Workshop và liên hệ', 'Workshop and contact'], ['select_content', 'generate_lead', 'click_zalo', 'click_phone', 'chat_open', 'chat_message_sent']]
+]
 
 function HistoricalAnalytics({ lang = 'vi', view = 'overview', onShowBusiness }) {
   const [data, setData] = useState(null)
@@ -45,7 +50,7 @@ function HistoricalAnalytics({ lang = 'vi', view = 'overview', onShowBusiness })
     {!loading && !error && data?.status !== 'EMPTY' && data && view === 'behavior' && <div className="analytics-reports">
       <Breakdown title={t('Trang được xem nhiều', 'Most viewed pages')} items={data.pageTitles || []} labelKey="title" valueKey="pageViews" lang={lang} />
       <Breakdown title={t('Các thao tác được ghi nhận', 'Recorded actions')} items={data.events || []} labelKey="name" valueKey="eventCount" lang={lang} translate />
-      <section className="admin-panel"><h3>{t('Thao tác mua sắm được ghi nhận', 'Recorded shopping actions')}</h3><p className="analytics-caption">{t('Đây là số lần từng thao tác được ghi nhận; không phải số khách đi qua một quy trình mua hàng.', 'These are counts of each action, not the number of shoppers progressing through checkout.')}</p><dl className="analytics-facts">{['view_item', 'add_to_cart', 'begin_checkout', 'purchase'].map(name => { const item = data.events?.find(event => event.name === name); return <div key={name}><dt title={name}>{friendlyName(name, lang)}</dt><dd>{item ? formatNumber(item.eventCount) : t('Chưa ghi nhận', 'Not observed')}</dd></div> })}</dl></section>
+      {eventGroups.map(([title, names]) => <section className="admin-panel" key={title[0]}><h3>{title[lang === 'en' ? 1 : 0]}</h3><p className="analytics-caption">{t('Số lần sự kiện được ghi nhận; không phải số khách duy nhất hoặc tỷ lệ hoàn tất phễu.', 'Recorded event counts, not unique visitors or funnel completion rates.')}</p><dl className="analytics-facts">{names.map(name => { const item = data.events?.find(event => event.name === name); return <div key={name}><dt title={name}>{friendlyName(name, lang)}</dt><dd>{item ? formatNumber(item.eventCount) : t('Chưa ghi nhận', 'Not observed')}</dd></div> })}</dl></section>)}
       <details className="analytics-details"><summary>{t('Xem đường dẫn trang', 'View page paths')}</summary><Breakdown title={t('Đường dẫn trang', 'Page paths')} items={data.pagePaths || []} labelKey="path" valueKey="pageViews" lang={lang} /></details>
     </div>}
     {!loading && !error && data?.status !== 'EMPTY' && data && view === 'overview' && <>
