@@ -18,7 +18,7 @@ import { ThemeProvider, useTheme } from './design/theme'
 import { DesignContext } from './design/i18n'
 import { validateCheckout } from './domain/checkout'
 import { useCheckout, useMyOrder, useMyOrders } from './hooks/useOrders'
-import { addGuestQuantity, guestCartFromProducts, hydrateGuestCart, mergeGuestCart, readGuestCart, setGuestQuantity, writeGuestCart } from './services/guestCart'
+import { addGuestQuantity, GUEST_CART_MAX_QUANTITY, guestCartFromProducts, hydrateGuestCart, mergeGuestCart, readGuestCart, setGuestQuantity, writeGuestCart } from './services/guestCart'
 import { businessLocalDateTimeToOffset } from './utils/businessDate'
 import { formatBusinessDateTime, formatCurrencyVnd } from './utils/format'
 import { orderStatusLabel, paymentStatusLabel } from './utils/status'
@@ -249,7 +249,14 @@ function StoreProvider({ children }) {
     const trackAdd = () => trackAnalytics('add_to_cart', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [analyticsItem(product)] })
     const productId = product.id
     if (!user) {
-      const entries = addGuestQuantity(readGuestCart(), productId)
+      const previous = readGuestCart()
+      const entries = addGuestQuantity(previous, productId)
+      const previousQuantity = previous.find(item => item.productId === productId)?.quantity || 0
+      const nextQuantity = entries.find(item => item.productId === productId)?.quantity || 0
+      if (nextQuantity === previousQuantity) {
+        notify(pick(lang, `Sản phẩm đã đạt tối đa ${GUEST_CART_MAX_QUANTITY} sản phẩm.`, `This product is already at the ${GUEST_CART_MAX_QUANTITY}-item limit.`))
+        return false
+      }
       writeGuestCart(entries)
       setCart(current => guestCartFromProducts(entries, [...current.items, product]))
       notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.'))

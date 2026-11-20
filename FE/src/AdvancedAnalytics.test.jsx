@@ -48,6 +48,20 @@ function mount(path) {
 const events = name => trackAnalytics.mock.calls.filter(([event]) => event === name)
 
 describe('catalog and cart analytics', () => {
+  it('tracks a guest add only when the stored quantity increases', async () => {
+    localStorage.setItem(GUEST_CART_KEY, JSON.stringify([{ productId: 7, quantity: 99 }]))
+    mount('/products/7')
+    const add = await screen.findByRole('button', { name: 'Thêm vào giỏ hàng' })
+    fireEvent.click(add)
+    expect(events('add_to_cart')).toHaveLength(0)
+    expect(screen.getByText('Sản phẩm đã đạt tối đa 99 sản phẩm.')).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(GUEST_CART_KEY))[0].quantity).toBe(99)
+    localStorage.setItem(GUEST_CART_KEY, JSON.stringify([{ productId: 7, quantity: 98 }]))
+    fireEvent.click(add)
+    expect(events('add_to_cart')).toHaveLength(1)
+    expect(JSON.parse(localStorage.getItem(GUEST_CART_KEY))[0].quantity).toBe(99)
+  })
+
   it('tracks managed featured products and their selection on the homepage', async () => {
     api.home.mockResolvedValue({ featuredProducts: [product, { ...product, id: 8 }, { ...product, id: 9 }] })
     mount('/')
