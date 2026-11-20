@@ -249,11 +249,12 @@ function StoreProvider({ children }) {
     const trackAdd = () => trackAnalytics('add_to_cart', { currency: 'VND', value: Number(product.sellingPrice || 0), items: [analyticsItem(product)] })
     const productId = product.id
     if (!user) {
-      const entries = addGuestQuantity(readGuestCart(), productId)
+      const previous = readGuestCart()
+      const entries = addGuestQuantity(previous, productId)
       writeGuestCart(entries)
       setCart(current => guestCartFromProducts(entries, [...current.items, product]))
       notify(pick(lang, 'Đã thêm vào giỏ hàng.', 'Added to cart.'))
-      trackAdd()
+      if ((entries.find(item => item.productId === productId)?.quantity || 0) > (previous.find(item => item.productId === productId)?.quantity || 0)) trackAdd()
       return true
     }
     if (user.role !== 'USER') { notify(pick(lang, 'Tài khoản quản trị không có giỏ hàng.', 'Admin accounts do not have carts.')); return false }
