@@ -38,9 +38,9 @@ test('manual SPA page views keep campaign tags and exclude private query data', 
   const views = () => page.evaluate(() => (window.dataLayer || []).filter(command => command[0] === 'event' && command[1] === 'page_view').map(command => command[2]))
   await expect.poll(async () => (await views()).length).toBe(1)
   expect((await views())[0].page_location).toBe('http://127.0.0.1:4173/?utm_source=facebook&utm_campaign=pottery_launch')
-  await page.locator('footer a[href="/products"]').click()
+  await page.locator('footer a[href="/san-pham"]').click()
   await expect.poll(async () => (await views()).length).toBe(2)
-  await page.locator('footer a[href="/workshop"]').click()
+  await page.locator('footer a[href="/trai-nghiem"]').click()
   await expect.poll(async () => (await views()).length).toBe(3)
   await page.goBack()
   await expect.poll(async () => (await views()).length).toBe(4)
@@ -293,7 +293,7 @@ const featuredProduct3 = {
   status: 'ACTIVE'
 }
 
-const collection = { id: 1, nameVi: 'Bo suu tap do', nameEn: 'Red collection', descriptionVi: 'Gom mau dat nung.', descriptionEn: 'Fired clay tones.', status: 'ACTIVE' }
+const collection = { id: 1, nameVi: 'Bình gốm trang trí', nameEn: 'Decorative vases', descriptionVi: 'Gốm màu đất nung.', descriptionEn: 'Fired clay tones.', status: 'ACTIVE' }
 const inactiveCollection = { id: 2, nameVi: 'Bo suu tap cu', nameEn: 'Archive collection', descriptionVi: 'Dang an.', descriptionEn: 'Hidden.', status: 'INACTIVE' }
 
 const cart = {
@@ -584,12 +584,24 @@ test('public catalog delegates search/filter/sort to backend and opens product d
   await expect(page.getByText(/200.000|200,000/)).toBeVisible()
 })
 
+test('collection slug keeps the catalog filter after refresh', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/san-pham/binh-gom-trang-tri')
+  await expect(page.getByRole('heading', { name: 'Bình gốm trang trí' })).toBeVisible()
+  await page.getByText(/Tìm kiếm & bộ lọc|Search & filters/i).click()
+  await expect(page.locator('.catalog-advanced select').first()).toHaveValue('1')
+  await page.reload()
+  await expect(page.locator('.catalog-advanced select').first()).toHaveValue('1')
+  await page.getByRole('button', { name: 'Tất Cả' }).click()
+  await expect(page).toHaveURL('/san-pham')
+})
+
 test('public collections route filters products and product detail gallery supports zoom', async ({ page, isMobile }) => {
   await mockApi(page)
   await page.goto('/collections')
   await expect(page.getByRole('heading', { name: /Khám phá theo bộ sưu tập|Explore by collection/i })).toBeVisible()
   await page.getByRole('link', { name: /Xem sản phẩm|View products/i }).click()
-  await expect(page).toHaveURL(/collectionId=1/)
+  await expect(page).toHaveURL(/\/san-pham\/binh-gom-trang-tri$/)
   await page.goto('/products/10')
   await page.getByRole('button', { name: /Phóng to ảnh|Zoom in/i }).click()
   await expect(page.getByText('125%')).toBeVisible()
