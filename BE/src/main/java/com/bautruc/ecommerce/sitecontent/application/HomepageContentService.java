@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class HomepageContentService {
     private static final int FEATURED_COUNT = 3;
-    public static final String DEFAULT_SLOGAN_VI = "Tinh hoa gốm Chăm – Gìn giữ hồn di sản";
+    public static final String DEFAULT_SLOGAN_VI = "Gốm Bàu Trúc – Tinh hoa gốm Chăm từ đôi tay nghệ nhân";
     public static final String DEFAULT_SLOGAN_EN = "The essence of Cham pottery – preserving the soul of heritage";
 
     private final SiteMediaJpaRepository media;

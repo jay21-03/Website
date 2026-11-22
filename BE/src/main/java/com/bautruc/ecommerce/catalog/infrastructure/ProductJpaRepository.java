@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 public interface ProductJpaRepository extends JpaRepository<Product,Long>, JpaSpecificationExecutor<Product>{
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
+    Optional<Product> findBySlugAndStatusAndDeletedAtIsNull(String slug, ProductStatus status);
+    boolean existsBySlug(String slug);
     Page<Product> findByStatusAndDeletedAtIsNull(ProductStatus status,Pageable pageable);
     Page<Product> findByDeletedAtIsNull(Pageable pageable);
     List<Product> findByIdInAndStatusAndDeletedAtIsNull(Collection<Long> ids, ProductStatus status);

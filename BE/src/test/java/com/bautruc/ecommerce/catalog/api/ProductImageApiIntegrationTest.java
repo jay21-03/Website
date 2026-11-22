@@ -157,8 +157,8 @@ class ProductImageApiIntegrationTest {
     }
 
     private long insertProduct() {
-        long collection = jdbc.queryForObject("insert into collections(name_vi,name_en,status,created_at,updated_at) values('Gom','Pottery','ACTIVE',now(),now()) returning id", Long.class);
-        return jdbc.queryForObject("insert into products(name_vi,name_en,base_price,status,collection_id,created_at,updated_at) values('Binh','Vase',100000,'ACTIVE',?,now(),now()) returning id", Long.class, collection);
+        long collection = jdbc.queryForObject("insert into collections(name_vi,name_en,slug,status,created_at,updated_at) values('Gom','Pottery',concat('test-',gen_random_uuid()),'ACTIVE',now(),now()) returning id", Long.class);
+        return jdbc.queryForObject("insert into products(name_vi,name_en,slug,base_price,status,collection_id,created_at,updated_at) values('Binh','Vase',concat('test-',gen_random_uuid()),100000,'ACTIVE',?,now(),now()) returning id", Long.class, collection);
     }
 
     private User saveAdmin(String subject) {

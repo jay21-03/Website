@@ -30,7 +30,8 @@ public enum SiteMediaSlot {
     SITE_FACEBOOK_ICON("facebook-icon"),
     SITE_TRUST_1_ICON("trust-1-icon"),
     SITE_TRUST_2_ICON("trust-2-icon"),
-    SITE_TRUST_3_ICON("trust-3-icon");
+    SITE_TRUST_3_ICON("trust-3-icon"),
+    SEO_SHARE("share");
 
     private final String pathSegment;
 

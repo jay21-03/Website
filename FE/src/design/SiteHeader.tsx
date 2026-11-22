@@ -12,6 +12,7 @@ export const NAV_LINKS = [
   { to: "/san-pham", vi: "Sản Phẩm", en: "Products" },
   { to: "/trai-nghiem", vi: "Trải Nghiệm", en: "Experience" },
   { to: "/ve-chung-toi", vi: "Về Chúng Tôi", en: "About Us" },
+  { to: "/blog", vi: "Chuyện Làng Gốm", en: "Journal" },
   { to: "/lien-he", vi: "Liên Hệ", en: "Contact" },
 ] as const;
 

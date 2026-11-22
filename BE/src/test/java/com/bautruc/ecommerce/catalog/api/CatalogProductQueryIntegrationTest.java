@@ -12,6 +12,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 
 import com.bautruc.ecommerce.common.storage.ObjectStoragePort;
+import com.bautruc.ecommerce.catalog.api.request.ProductRequest;
+import com.bautruc.ecommerce.catalog.application.CatalogService;
+import com.bautruc.ecommerce.catalog.domain.ProductStatus;
 import com.bautruc.ecommerce.common.security.JwtAuthenticationFilter;
 import com.bautruc.ecommerce.common.security.JwtTokenService;
 import com.bautruc.ecommerce.identity.domain.User;
@@ -63,6 +66,12 @@ class CatalogProductQueryIntegrationTest {
     JdbcTemplate jdbc;
 
     @Autowired
+    CatalogService catalog;
+
+    @Autowired
+    com.bautruc.ecommerce.seo.SeoPageController seoPages;
+
+    @Autowired
     UserJpaRepository users;
 
     @Autowired
@@ -75,6 +84,82 @@ class CatalogProductQueryIntegrationTest {
     void clean() {
         jdbc.execute("TRUNCATE TABLE collections, users CASCADE");
         when(storage.publicUrl(anyString())).thenAnswer(invocation -> "https://cdn.example/" + invocation.getArgument(0));
+    }
+
+    @Test
+    void productSlugIsStableAndOnlyPublicForActiveProducts() throws Exception {
+        long group = collection("Bình gốm trang trí", "Decorative vases");
+        var request = new ProductRequest("Bình gốm Đàng Xem", "Dang Xem vase", "Mô tả", "Description", 100000L, group, ProductStatus.ACTIVE);
+        var first = catalog.createProduct(request);
+        var second = catalog.createProduct(request);
+        assertThat(first.getSlug()).isNotEqualTo(second.getSlug());
+        mvc.perform(get("/api/v1/products/{slug}", first.getSlug()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(first.getId()))
+                .andExpect(jsonPath("$.data.slug").value(first.getSlug()));
+        catalog.updateProduct(first.getId(), new ProductRequest("Tên mới", "New name", "Mô tả", "Description", 100000L, group, ProductStatus.ACTIVE));
+        assertThat(catalog.requireProduct(first.getId()).getSlug()).isEqualTo(first.getSlug());
+        catalog.updateProductStatus(first.getId(), ProductStatus.INACTIVE);
+        mvc.perform(get("/api/v1/products/{slug}", first.getSlug())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/products/{id}", first.getId())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminCanUpdateSeoAndSlugWithoutLosingOldAddress() throws Exception {
+        long group = collection("Gom", "Pottery");
+        var product = catalog.createProduct(new ProductRequest("Binh gom", "Vase", "Mo ta", "Description", 1000L, group, ProductStatus.ACTIVE));
+        String originalSlug = product.getSlug();
+        Cookie admin = access(saveAdmin());
+        String payload = """
+                {"nameVi":"Binh gom","nameEn":"Vase","descriptionVi":"Mo ta","descriptionEn":"Description",
+                 "basePrice":1000,"collectionId":%d,"status":"ACTIVE","slug":"binh-gom-moi",
+                 "seoTitle":"Binh gom seo","seoDescription":"Mo ta tim kiem"}
+                """.formatted(group);
+        mvc.perform(put("/api/v1/admin/products/{id}", product.getId()).with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON).content(payload)).andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/v1/admin/products/{id}", product.getId()).cookie(admin).with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.slug").value("binh-gom-moi"))
+                .andExpect(jsonPath("$.data.seoTitle").value("Binh gom seo"));
+        mvc.perform(get("/api/v1/admin/products/{id}", product.getId()).cookie(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.seoDescription").value("Mo ta tim kiem"));
+        assertThat(jdbc.queryForObject("SELECT product_id FROM product_slug_redirects WHERE old_slug = ?", Long.class, originalSlug))
+                .isEqualTo(product.getId());
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title></head><body><div id=\"root\"></div><script src=\"/assets/app.js\"></script></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        mvc.perform(get("/products/{id}", product.getId()))
+                .andExpect(status().isMovedPermanently())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Location", "https://dangxembautruc.com/san-pham/binh-gom-moi"));
+        mvc.perform(get("/san-pham/{slug}", originalSlug))
+                .andExpect(status().isMovedPermanently());
+        mvc.perform(get("/san-pham/binh-gom-moi"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("<link rel=\"canonical\" href=\"https://dangxembautruc.com/san-pham/binh-gom-moi\">")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("Binh gom seo")));
+        mvc.perform(get("/san-pham/unknown-product"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void seoSettingsRequireAdminAndEscapeCrawlerHtml() throws Exception {
+        Cookie admin = access(saveAdmin());
+        String payload = """
+                {"path":"/faq","title":"FAQ <script>alert(1)</script>","description":"Safe description"}
+                """;
+        mvc.perform(put("/api/v1/admin/seo/metadata").with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON).content(payload)).andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/v1/admin/seo/metadata").cookie(admin).with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON).content(payload)).andExpect(status().isOk());
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title></head><body><div id=\"root\"></div><script src=\"/assets/app.js\"></script></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        mvc.perform(get("/faq")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("FAQ  alert(1)")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<script>alert(1)</script>"))));
+        mvc.perform(get("/sitemap.xml")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("https://dangxembautruc.com/faq")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/products/"))));
     }
 
     @Test
@@ -186,16 +271,16 @@ class CatalogProductQueryIntegrationTest {
 
     private long collection(String nameVi, String nameEn) {
         return jdbc.queryForObject("""
-                INSERT INTO collections(name_vi,name_en,status,created_at,updated_at)
-                VALUES(?,?,'ACTIVE',now(),now())
+                INSERT INTO collections(name_vi,name_en,status,slug,created_at,updated_at)
+                VALUES(?,?,'ACTIVE',gen_random_uuid()::text,now(),now())
                 RETURNING id
                 """, Long.class, nameVi, nameEn);
     }
 
     private long product(String nameVi, String nameEn, long basePrice, String status, long collectionId) {
         return jdbc.queryForObject("""
-                INSERT INTO products(name_vi,name_en,base_price,status,collection_id,created_at,updated_at)
-                VALUES(?,?,?,?,?,now(),now())
+                INSERT INTO products(name_vi,name_en,base_price,status,collection_id,slug,created_at,updated_at)
+                VALUES(?,?,?,?,?,gen_random_uuid()::text,now(),now())
                 RETURNING id
                 """, Long.class, nameVi, nameEn, basePrice, status, collectionId);
     }

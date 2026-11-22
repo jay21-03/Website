@@ -38,9 +38,9 @@ test('manual SPA page views keep campaign tags and exclude private query data', 
   const views = () => page.evaluate(() => (window.dataLayer || []).filter(command => command[0] === 'event' && command[1] === 'page_view').map(command => command[2]))
   await expect.poll(async () => (await views()).length).toBe(1)
   expect((await views())[0].page_location).toBe('http://127.0.0.1:4173/?utm_source=facebook&utm_campaign=pottery_launch')
-  await page.locator('footer a[href="/products"]').click()
+  await page.locator('footer a[href="/san-pham"]').click()
   await expect.poll(async () => (await views()).length).toBe(2)
-  await page.locator('footer a[href="/workshop"]').click()
+  await page.locator('footer a[href="/trai-nghiem"]').click()
   await expect.poll(async () => (await views()).length).toBe(3)
   await page.goBack()
   await expect.poll(async () => (await views()).length).toBe(4)
@@ -73,7 +73,7 @@ test('featured product impression waits until the list is visible', async ({ pag
   await mockApi(page, null)
   await page.route('https://www.googletagmanager.com/gtag/js?*', route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }))
   await page.goto('/')
-  const list = page.locator('a[href="/products/10"]').last()
+  const list = page.locator('a[href="/san-pham/binh-gom-do-10"]').last()
   await expect(list).toBeAttached()
   const impressions = () => page.evaluate(() => (window.dataLayer || []).filter(command => command[0] === 'event' && command[1] === 'view_item_list' && command[2].item_list_id === 'home_featured').length)
   expect(await impressions()).toBe(0)
@@ -243,6 +243,7 @@ test('product detail controls and tabs use readable theme colors in light and da
 
 const product = {
   id: 10,
+  slug: 'binh-gom-do-10',
   nameVi: 'Binh gom do',
   nameEn: 'Red pottery vase',
   descriptionVi: 'Gom Bau Truc tao hinh bang tay.',
@@ -260,6 +261,7 @@ const product = {
 const inactiveProduct = {
   ...product,
   id: 11,
+  slug: 'binh-gom-an-11',
   nameVi: 'Binh gom an',
   nameEn: 'Hidden pottery vase',
   status: 'INACTIVE',
@@ -276,6 +278,7 @@ const inactiveProduct = {
 const featuredProduct2 = {
   ...product,
   id: 12,
+  slug: 'binh-gom-xanh-12',
   nameVi: 'Binh gom xanh',
   nameEn: 'Blue pottery vase',
   sellingPrice: 220000,
@@ -286,6 +289,7 @@ const featuredProduct2 = {
 const featuredProduct3 = {
   ...product,
   id: 13,
+  slug: 'bo-tra-gom-13',
   nameVi: 'Bo tra gom',
   nameEn: 'Pottery tea set',
   sellingPrice: 320000,
@@ -293,7 +297,7 @@ const featuredProduct3 = {
   status: 'ACTIVE'
 }
 
-const collection = { id: 1, nameVi: 'Bo suu tap do', nameEn: 'Red collection', descriptionVi: 'Gom mau dat nung.', descriptionEn: 'Fired clay tones.', status: 'ACTIVE' }
+const collection = { id: 1, slug: 'binh-gom-trang-tri', nameVi: 'Bình gốm trang trí', nameEn: 'Decorative vases', descriptionVi: 'Gốm màu đất nung.', descriptionEn: 'Fired clay tones.', status: 'ACTIVE' }
 const inactiveCollection = { id: 2, nameVi: 'Bo suu tap cu', nameEn: 'Archive collection', descriptionVi: 'Dang an.', descriptionEn: 'Hidden.', status: 'INACTIVE' }
 
 const cart = {
@@ -422,7 +426,7 @@ async function mockApi(page, role = 'USER') {
         ...adminHome,
         featuredProducts: productIds.map((id, index) => {
           const selected = candidates.find(item => item.id === id)
-          return { slot: index + 1, id: selected.id, nameVi: selected.nameVi, nameEn: selected.nameEn, descriptionVi: selected.descriptionVi, descriptionEn: selected.descriptionEn, basePrice: selected.basePrice, sellingPrice: selected.sellingPrice, thumbnailUrl: selected.thumbnailUrl }
+          return { slot: index + 1, id: selected.id, slug: selected.slug, nameVi: selected.nameVi, nameEn: selected.nameEn, descriptionVi: selected.descriptionVi, descriptionEn: selected.descriptionEn, basePrice: selected.basePrice, sellingPrice: selected.sellingPrice, thumbnailUrl: selected.thumbnailUrl }
         })
       }
       return ok(adminHome)
@@ -567,7 +571,7 @@ test('public homepage renders managed media and backend featured products', asyn
 
   const featured = page.locator('article').filter({ hasText: 'Binh gom xanh' })
   await expect(featured.getByRole('heading', { name: 'Binh gom xanh' })).toBeVisible()
-  await expect(featured.getByRole('link', { name: /Xem Chi Tiết|View Details/i })).toHaveAttribute('href', '/products/12')
+  await expect(featured.getByRole('link', { name: /Xem Chi Tiết|View Details/i })).toHaveAttribute('href', '/san-pham/binh-gom-xanh-12')
 
   const journeyImage = page.getByRole('img', { name: 'Ảnh xưởng gốm 1' })
   await expect(journeyImage).toHaveAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==')
@@ -584,12 +588,72 @@ test('public catalog delegates search/filter/sort to backend and opens product d
   await expect(page.getByText(/200.000|200,000/)).toBeVisible()
 })
 
+test('collection slug keeps the catalog filter after refresh', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/san-pham/binh-gom-trang-tri')
+  await expect(page.getByRole('heading', { name: 'Bình gốm trang trí' })).toBeVisible()
+  await page.getByText(/Tìm kiếm & bộ lọc|Search & filters/i).click()
+  await expect(page.locator('.catalog-advanced select').first()).toHaveValue('1')
+  await page.reload()
+  await expect(page.locator('.catalog-advanced select').first()).toHaveValue('1')
+  await page.getByRole('button', { name: 'Tất Cả' }).click()
+  await expect(page).toHaveURL('/san-pham')
+})
+
+test('product slug opens detail without changing the product ID used for cart actions', async ({ page }) => {
+  await mockApi(page)
+  await page.route('**/api/v1/products/binh-gom-10', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, data: { ...product, slug: 'binh-gom-10' } })
+  }))
+  await page.goto('/san-pham/binh-gom-10')
+  await expect(page.getByRole('heading', { name: product.nameVi })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Thêm vào giỏ hàng|Add to cart/i })).toBeVisible()
+})
+
+test('blog SEO title overrides the site default after hydration', async ({ page }) => {
+  await mockApi(page)
+  await page.route('**/api/v1/seo/metadata', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { default: { title: 'Site default', description: 'Site description' } } }) }))
+  await page.route('**/api/v1/blog/test-post', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { id: 1, slug: 'test-post', title: 'Blog article', bodyMarkdown: '# Blog article', seoTitle: 'Article SEO title', seoDescription: 'Article SEO description', status: 'PUBLISHED' } }) }))
+  await page.goto('/blog/test-post')
+  await expect(page).toHaveTitle('Article SEO title')
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', 'Article SEO description')
+})
+
+test('admin blog preview reflects the unsaved draft', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  await page.route('**/api/v1/admin/blog', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) }))
+  await page.goto('/admin?section=blog')
+  await page.getByRole('button', { name: /Viết bài mới|New story/ }).click()
+  await page.getByLabel('Tiêu đề bài viết').fill('Bài viết mới')
+  await expect(page.locator('.blog-url-hint')).toHaveText('/blog/bai-viet-moi')
+  await page.locator('.blog-seo-options summary').click()
+  await expect(page.getByLabel('Đường dẫn bài viết')).toHaveValue('bai-viet-moi')
+  await page.getByLabel('Nội dung (Markdown)').fill('# Bài viết mới\n## Làng nghề\nNội dung xem trước.')
+  const preview = page.getByText('Xem trước bài viết').locator('..')
+  await expect(preview.getByRole('heading', { name: 'Bài viết mới' })).toBeVisible()
+  await expect(preview.getByRole('heading', { name: 'Làng nghề' })).toBeVisible()
+  await expect(preview).toContainText('Nội dung xem trước.')
+})
+
+test('public blog link remains findable while posts are drafts', async ({ page, isMobile }) => {
+  await mockApi(page)
+  await page.route('**/api/v1/blog', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) }))
+  await page.goto('/')
+  if (isMobile) await page.getByRole('button', { name: 'Mở menu' }).click()
+  await page.getByRole('navigation').getByRole('link', { name: 'Chuyện Làng Gốm' }).first().click()
+  await expect(page).toHaveURL(/\/blog$/)
+  await expect(page.getByRole('heading', { name: 'Chưa có bài viết được xuất bản' })).toBeVisible()
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
+})
+
 test('public collections route filters products and product detail gallery supports zoom', async ({ page, isMobile }) => {
   await mockApi(page)
   await page.goto('/collections')
   await expect(page.getByRole('heading', { name: /Khám phá theo bộ sưu tập|Explore by collection/i })).toBeVisible()
   await page.getByRole('link', { name: /Xem sản phẩm|View products/i }).click()
-  await expect(page).toHaveURL(/collectionId=1/)
+  await expect(page).toHaveURL(/\/san-pham\/binh-gom-trang-tri$/)
   await page.goto('/products/10')
   await page.getByRole('button', { name: /Phóng to ảnh|Zoom in/i }).click()
   await expect(page.getByText('125%')).toBeVisible()
@@ -824,6 +888,7 @@ test('failed checkout login preserves the guest cart and stays on cart', async (
 })
 
 test('normal header Google login does not create checkout redirect', async ({ page, isMobile }) => {
+  await page.addInitScript(() => localStorage.setItem('dx.analytics.consent.v1', 'denied'))
   await mockGoogleIdentity(page)
   await mockApi(page, null)
   await page.route('**/api/v1/auth/google', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { user: { id: 2, fullName: 'Customer', email: 'customer@example.com', role: 'USER' } } }) }))

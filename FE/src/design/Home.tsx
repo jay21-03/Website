@@ -28,6 +28,7 @@ type HomepageMedia = {
 type HomepageProduct = {
   slot?: number;
   id: number;
+  slug?: string | null;
   nameVi: string;
   nameEn?: string | null;
   descriptionVi?: string | null;
@@ -110,7 +111,7 @@ export default function Home({ home, fallbackProducts = [], presentation, media 
             </p>
             <h1 className="max-w-4xl font-display text-[2.4rem] leading-[1.08] sm:text-6xl lg:text-7xl">
               {t(
-                home?.sloganVi || "Tinh hoa gốm Chăm – Gìn giữ hồn di sản",
+                home?.sloganVi || "Gốm Bàu Trúc – Tinh hoa gốm Chăm từ đôi tay nghệ nhân",
                 home?.sloganEn || "The essence of Cham pottery – preserving the soul of heritage",
               )}
             </h1>
@@ -135,6 +136,16 @@ export default function Home({ home, fallbackProducts = [], presentation, media 
               </Link>
             </div>
           </Reveal>
+        </div>
+      </section>
+
+      <section className="border-b border-primary/20 bg-background">
+        <div className="mx-auto max-w-5xl px-5 py-12 lg:px-8">
+          <p className="text-base leading-8 text-foreground sm:text-lg">{copy("introBody")}</p>
+          <div className="mt-5 flex flex-wrap gap-5 text-sm text-primary">
+            <Link to="/san-pham">{copy("productsAction")}</Link>
+            <Link to="/trai-nghiem">{copy("bookingAction")}</Link>
+          </div>
         </div>
       </section>
 
@@ -226,7 +237,7 @@ export default function Home({ home, fallbackProducts = [], presentation, media 
                       <h3 className="font-display text-xl">{name}</h3>
                       <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
                       <Link
-                        to={`/products/${product.id}`}
+                        to={product.slug ? `/san-pham/${product.slug}` : `/products/${product.id}`}
                         onClick={() => trackAnalytics('select_item', { item_list_id: 'home_featured', items: [analyticsItem(product, 1, undefined, i)] })}
                         className="mt-6 inline-flex w-fit items-center gap-2 rounded-sm border border-primary px-5 py-2.5 text-sm text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                       >

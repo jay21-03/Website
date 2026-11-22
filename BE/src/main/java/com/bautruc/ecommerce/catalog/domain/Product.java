@@ -8,6 +8,9 @@ public class Product {
     @Id @GeneratedValue(strategy=GenerationType.SEQUENCE,generator="global_seq")
     @SequenceGenerator(name="global_seq",sequenceName="app_global_id_seq",allocationSize=1)
     private Long id;
+    @Column(name="slug",nullable=false,length=300,unique=true) private String slug;
+    @Column(name="seo_title",length=180) private String seoTitle;
+    @Column(name="seo_description",length=500) private String seoDescription;
     @Column(name="name_vi",nullable=false) private String nameVi;
     @Column(name="name_en",nullable=false) private String nameEn;
     @Column(name="description_vi") private String descriptionVi;
@@ -25,13 +28,16 @@ public class Product {
         this.nameVi=required(vi);this.nameEn=required(en);this.descriptionVi=dvi;this.descriptionEn=den;setPrice(price);
         this.status=required(status);this.collectionId=required(collectionId);this.createdAt=now;this.updatedAt=now;
     }
-    public Long getId(){return id;} public String getNameVi(){return nameVi;} public String getNameEn(){return nameEn;}
+    @PrePersist private void assignSlug(){if(slug==null)slug=ProductSlug.fromName(nameVi,id);}
+    public Long getId(){return id;} public String getSlug(){return slug;} public String getSeoTitle(){return seoTitle;} public String getSeoDescription(){return seoDescription;} public String getNameVi(){return nameVi;} public String getNameEn(){return nameEn;}
     public String getDescriptionVi(){return descriptionVi;} public String getDescriptionEn(){return descriptionEn;}
     public long getBasePrice(){return basePrice;} public ProductStatus getStatus(){return status;}
     public String getSizeCm(){return sizeCm;} public Long getWeightGrams(){return weightGrams;}
     public Long getCollectionId(){return collectionId;} public Instant getCreatedAt(){return createdAt;}
     public Instant getUpdatedAt(){return updatedAt;} public Instant getDeletedAt(){return deletedAt;}
     public boolean isPurchasable(){return status==ProductStatus.ACTIVE&&deletedAt==null;}
+    public void changeSlug(String value){slug=value;}
+    public void updateSeo(String title,String description){if(title!=null)seoTitle=title.isBlank()?null:title.trim();if(description!=null)seoDescription=description.isBlank()?null:description.trim();}
     public void update(String vi,String en,String dvi,String den,long price,ProductStatus status,Long collectionId,Instant now){
         this.nameVi=required(vi);this.nameEn=required(en);this.descriptionVi=dvi;this.descriptionEn=den;setPrice(price);
         this.status=required(status);this.collectionId=required(collectionId);this.updatedAt=now;
