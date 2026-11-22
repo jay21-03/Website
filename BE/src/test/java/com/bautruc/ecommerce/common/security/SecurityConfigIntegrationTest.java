@@ -105,6 +105,12 @@ class SecurityConfigIntegrationTest {
     }
 
     @Test
+    void localMediaIsPublic() throws Exception {
+        mockMvc.perform(get("/local-media/example.jpg"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void csrfRepositoryAndAuthenticationStrategyAreSharedBeans() {
         assertThat(csrfTokenRepository).isNotNull();
         assertThat(csrfAuthenticationStrategy).isNotNull();

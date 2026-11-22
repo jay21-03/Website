@@ -3,10 +3,12 @@ package com.bautruc.ecommerce.common.storage;
 import com.bautruc.ecommerce.common.config.ApplicationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
 @Configuration
+@Profile("!local")
 public class S3Configuration {
     @Bean(destroyMethod = "close")
     ObjectStoragePort objectStoragePort(ApplicationProperties properties) {
