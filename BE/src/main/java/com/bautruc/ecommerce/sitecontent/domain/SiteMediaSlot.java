@@ -31,6 +31,8 @@ public enum SiteMediaSlot {
     SITE_TRUST_1_ICON("trust-1-icon"),
     SITE_TRUST_2_ICON("trust-2-icon"),
     SITE_TRUST_3_ICON("trust-3-icon"),
+    BLOG_HERO("hero"),
+    BLOG_HERO_DARK("hero-dark"),
     SEO_SHARE("share");
 
     private final String pathSegment;

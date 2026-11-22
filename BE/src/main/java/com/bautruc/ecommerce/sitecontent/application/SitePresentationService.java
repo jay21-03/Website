@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SitePresentationService {
-    private static final Set<String> PAGES = Set.of("brand", "home", "workshop", "support", "catalog", "cart", "orders", "faq", "policy", "checkout");
+    private static final Set<String> PAGES = Set.of("brand", "home", "workshop", "support", "catalog", "blog", "cart", "orders", "faq", "policy", "checkout");
     private static final Set<String> FIELDS = Set.of("receiverName", "phone", "email", "address", "note");
     private static final Set<String> SECTIONS = Set.of("form", "summary");
     private static final Set<String> COLORS = Set.of("clay", "royal", "minimal", "nature", "sunset", "night", "sage", "ocean");
@@ -57,6 +57,7 @@ public class SitePresentationService {
             }
         }
         Map<String, String> urls = Set.of(SiteMediaSlot.CATALOG_HERO, SiteMediaSlot.CATALOG_HERO_DARK,
+                SiteMediaSlot.BLOG_HERO, SiteMediaSlot.BLOG_HERO_DARK,
                 SiteMediaSlot.WORKSHOP_HERO, SiteMediaSlot.WORKSHOP_HERO_DARK,
                 SiteMediaSlot.SUPPORT_HERO, SiteMediaSlot.SUPPORT_HERO_DARK,
                 SiteMediaSlot.CHECKOUT_HERO, SiteMediaSlot.CHECKOUT_HERO_DARK,

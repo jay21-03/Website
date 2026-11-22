@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFront CDN for existing private Bau Truc Dev S3 bucket.
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: shopbautruc-product-images-dev
+
+Resources:
+  ImagesOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "bautruc-dev-images-${AWS::AccountId}"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+        Description: Private Dev S3 media access
+
+  ImagesDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: Bau Truc Dev image CDN
+        Enabled: true
+        IPV6Enabled: true
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: DevImagesS3Origin
+            DomainName: !Sub "${BucketName}.s3.ap-southeast-1.amazonaws.com"
+            OriginAccessControlId: !Ref ImagesOAC
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: DevImagesS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+Outputs:
+  DistributionId:
+    Value: !Ref ImagesDistribution
+  PublicBaseUrl:
+    Value: !Sub "https://${ImagesDistribution.DomainName}"

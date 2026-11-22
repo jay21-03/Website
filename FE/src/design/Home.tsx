@@ -8,11 +8,11 @@ import { PotIcon } from "./PotIcon";
 import { useI18n } from "./i18n";
 import heroPottery from "./assets/hero-pottery.jpg";
 import artisan from "./assets/artisan.jpg";
-import pVase from "./assets/p-vase.jpg";
 import pKit from "./assets/p-kit.jpg";
-import pApsara from "./assets/p-apsara.jpg";
 import wsFamily from "./assets/ws-family.jpg";
+import pApsara from "./assets/p-apsara.jpg";
 import wsTour from "./assets/ws-tour.jpg";
+import pVase from "./assets/p-vase.jpg";
 import { presentationNode } from "./sitePresentation";
 import { trackAnalytics, useAnalyticsConsent } from "../analytics/Analytics";
 import { analyticsItem, whenVisible } from "../analytics/ecommerce";
@@ -139,12 +139,28 @@ export default function Home({ home, fallbackProducts = [], presentation, media 
         </div>
       </section>
 
-      <section className="border-b border-primary/20 bg-background">
-        <div className="mx-auto max-w-5xl px-5 py-12 lg:px-8">
-          <p className="text-base leading-8 text-foreground sm:text-lg">{copy("introBody")}</p>
-          <div className="mt-5 flex flex-wrap gap-5 text-sm text-primary">
-            <Link to="/san-pham">{copy("productsAction")}</Link>
-            <Link to="/trai-nghiem">{copy("bookingAction")}</Link>
+      <section className="home-intro">
+        <div className="home-intro-inner">
+          <div className="home-intro-image">
+            <img
+              src={home?.storyImageUrl || artisan}
+              alt={t("Nghệ nhân Đàng Xem bên lò nung gốm", "Artisan Đàng Xem beside the open kiln")}
+              width={1000}
+              height={750}
+              loading="lazy"
+              onError={event => imageFallback(event, artisan)}
+            />
+          </div>
+          <div className="home-intro-content">
+            <p>{copy("introBody")}</p>
+            <div className="home-intro-actions">
+              <Link to="/san-pham" className="home-intro-primary">
+                {copy("productsAction")} <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link to="/trai-nghiem" className="home-intro-secondary">
+                {copy("bookingAction")}
+              </Link>
+            </div>
           </div>
         </div>
       </section>

@@ -31,6 +31,11 @@ const fallbackImage = '/assets/images/vase.jpg'
 const money = formatCurrencyVnd
 const date = formatBusinessDateTime
 const pick = (lang, vi, en) => lang === 'vi' ? vi : en
+
+const blogField = (post, key, lang) =>
+  lang === 'en'
+    ? post?.[`${key}En`]?.trim() || post?.[key]
+    : post?.[key]
 const collectionPath = item => item.slug ? `/san-pham/${item.slug}` : `/san-pham?collectionId=${item.id}`
 const contact = {
   email: 'dangxembautrucpottery@gmail.com',
@@ -67,7 +72,7 @@ function StoreProvider({ children }) {
   const activeContent = useMemo(() => presentationMode(rawPresentation?.content || presentationDefaults, theme), [rawPresentation, theme])
   const presentation = useMemo(() => {
     const media = { ...rawPresentation?.media }
-    if (theme === 'dark') ['SITE_LOGO', 'CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_HERO', 'CHECKOUT_HERO'].forEach(slot => {
+    if (theme === 'dark') ['SITE_LOGO', 'CATALOG_HERO', 'BLOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_HERO', 'CHECKOUT_HERO'].forEach(slot => {
       media[slot] = media[`${slot}_DARK`] || media[slot]
     })
     return { ...rawPresentation, content: activeContent, media }
@@ -278,14 +283,14 @@ function Layout({ children }) {
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
   const account = user ? <>{user.role === 'USER' && <CustomerNotificationLink userId={user.id} lang={lang} />}<Link className="icon-btn" to={user.role === 'ADMIN' ? '/admin' : '/account'}>{user.fullName || pick(lang, 'Tài khoản', 'Account')}</Link></> : <DirectGoogleLogin />
   return <DesignContext.Provider value={{ lang, setLang, t: (vi, en) => pick(lang, vi, en), count: cart.items.reduce((sum, item) => sum + item.quantity, 0) }}>
-    <SiteHeader account={account} phone={support.phones[0]} brandName={presentationNode(presentation?.content, 'brand', 'name', lang)} logoUrl={presentation?.media?.SITE_LOGO} menuLabels={{ booking: presentationNode(presentation?.content, 'brand', 'menuBooking', lang), call: presentationNode(presentation?.content, 'brand', 'menuCall', lang) }} navLabels={Object.fromEntries([['/', 'navHome'], ['/san-pham', 'navProducts'], ['/trai-nghiem', 'navExperience'], ['/ve-chung-toi', 'navAbout'], ['/lien-he', 'navContact']].map(([route, key]) => [route, presentationNode(presentation?.content, 'brand', key, lang)]))} />
+    <SiteHeader account={account} phone={support.phones[0]} brandName={presentationNode(presentation?.content, 'brand', 'name', lang)} logoUrl={presentation?.media?.SITE_LOGO} menuLabels={{ booking: presentationNode(presentation?.content, 'brand', 'menuBooking', lang), call: presentationNode(presentation?.content, 'brand', 'menuCall', lang) }} navLabels={Object.fromEntries([['/', 'navHome'], ['/san-pham', 'navProducts'], ['/blog', 'navBlog'], ['/trai-nghiem', 'navExperience'], ['/ve-chung-toi', 'navAbout'], ['/lien-he', 'navContact']].map(([route, key]) => [route, presentationNode(presentation?.content, 'brand', key, lang)]))} />
     {children}
     <BilingualFooter />
     <MobileActionBar phone={support.phones[0]} presentation={presentation?.content} />
     <div className="floating-chat">
       <ChatWidget lang={lang} user={user} presentation={presentation?.content} iconUrl={presentation?.media?.SITE_CHAT_ICON} />
-      {support.phones[0] && <a data-preview-target="field:brand.zaloLabel" className="zalo" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8') }} href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo"><span className="floating-symbol">{presentationText(presentation?.content, 'brand', 'zaloLabel', lang)}{presentation?.media?.SITE_ZALO_ICON && <img src={presentation.media.SITE_ZALO_ICON} alt="" onError={event => { event.currentTarget.hidden = true }} />}</span></a>}
-      {support.facebook && <a data-preview-target="field:brand.facebookLabel" className="facebook" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2') }} href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook"><span className="floating-symbol">{presentationText(presentation?.content, 'brand', 'facebookLabel', lang)}{presentation?.media?.SITE_FACEBOOK_ICON && <img src={presentation.media.SITE_FACEBOOK_ICON} alt="" onError={event => { event.currentTarget.hidden = true }} />}</span></a>}
+      {support.phones[0] && <a data-preview-target="field:brand.zaloLabel" className="zalo" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.zaloLabel?.color || '') ? presentation.content.pages.brand.zaloLabel.color : '#0877e8') }} href={`https://zalo.me/${support.phones[0]}`} target="_blank" rel="noreferrer" aria-label="Zalo"><span className="floating-symbol">{presentationText(presentation?.content, 'brand', 'zaloLabel', lang)}{presentation?.media?.SITE_ZALO_ICON && <img src={presentation.media.SITE_ZALO_ICON} alt="" onError={event => { event.currentTarget.style.display = 'none' }} />}</span></a>}
+      {support.facebook && <a data-preview-target="field:brand.facebookLabel" className="facebook" style={{ background: /^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2', color: contrastText(/^#[0-9a-fA-F]{6}$/.test(presentation?.content?.pages?.brand?.facebookLabel?.color || '') ? presentation.content.pages.brand.facebookLabel.color : '#1877f2') }} href={support.facebook} target="_blank" rel="noreferrer" aria-label="Facebook"><span className="floating-symbol">{presentationText(presentation?.content, 'brand', 'facebookLabel', lang)}{presentation?.media?.SITE_FACEBOOK_ICON && <img src={presentation.media.SITE_FACEBOOK_ICON} alt="" onError={event => { event.currentTarget.style.display = 'none' }} />}</span></a>}
     </div>
   </DesignContext.Provider>
 }
@@ -319,7 +324,9 @@ function DirectGoogleLogin() {
 function BilingualFooter() {
   const { lang, support, homepage, presentation } = useStore()
   const slogan = pick(lang, homepage?.sloganVi || 'Gốm Bàu Trúc – Tinh hoa gốm Chăm từ đôi tay nghệ nhân', homepage?.sloganEn || 'The essence of Cham pottery – preserving the soul of heritage')
-  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">{presentation?.media?.SITE_LOGO && <img src={presentation.media.SITE_LOGO} alt="" className="presentation-footer-logo" onError={event => { event.currentTarget.hidden = true }} />}{presentationNode(presentation?.content, 'brand', 'name', lang)}</Link><p className="footer-slogan">{slogan}</p><p>{presentationNode(presentation?.content, 'brand', 'footerDescription', lang)}</p></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerLinksTitle', lang)}</h3><Link to="/san-pham">{presentationNode(presentation?.content, 'brand', 'navProducts', lang)}</Link><Link to="/trai-nghiem">{presentationNode(presentation?.content, 'brand', 'navExperience', lang)}</Link><Link to="/cart">{presentationNode(presentation?.content, 'brand', 'footerCart', lang)}</Link><Link to="/orders">{presentationNode(presentation?.content, 'brand', 'footerOrders', lang)}</Link><Link to="/ve-chung-toi">{presentationNode(presentation?.content, 'brand', 'navAbout', lang)}</Link><Link to="/lien-he">{presentationNode(presentation?.content, 'brand', 'footerSupport', lang)}</Link><Link to="/faq">{presentationNode(presentation?.content, 'faq', 'title', lang)}</Link><Link to="/blog">{pick(lang, 'Chuyện Làng Gốm', 'Journal')}</Link><Link to="/chinh-sach">{presentationNode(presentation?.content, 'brand', 'footerPolicy', lang)}</Link></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerContactTitle', lang)}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
+  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">{presentation?.media?.SITE_LOGO && <img src={presentation.media.SITE_LOGO} alt="" className="presentation-footer-logo" onError={event => { event.currentTarget.style.display = 'none' }} />}{presentationNode(presentation?.content, 'brand', 'name', lang)}</Link><p className="footer-slogan">{slogan}</p><p>{presentationNode(presentation?.content, 'brand', 'footerDescription', lang)}</p></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerLinksTitle', lang)}</h3><Link to="/san-pham">{presentationNode(presentation?.content, 'brand', 'navProducts', lang)}</Link><Link to="/trai-nghiem">{presentationNode(presentation?.content, 'brand', 'navExperience', lang)}</Link><Link to="/cart">{presentationNode(presentation?.content, 'brand', 'footerCart', lang)}</Link><Link to="/orders">{presentationNode(presentation?.content, 'brand', 'footerOrders', lang)}</Link><Link to="/ve-chung-toi">{presentationNode(presentation?.content, 'brand', 'navAbout', lang)}</Link><Link to="/lien-he">{presentationNode(presentation?.content, 'brand', 'footerSupport', lang)}</Link><Link to="/faq">{presentationNode(presentation?.content, 'faq', 'title', lang)}</Link>  <Link to="/blog">
+    {presentationNode(presentation?.content, 'brand', 'navBlog', lang)}
+  </Link><Link to="/chinh-sach">{presentationNode(presentation?.content, 'brand', 'footerPolicy', lang)}</Link></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerContactTitle', lang)}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
 }
 function Loading({ text = 'Đang tải dữ liệu...' }) { return <div className="state-box">{text}</div> }
 function Empty({ children }) { return <div className="state-box">{children}</div> }
@@ -860,7 +867,7 @@ function Checkout() {
   return (
     <Layout>
       <main className="page checkout-page">
-        {presentation?.media?.CHECKOUT_HERO && <img key={presentation.media.CHECKOUT_HERO} className="presentation-checkout-image" src={presentation.media.CHECKOUT_HERO} alt="" onError={event => { event.currentTarget.hidden = true }} />}
+        {presentation?.media?.CHECKOUT_HERO && <img key={presentation.media.CHECKOUT_HERO} className="presentation-checkout-image" src={presentation.media.CHECKOUT_HERO} alt="" onError={event => { event.currentTarget.style.display = 'none' }} />}
         <div className="page-title">
           <span className="kicker">
             {pick(
@@ -892,16 +899,155 @@ function OrderDetail() {
   return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Chi tiết đơn hàng', 'Order detail')}</span><h1>{order?.orderCode || pick(lang, 'Đơn hàng', 'Order')}</h1></div>{authLoading || query.isLoading ? <Loading text={pick(lang, 'Đang tải đơn hàng...', 'Loading order...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Vui lòng đăng nhập bằng tài khoản khách hàng.', 'Please sign in with a customer account.')}</Empty> : query.isError && query.error.status === 404 ? <Empty>{pick(lang, 'Không tìm thấy đơn hàng.', 'Order not found.')}</Empty> : query.isError ? <div className="state-box error" role="alert">{query.error.message}<button onClick={() => query.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : <div className="order-detail"><section><h3>{pick(lang, 'Thông tin nhận hàng', 'Recipient information')}</h3><p>{order.receiverName} · {order.phone}</p>{order.email && <p>{order.email}</p>}<p>{order.address}</p>{order.note && <p>{pick(lang, 'Ghi chú', 'Note')}: {order.note}</p>}<p>{pick(lang, 'Ngày tạo', 'Created at')}: {date(order.createdAt, lang)}</p><p>{pick(lang, 'Đơn hàng', 'Order')}: <b>{orderStatusLabel(order.orderStatus, lang)}</b></p><p>{pick(lang, 'Thanh toán', 'Payment')}: <b>{paymentStatusLabel(order.paymentStatus, lang)}</b></p>{pendingPayment && <small>{pick(lang, 'Trang này tự cập nhật trạng thái thanh toán mỗi 5 giây.', 'This page refreshes payment status every 5 seconds.')}</small>}<div className="payment-panel"><h3>{pick(lang, 'Thanh toán payOS', 'payOS payment')}</h3><div className="summary-line"><span>{pick(lang, 'Trạng thái', 'Status')}</span><b>{paymentStatusLabel(order.paymentStatus, lang)}</b></div><div className="summary-line"><span>{pick(lang, 'Số tiền thanh toán', 'Payment amount')}</span><b>{money(order.paymentAmount ?? order.totalAmount, lang)}</b></div>{order.expiresAt && <div className="summary-line"><span>{pick(lang, 'Hết hạn', 'Expires at')}</span><b>{date(order.expiresAt, lang)}</b></div>}{order.qrCode && <img className="payment-qr" src={order.qrCode} alt={pick(lang, 'Mã QR thanh toán payOS', 'payOS payment QR code')} />}{order.checkoutUrl ? <a className="button dark full" href={order.checkoutUrl} target="_blank" rel="noreferrer">{pick(lang, 'Thanh toán qua payOS', 'Pay with payOS')}</a> : pendingPayment && <p className="payment-note">{pick(lang, 'Cổng thanh toán đang chờ cấu hình hoặc thông tin thanh toán chưa khả dụng. Trạng thái đơn hàng vẫn được lấy từ hệ thống.', 'Payment gateway configuration or payment details are not available yet. Order state remains system-authoritative.')}</p>}</div></section><aside className="order-summary">{order.items.map(item => <div className="summary-line" key={item.productId}><span>{lang === 'vi' ? item.productNameVi : item.productNameEn} × {item.quantity}<small>{money(item.sellingPrice, lang)} / {pick(lang, 'sản phẩm', 'item')}</small></span><b>{money(item.totalPrice, lang)}</b></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(order.subtotal, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(order.totalAmount, lang)}</b></div></aside></div>}</main></Layout>
 }
 function BlogIndex() {
-  const { lang } = useStore()
+  const { lang, presentation } = useStore()
   const posts = useQuery({ queryKey: ['blog'], queryFn: api.blogPosts })
-  return <Layout><main className="page blog-page"><div className="page-title"><span className="kicker">{pick(lang, 'Chuyện Làng Gốm', 'Journal')}</span><h1>{pick(lang, 'Câu chuyện gốm Chăm Bàu Trúc', 'Bau Truc pottery stories')}</h1><p>{pick(lang, 'Khám phá làng nghề, nghệ nhân và những câu chuyện đằng sau mỗi tác phẩm.', 'Explore the craft village, its artisans and the stories behind each piece.')}</p></div>{posts.isLoading ? <Loading /> : posts.isError ? <div className="state-box error" role="alert">{pick(lang, 'Không tải được bài viết.', 'Could not load posts.')} <button onClick={() => posts.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : !posts.data?.length ? <div className="blog-empty"><h2>{pick(lang, 'Chưa có bài viết được xuất bản', 'No stories published yet')}</h2><p>{pick(lang, 'Những câu chuyện từ làng gốm sẽ xuất hiện tại đây sau khi được đăng.', 'Stories from the pottery village will appear here when published.')}</p><Link to="/ve-chung-toi">{pick(lang, 'Tìm hiểu về chúng tôi', 'About us')} →</Link></div> : <section className="blog-grid" aria-label={pick(lang, 'Danh sách bài viết', 'Stories')}>{posts.data.map(post => <article className="blog-card" key={post.id}><Link className="blog-card-image" to={`/blog/${post.slug}`} aria-label={post.title}>{post.imageUrl ? <img src={post.imageUrl} alt="" loading="lazy" /> : <span>{pick(lang, 'Chuyện Làng Gốm', 'Journal')}</span>}</Link><div className="blog-card-body"><span className="kicker">{pick(lang, 'Bài viết', 'Story')}</span><h2><Link to={`/blog/${post.slug}`}>{post.title}</Link></h2>{post.seoDescription && <p>{post.seoDescription}</p>}<Link className="blog-read-more" to={`/blog/${post.slug}`}>{pick(lang, 'Đọc bài viết', 'Read story')} →</Link></div></article>)}</section>}</main></Layout>
+
+  const copy = key =>
+    presentationNode(presentation?.content, 'blog', key, lang)
+
+  return (
+    <Layout>
+      <main>
+        <div
+          className="reference-page blog-hero"
+          data-preview-target="media:BLOG_HERO"
+        >
+          <PageHero
+            title={copy('heroTitle')}
+            subtitle={copy('heroSubtitle')}
+            seed="blog-hero"
+            imageUrl={presentation?.media?.BLOG_HERO}
+          />
+        </div>
+
+        <div className="page blog-page">
+          {posts.isLoading ? (
+            <Loading />
+          ) : posts.isError ? (
+            <div className="state-box error" role="alert">
+              {pick(lang, 'Không tải được bài viết.', 'Could not load stories.')}
+              <button onClick={() => posts.refetch()}>
+                {pick(lang, 'Thử lại', 'Retry')}
+              </button>
+            </div>
+          ) : !posts.data?.length ? (
+            <div className="blog-empty">
+              <h2>{copy('emptyTitle')}</h2>
+              <p>{copy('emptyBody')}</p>
+              <Link to="/ve-chung-toi">{copy('aboutAction')}</Link>
+            </div>
+          ) : (
+            <section
+              className="blog-stories"
+              aria-labelledby="blog-stories-title"
+            >
+              <h2 className="blog-section-title" id="blog-stories-title">
+                {copy('sectionTitle')}
+              </h2>
+
+              <div className="blog-grid">
+                {posts.data.map(post => {
+                  const title = blogField(post, 'title', lang)
+                  const description = blogField(post, 'seoDescription', lang)
+
+                  return (
+                    <article className="blog-card" key={post.id}>
+                      <Link
+                        className="blog-card-image"
+                        to={`/blog/${post.slug}`}
+                        aria-label={title}
+                      >
+                        {post.imageUrl ? <img src={post.imageUrl} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none' }} /> : <span>{copy('imageFallback')}</span>}
+                      </Link>
+
+                      <div className="blog-card-body">
+                        <h2>
+                          <Link to={`/blog/${post.slug}`}>
+                            {title}
+                          </Link>
+                        </h2>
+
+                        {description && <p>{description}</p>}
+
+                        <Link
+                          className="blog-read-more"
+                          to={`/blog/${post.slug}`}
+                        >
+                          {copy('readMore')} →
+                        </Link>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+        </div>
+      </main>
+    </Layout>
+  )
 }
 function BlogPost() {
   const { slug } = useParams()
-  const { lang } = useStore()
-  const post = useQuery({ queryKey: ['blog', slug], queryFn: () => api.blogPost(slug) })
-  if (post.isError && post.error?.status === 404) return <NotFound />
-  return <Layout><main className="page blog-article"><Link className="blog-back" to="/blog">← {pick(lang, 'Tất cả bài viết', 'All stories')}</Link><div className="page-title"><span className="kicker">{pick(lang, 'Chuyện Làng Gốm', 'Journal')}</span><h1>{post.data?.title || pick(lang, 'Đang tải...', 'Loading...')}</h1></div>{post.isLoading ? <Loading /> : post.isError ? <div className="state-box error" role="alert">{pick(lang, 'Không tải được bài viết.', 'Could not load post.')} <button onClick={() => post.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : <article className="blog-article-body">{post.data.imageUrl && <img className="blog-cover" src={post.data.imageUrl} alt="" />}<BlogBody markdown={post.data.bodyMarkdown} /></article>}</main></Layout>
+  const { lang, presentation } = useStore()
+  const post = useQuery({
+    queryKey: ['blog', slug],
+    queryFn: () => api.blogPost(slug)
+  })
+
+  const copy = key =>
+    presentationNode(presentation?.content, 'blog', key, lang)
+
+  if (post.isError && post.error?.status === 404) {
+    return <NotFound />
+  }
+
+  const title = blogField(post.data, 'title', lang)
+  const body = blogField(post.data, 'bodyMarkdown', lang)
+  const description = blogField(post.data, 'seoDescription', lang)
+
+  return (
+    <Layout>
+      <main className="page blog-article" aria-busy={post.isLoading}>
+        <header className="blog-article-heading">
+          <Link className="blog-back" to="/blog">
+            <span aria-hidden="true">←</span> {copy('backAction')}
+          </Link>
+
+          <div className="blog-article-heading-copy">
+            <span className="blog-article-kicker">{copy('eyebrow')}</span>
+            <h1>{title || pick(lang, 'Đang tải...', 'Loading...')}</h1>
+            {description && <p className="blog-article-deck">{description}</p>}
+          </div>
+        </header>
+
+        {post.isLoading ? (
+          <div className="blog-article-state"><Loading /></div>
+        ) : post.isError ? (
+          <div className="state-box error blog-article-state" role="alert">
+            {pick(lang, 'Không tải được bài viết.', 'Could not load story.')}
+            <button onClick={() => post.refetch()}>
+              {pick(lang, 'Thử lại', 'Retry')}
+            </button>
+          </div>
+        ) : (
+          <article className="blog-article-content">
+            {post.data.imageUrl && <figure className="blog-cover-frame"><img className="blog-cover" src={post.data.imageUrl} alt="" onError={event => { event.currentTarget.style.display = 'none' }} /></figure>}
+
+            <div className="blog-article-body">
+              <BlogBody markdown={body || ''} />
+            </div>
+
+            <footer className="blog-article-end">
+              <Link className="blog-back" to="/blog">
+                <span aria-hidden="true">←</span> {copy('backAction')}
+              </Link>
+            </footer>
+          </article>
+        )}
+      </main>
+    </Layout>
+  )
 }
 function Faq() {
   const { lang, presentation } = useStore()
@@ -945,7 +1091,7 @@ function Workshop() {
       notify(pick(lang, 'Đã gửi yêu cầu đặt lịch workshop.', 'Workshop booking request sent.'))
     } catch (error) { notify(error.message) } finally { setSubmitting(false) }
   }
-  return <Layout><main className="page workshop-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="experience-hero" imageUrl={presentation?.media?.WORKSHOP_HERO} /><ExperienceIntro presentation={presentation?.content} /></div>{workshops.length > 0 && <section className="workshop-cards">{workshops.map(item => <article className={String(item.id) === String(selectedId) ? 'selected' : ''} key={item.id}><img src={item.imageUrl || '/assets/images/tour.jpg'} alt={item.title} /><div><h2>{item.title}</h2><p>{item.description}</p><b>{money(item.priceAmount, lang)}</b><span>{item.durationMinutes} {pick(lang, 'phút', 'minutes')} · {pick(lang, 'tối đa', 'up to')} {item.maxParticipants} {pick(lang, 'khách', 'guests')}</span><button className="button light full" onClick={() => chooseWorkshop(String(item.id))}>{pick(lang, 'Chọn gói này', 'Select this offering')}</button></div></article>)}</section>}<section className="workshop-layout"><form className="workshop-form" onSubmit={submit}><h2>{copy('bookingTitle')}</h2>{created && <div className="form-success" role="status">{pick(lang, `Yêu cầu #${created.id} đã được ghi nhận. Cửa hàng sẽ liên hệ xác nhận.`, `Request #${created.id} has been recorded. The store will contact you to confirm.`)}</div>}<label className="wide">{pick(lang, 'Gói workshop', 'Workshop offering')}<select name="workshopId" value={selectedId} onChange={e => chooseWorkshop(e.target.value)}><option value="">{pick(lang, 'Tư vấn chọn gói', 'Help me choose')}</option>{workshops.map(item => <option key={item.id} value={item.id}>{item.title} · {money(item.priceAmount, lang)}</option>)}</select></label><label>{pick(lang, 'Họ và tên', 'Full name')}<input name="fullName" defaultValue={defaultName} maxLength="255" required /></label><label>Email<input name="email" type="email" defaultValue={defaultEmail} maxLength="320" required /></label><label>{pick(lang, 'Số điện thoại', 'Phone number')}<input name="phone" maxLength="32" required /></label><label>{pick(lang, 'Ngày giờ mong muốn', 'Preferred date and time')}<input name="preferredAt" type="datetime-local" required /></label><label>{pick(lang, 'Số người', 'Participants')}<input name="participants" type="number" min="1" max="30" defaultValue="2" required /></label><label>{pick(lang, 'Ghi chú', 'Note')}<textarea name="note" maxLength="1000" placeholder={pick(lang, 'Ví dụ: có trẻ em đi cùng, cần tư vấn gói trải nghiệm...', 'Example: children joining, need help choosing an offering...')} /></label><button className="button dark full" disabled={submitting}>{submitting ? pick(lang, 'Đang gửi...', 'Sending...') : pick(lang, 'Gửi yêu cầu đặt lịch', 'Submit booking request')}</button></form><aside className="workshop-info"><h2>{copy('informationTitle')}</h2><p><b>{pick(lang, 'Địa điểm', 'Location')}:</b> {support.address}</p><p><b>{pick(lang, 'Liên hệ', 'Contact')}:</b> {support.phones.join(' · ')}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}<p><b>{pick(lang, 'Lưu ý', 'Note')}:</b> {pick(lang, 'Đây là yêu cầu đặt lịch. Admin sẽ xác nhận lại thời gian qua điện thoại hoặc email.', 'This is a booking request. Admin will confirm the time by phone or email.')}</p><Link className="button light full" to="/lien-he">{pick(lang, 'Cần tư vấn thêm', 'Need more help')}</Link></aside></section></main></Layout>
+  return <Layout><main className="page workshop-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="experience-hero" imageUrl={presentation?.media?.WORKSHOP_HERO} /><ExperienceIntro presentation={presentation?.content} /></div>{workshops.length > 0 && <section className="workshop-cards">{workshops.map(item => <article className={String(item.id) === String(selectedId) ? 'selected' : ''} key={item.id}>{item.imageUrl && <img src={item.imageUrl} alt={item.title} onError={event => { event.currentTarget.style.display = 'none' }} />}<div><h2>{item.title}</h2><p>{item.description}</p><b>{money(item.priceAmount, lang)}</b><span>{item.durationMinutes} {pick(lang, 'phút', 'minutes')} · {pick(lang, 'tối đa', 'up to')} {item.maxParticipants} {pick(lang, 'khách', 'guests')}</span><button className="button light full" onClick={() => chooseWorkshop(String(item.id))}>{pick(lang, 'Chọn gói này', 'Select this offering')}</button></div></article>)}</section>}<section className="workshop-layout"><form className="workshop-form" onSubmit={submit}><h2>{copy('bookingTitle')}</h2>{created && <div className="form-success" role="status">{pick(lang, `Yêu cầu #${created.id} đã được ghi nhận. Cửa hàng sẽ liên hệ xác nhận.`, `Request #${created.id} has been recorded. The store will contact you to confirm.`)}</div>}<label className="wide">{pick(lang, 'Gói workshop', 'Workshop offering')}<select name="workshopId" value={selectedId} onChange={e => chooseWorkshop(e.target.value)}><option value="">{pick(lang, 'Tư vấn chọn gói', 'Help me choose')}</option>{workshops.map(item => <option key={item.id} value={item.id}>{item.title} · {money(item.priceAmount, lang)}</option>)}</select></label><label>{pick(lang, 'Họ và tên', 'Full name')}<input name="fullName" defaultValue={defaultName} maxLength="255" required /></label><label>Email<input name="email" type="email" defaultValue={defaultEmail} maxLength="320" required /></label><label>{pick(lang, 'Số điện thoại', 'Phone number')}<input name="phone" maxLength="32" required /></label><label>{pick(lang, 'Ngày giờ mong muốn', 'Preferred date and time')}<input name="preferredAt" type="datetime-local" required /></label><label>{pick(lang, 'Số người', 'Participants')}<input name="participants" type="number" min="1" max="30" defaultValue="2" required /></label><label>{pick(lang, 'Ghi chú', 'Note')}<textarea name="note" maxLength="1000" placeholder={pick(lang, 'Ví dụ: có trẻ em đi cùng, cần tư vấn gói trải nghiệm...', 'Example: children joining, need help choosing an offering...')} /></label><button className="button dark full" disabled={submitting}>{submitting ? pick(lang, 'Đang gửi...', 'Sending...') : pick(lang, 'Gửi yêu cầu đặt lịch', 'Submit booking request')}</button></form><aside className="workshop-info"><h2>{copy('informationTitle')}</h2><p><b>{pick(lang, 'Địa điểm', 'Location')}:</b> {support.address}</p><p><b>{pick(lang, 'Liên hệ', 'Contact')}:</b> {support.phones.join(' · ')}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}<p><b>{pick(lang, 'Lưu ý', 'Note')}:</b> {pick(lang, 'Đây là yêu cầu đặt lịch. Admin sẽ xác nhận lại thời gian qua điện thoại hoặc email.', 'This is a booking request. Admin will confirm the time by phone or email.')}</p><Link className="button light full" to="/lien-he">{pick(lang, 'Cần tư vấn thêm', 'Need more help')}</Link></aside></section></main></Layout>
 }
 function AboutPage() { return <Layout><div className="reference-page"><About /></div></Layout> }
 
@@ -979,7 +1125,7 @@ function CatalogOrProduct() {
 
 function SeoHead() {
   const { pathname } = useLocation()
-  const { collections, catalogLoading, presentation } = useStore()
+  const { lang, collections, catalogLoading, presentation } = useStore()
   const metadata = useQuery({ queryKey: ['seo-metadata'], queryFn: api.seoMetadata, staleTime: 60_000 })
   const collection = collections.find(item => `/san-pham/${item.slug}` === pathname)
   const productSlug = pathname.startsWith('/san-pham/') && !catalogLoading && !collection ? pathname.slice(10) : null
@@ -998,8 +1144,16 @@ function SeoHead() {
     const defaults = metadata.data.default || {}
     const item = product.data
     const article = blog.data
-    const dynamicTitle = item ? (item.seoTitle || `${item.nameVi} | Gốm Bàu Trúc Đàng Xem`) : collection ? (collection.seoTitle || `${collection.nameVi} | Gốm Bàu Trúc Đàng Xem`) : article ? (article.seoTitle || article.title) : null
-    const dynamicDescription = item ? (item.seoDescription || item.descriptionVi || '') : collection ? (collection.seoDescription || collection.descriptionVi || '') : article ? (article.seoDescription || '') : null
+    const dynamicTitle = item ? (item.seoTitle || `${item.nameVi} | Gốm Bàu Trúc Đàng Xem`) : collection ? (collection.seoTitle || `${collection.nameVi} | Gốm Bàu Trúc Đàng Xem`) : article
+      ? lang === 'en'
+        ? article.seoTitleEn || article.titleEn || article.seoTitle || article.title
+        : article.seoTitle || article.title
+      : null
+    const dynamicDescription = item ? (item.seoDescription || item.descriptionVi || '') : collection ? (collection.seoDescription || collection.descriptionVi || '') : article
+      ? lang === 'en'
+        ? article.seoDescriptionEn || article.seoDescription || ''
+        : article.seoDescription || ''
+      : null
     const title = item || article || collection?.seoTitle ? dynamicTitle : configured.title || dynamicTitle || defaults.title
     const description = item || article || collection?.seoDescription ? dynamicDescription : configured.description || dynamicDescription || defaults.description
     if (!title) return
@@ -1011,12 +1165,16 @@ function SeoHead() {
     document.title = title
     if (description) setTag('meta[name="description"]', 'meta', { name: 'description', content: description })
     setTag('link[rel="canonical"]', 'link', { rel: 'canonical', href: `https://dangxembautruc.com${pathname}` })
-    setTag('meta[property="og:title"]', 'meta', { property: 'og:title', content: article?.ogTitle || configured.ogTitle || dynamicTitle || defaults.ogTitle || title })
-    setTag('meta[property="og:description"]', 'meta', { property: 'og:description', content: article?.ogDescription || configured.ogDescription || dynamicDescription || defaults.ogDescription || description || '' })
+    setTag('meta[property="og:title"]', 'meta', { property: 'og:title', content: (lang === 'en'
+      ? article?.ogTitleEn || article?.seoTitleEn || article?.titleEn || article?.ogTitle
+      : article?.ogTitle) || configured.ogTitle || dynamicTitle || defaults.ogTitle || title })
+    setTag('meta[property="og:description"]', 'meta', { property: 'og:description', content: (lang === 'en'
+      ? article?.ogDescriptionEn || article?.seoDescriptionEn || article?.ogDescription
+      : article?.ogDescription) || configured.ogDescription || dynamicDescription || defaults.ogDescription || description || '' })
     setTag('meta[property="og:url"]', 'meta', { property: 'og:url', content: `https://dangxembautruc.com${pathname}` })
     const image = item?.thumbnailUrl || article?.imageUrl || presentation?.media?.[configured.imageSlot || defaults.imageSlot]
     if (image) setTag('meta[property="og:image"]', 'meta', { property: 'og:image', content: image })
-  }, [pathname, metadata.data, product.data, product.isError, productSlug, blog.data, blog.isError, blogSlug, blogList.data, collection, presentation?.media])
+  }, [pathname, lang, metadata.data, product.data, product.isError, productSlug, blog.data, blog.isError, blogSlug, blogList.data, collection, presentation?.media])
   return null
 }
 

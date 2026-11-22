@@ -8,6 +8,7 @@ export const presentationFields = {
     footerDescription: pair('Gốm thủ công Chăm Bàu Trúc — Di sản UNESCO 2022.', 'Handcrafted Cham pottery from Bau Truc — UNESCO Heritage 2022.'),
     navHome: pair('Trang Chủ', 'Home'),
     navProducts: pair('Sản Phẩm', 'Products'),
+    navBlog: pair('Chuyện Làng Gốm', 'Journal'),
     navExperience: pair('Trải Nghiệm', 'Experience'),
     navAbout: pair('Về Chúng Tôi', 'About Us'),
     navContact: pair('Liên Hệ', 'Contact'),
@@ -73,6 +74,31 @@ export const presentationFields = {
     step3Body: pair('Sản phẩm được hong khô, hoàn thiện và gửi về tận tay bạn.', 'Your piece is dried, finished and delivered to you.'),
     bookingTitle: pair('Thông tin đặt lịch', 'Booking information'),
     informationTitle: pair('Thông tin trải nghiệm', 'Experience information')
+  },
+  blog: {
+    eyebrow: pair('Chuyện Làng Gốm', 'Journal'),
+    heroTitle: pair(
+      'Câu chuyện gốm Chăm Bàu Trúc',
+      'Bau Truc pottery stories'
+    ),
+    heroSubtitle: pair(
+      'Khám phá làng nghề, nghệ nhân và những câu chuyện đằng sau mỗi tác phẩm.',
+      'Explore the craft village, its artisans and the stories behind each piece.'
+    ),
+    emptyTitle: pair(
+      'Chưa có bài viết được xuất bản',
+      'No stories published yet'
+    ),
+    emptyBody: pair(
+      'Những câu chuyện từ làng gốm sẽ xuất hiện tại đây sau khi được đăng.',
+      'Stories from the pottery village will appear here when published.'
+    ),
+    sectionTitle: pair('Bài viết mới nhất', 'Latest stories'),
+    imageFallback: pair('Ảnh đang cập nhật', 'Cover coming soon'),
+    aboutAction: pair('Tìm hiểu về chúng tôi', 'About us'),
+    articleLabel: pair('Bài viết', 'Story'),
+    readMore: pair('Đọc bài viết', 'Read story'),
+    backAction: pair('Tất cả bài viết', 'All stories')
   },
   support: {
     heroTitle: pair('Kết Nối Với Chúng Tôi', 'Get in Touch'),

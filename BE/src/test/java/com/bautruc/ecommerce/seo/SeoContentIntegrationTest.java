@@ -85,13 +85,55 @@ class SeoContentIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/blog/test-pottery-story")));
     }
 
-    @Test void futureArticleCannotPublishBeforeDecember() throws Exception {
+    @Test void blogArticleCanPublishImmediately() throws Exception {
         Cookie admin = admin();
         mvc.perform(post("/api/v1/admin/blog").cookie(admin).with(csrf().asHeader())
                 .contentType(MediaType.APPLICATION_JSON).content("""
                         {"slug":"mua-gom-bau-truc-lam-qua-tet","title":"Tet pottery","bodyMarkdown":"# Tet pottery","status":"PUBLISHED"}
                         """))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/blog/mua-gom-bau-truc-lam-qua-tet"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.titleEn").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.bodyMarkdownEn").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test void blogEnglishFieldsPersistAcrossAdminAndPublicReads() throws Exception {
+        Cookie admin = admin();
+        String draft = """
+                {
+                  "slug":"bilingual-story",
+                  "title":"Tiêu đề tiếng Việt",
+                  "bodyMarkdown":"# Tiêu đề tiếng Việt\\nNội dung tiếng Việt",
+                  "titleEn":"English title",
+                  "bodyMarkdownEn":"# English title\\nEnglish content",
+                  "seoTitleEn":"English SEO title",
+                  "seoDescriptionEn":"English description",
+                  "ogTitleEn":"English share title",
+                  "ogDescriptionEn":"English share description",
+                  "status":"DRAFT"
+                }
+                """;
+        var created = mvc.perform(post("/api/v1/admin/blog").cookie(admin).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON).content(draft))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.titleEn").value("English title"))
+                .andExpect(jsonPath("$.data.bodyMarkdownEn").value("# English title\nEnglish content"))
+                .andExpect(jsonPath("$.data.seoTitleEn").value("English SEO title"))
+                .andReturn();
+        long id = ((Number) com.jayway.jsonpath.JsonPath.read(
+                created.getResponse().getContentAsString(), "$.data.id")).longValue();
+
+        mvc.perform(put("/api/v1/admin/blog/{id}", id).cookie(admin).with(csrf().asHeader())
+                        .contentType(MediaType.APPLICATION_JSON).content(draft.replace("\"DRAFT\"", "\"PUBLISHED\"")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.ogTitleEn").value("English share title"))
+                .andExpect(jsonPath("$.data.ogDescriptionEn").value("English share description"));
+        mvc.perform(get("/api/v1/blog/bilingual-story"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.titleEn").value("English title"))
+                .andExpect(jsonPath("$.data.bodyMarkdownEn").value("# English title\nEnglish content"))
+                .andExpect(jsonPath("$.data.seoDescriptionEn").value("English description"));
     }
 
     @Test void scheduledBlogIsPrivateUntilItsPublicationTime() throws Exception {

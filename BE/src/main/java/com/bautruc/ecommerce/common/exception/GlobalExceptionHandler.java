@@ -23,6 +23,7 @@ import com.bautruc.ecommerce.common.storage.ObjectStorageException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND";
     public static final String CONFLICT = "CONFLICT";
@@ -123,6 +124,8 @@ public class GlobalExceptionHandler {
             ObjectStorageException exception,
             HttpServletRequest request
     ) {
+        log.error("Object storage request failed for {} (correlationId={})",
+                request.getRequestURI(), LogContext.currentCorrelationId(), exception);
         ApiError error = ApiError.of("OBJECT_STORAGE_UPLOAD_FAILED", "Could not upload the file to storage.");
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(failure(error));
     }

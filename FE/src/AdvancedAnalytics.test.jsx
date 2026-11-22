@@ -15,6 +15,7 @@ const page = { content: [product], totalElements: 1, totalPages: 1, page: 0, fir
 
 vi.mock('./api', () => ({ api: {
   home: vi.fn(), sitePresentation: vi.fn(), products: vi.fn(), collections: vi.fn(),
+  blogPosts: vi.fn(), blogPost: vi.fn(),
   supportSettings: vi.fn(), me: vi.fn(), product: vi.fn(), cart: vi.fn(),
   updateCart: vi.fn(), removeCart: vi.fn(), chatSession: vi.fn(), chatSend: vi.fn()
 } }))
@@ -31,6 +32,8 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn()
   api.home.mockResolvedValue({})
   api.sitePresentation.mockResolvedValue({})
+  api.blogPosts.mockResolvedValue([])
+  api.blogPost.mockResolvedValue({})
   api.products.mockResolvedValue(page)
   api.collections.mockResolvedValue([{ id: 3, nameVi: 'Bình', nameEn: 'Vases' }])
   api.supportSettings.mockResolvedValue({})
@@ -48,6 +51,45 @@ function mount(path) {
 const events = name => trackAnalytics.mock.calls.filter(([event]) => event === name)
 
 describe('catalog and cart analytics', () => {
+  it('renders the localized article title, description and body in the Blog reading layout', async () => {
+    api.blogPost.mockResolvedValue({
+      id: 12,
+      slug: 'story',
+      title: 'Một câu chuyện về gốm',
+      seoDescription: 'Gốm được tạo hình bằng tay.',
+      bodyMarkdown: '# Một câu chuyện về gốm\n\nMỗi chiếc bình mang dấu tay người thợ.',
+      imageUrl: '/story-cover.jpg'
+    })
+
+    mount('/blog/story')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Một câu chuyện về gốm' })).toBeInTheDocument()
+    expect(screen.getByText('Gốm được tạo hình bằng tay.')).toBeInTheDocument()
+    expect(screen.getByText('Mỗi chiếc bình mang dấu tay người thợ.')).toBeInTheDocument()
+    expect(document.querySelector('.blog-cover').getAttribute('src')).toBe('/story-cover.jpg')
+  })
+
+  it('hides a broken Blog cover without substituting the homepage hero', async () => {
+    api.home.mockResolvedValue({ heroImageUrl: '/home-hero.jpg' })
+    api.blogPosts.mockResolvedValue([{
+      id: 9,
+      slug: 'story',
+      title: 'Story',
+      bodyMarkdown: '# Story',
+      status: 'PUBLISHED',
+      imageUrl: '/broken-cover.jpg'
+    }])
+
+    mount('/blog')
+    await screen.findByText('Story')
+    const image = document.querySelector('.blog-card-image img')
+
+    expect(image.getAttribute('src')).toBe('/broken-cover.jpg')
+    fireEvent.error(image)
+    expect(image.getAttribute('src')).toBe('/broken-cover.jpg')
+    expect(image.style.display).toBe('none')
+  })
+
   it('tracks a guest add only when the stored quantity increases', async () => {
     localStorage.setItem(GUEST_CART_KEY, JSON.stringify([{ productId: 7, quantity: 99 }]))
     mount('/products/7')
@@ -68,6 +110,17 @@ describe('catalog and cart analytics', () => {
     await waitFor(() => expect(events('view_item_list').some(([, params]) => params.item_list_id === 'home_featured')).toBe(true))
     fireEvent.click(document.querySelector('a[href="/products/7"]'))
     expect(events('select_item').some(([, params]) => params.item_list_id === 'home_featured')).toBe(true)
+  })
+
+  it('shows the homepage intro with its story image and both existing actions', async () => {
+    api.home.mockResolvedValue({ heroImageUrl: '/home-hero.jpg', storyImageUrl: '/workshop-story.jpg' })
+    mount('/')
+
+    await waitFor(() => {
+      expect(document.querySelector('.home-intro-image img')).toHaveAttribute('src', '/workshop-story.jpg')
+    })
+    expect(document.querySelector('.home-intro-actions a[href="/san-pham"]')).toBeInTheDocument()
+    expect(document.querySelector('.home-intro-actions a[href="/trai-nghiem"]')).toBeInTheDocument()
   })
 
   it('tracks a displayed list and selected product once, with real category metadata', async () => {

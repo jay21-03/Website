@@ -1549,7 +1549,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:760px){.workshop-hero,.workshop-layout,.workshop-form{grid-template-columns:1fr}.workshop-hero h1{font-size:38px}.workshop-info{position:static}}
 /* Contact/about page adapted from the supplied reference. */
 .about-container { width: 100%; max-width: 1280px; padding-inline: 32px; margin-inline: auto }
-.about-hero { border-bottom: 1px solid var(--line); background: linear-gradient(rgba(251,246,236,.87), rgba(251,246,236,.87)), url('/assets/images/hero-pottery.jpg') center / cover }
+.about-hero { border-bottom: 1px solid var(--line); background: var(--white) }
 .about-hero .about-container { padding-block: 128px }
 .about-hero h1 { max-width: 800px; margin: 0; font: 500 clamp(36px, 4.6vw, 60px)/1.1 'Playfair Display', serif }
 .about-hero p { max-width: 660px; margin: 24px 0 0; font-size: 18px; line-height: 1.7; color: var(--muted) }
@@ -1607,7 +1607,7 @@ body { font-family: 'DM Sans', sans-serif; font-weight: 400 }
 .store-menu-toggle { display: none }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px }
 .catalog-page { width: 100%; max-width: none; padding: 0; margin: 0 }
-.catalog-hero { border-bottom: 1px solid var(--line); background: linear-gradient(rgba(251,246,236,.86), rgba(251,246,236,.86)), url('/assets/images/vase.jpg') center 48% / cover }
+.catalog-hero { border-bottom: 1px solid var(--line); background: var(--white) }
 .catalog-hero > div { max-width: 1280px; margin: auto; padding: 100px 32px }
 .catalog-hero h1 { max-width: 780px; margin: 18px 0 22px; font: 500 clamp(36px, 4.6vw, 60px)/1.12 'Playfair Display', serif }
 .catalog-hero p { max-width: 660px; font-size: 18px; line-height: 1.7; color: var(--muted); margin: 0 }
@@ -1678,3 +1678,43 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 @media(max-width:980px){.product-related-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.product-detail-extra,.product-related{margin-top:32px}.product-detail-panel{padding:18px}.product-specifications>div{grid-template-columns:1fr;gap:6px}.product-related-grid{grid-template-columns:1fr}}
 .blog-page,.blog-article{max-width:1200px}.blog-page .page-title,.blog-article .page-title{max-width:760px}.blog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:24px}.blog-card{min-width:0;overflow:hidden;border:1px solid var(--border);background:var(--card);color:var(--foreground)}.blog-card-image{display:grid;place-items:center;aspect-ratio:16/10;background:var(--card);color:var(--foreground);text-decoration:none}.blog-card-image img{display:block;width:100%;height:100%;object-fit:cover}.blog-card-image span{font-family:'Playfair Display',serif;font-size:24px}.blog-card-body{padding:24px}.blog-card-body h2{font:500 clamp(22px,3vw,29px)/1.3 'Playfair Display',serif;margin:8px 0 12px;text-wrap:balance}.blog-card-body h2 a{color:inherit;text-decoration:none}.blog-card-body h2 a:hover,.blog-read-more:hover,.blog-back:hover{text-decoration:underline}.blog-card-body p{line-height:1.65;max-width:65ch}.blog-read-more,.blog-back,.blog-empty a{color:var(--primary);font-weight:600}.blog-empty{padding:32px;border:1px solid var(--border);background:var(--card);max-width:650px}.blog-empty h2{margin-top:0}.blog-article{max-width:900px}.blog-back{display:inline-block;margin-bottom:24px}.blog-article-body{max-width:72ch;margin:0 auto;line-height:1.8;overflow-wrap:anywhere}.blog-article-body h2,.blog-article-body h3{margin:2em 0 .6em;line-height:1.3;text-wrap:balance}.blog-cover{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;margin:0 0 32px}
+.blog-page {
+  width: min(100% - 40px, 1200px);
+  margin-inline: auto;
+}
+
+.blog-section-title {
+  margin: 0 0 24px;
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 36px);
+}
+
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.blog-grid > .blog-card {
+  min-width: 0;
+  grid-column: auto;
+}
+
+.blog-card-image {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+
+.blog-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 720px) {
+  .blog-grid {
+    grid-template-columns: 1fr;
+  }
+}

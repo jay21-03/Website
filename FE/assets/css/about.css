@@ -1,6 +1,6 @@
 /* Values and spacing from the saved contact-page reference.
    Assets live in public/assets/images; the saved download can be removed. */
-body:has(.about-page, .catalog-page) {
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) {
   --ink: oklch(24.5% .045 55);
   --accent: oklch(61.2% .121 51);
   --wood: oklch(48.2% .072 55);
@@ -11,25 +11,17 @@ body:has(.about-page, .catalog-page) {
   --paper: oklch(98.3% .008 78);
   background: var(--white);
 }
-body:has(.about-page, .catalog-page) .site-header {
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) .site-header {
   background: var(--white);
   border-bottom: 0;
 }
-body:has(.about-page, .catalog-page) .site-header .brand { font-size: 24px; font-weight: 500 }
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) .site-header .brand { font-size: 24px; font-weight: 500 }
 .about-hero {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   background: var(--white);
   border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-}
-.about-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: url('/assets/images/contact-hero.jpg') center / cover;
-  opacity: .105;
 }
 .about-hero::after {
   content: '';
@@ -57,17 +49,17 @@ body:has(.about-page, .catalog-page) .site-header .brand { font-size: 24px; font
 .about-details p, .about-details a { line-height: 1.5 }
 .about-socials a { border-color: color-mix(in srgb, var(--accent) 40%, transparent) }
 .about-map iframe { border-color: color-mix(in srgb, var(--accent) 30%, transparent) }
-body:has(.about-page, .catalog-page) .site-footer {
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) .site-footer {
   background: var(--soft);
   color: var(--ink);
   margin-top: 96px;
   padding: 64px max(20px, calc((100vw - 1216px) / 2));
   border-top: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
-body:has(.about-page, .catalog-page) .footer-grid { gap: 48px; grid-template-columns: repeat(3, minmax(0, 1fr)) }
-body:has(.about-page, .catalog-page) .footer-grid p,
-body:has(.about-page, .catalog-page) .footer-col a { color: var(--muted); line-height: 1.7; overflow-wrap: anywhere }
-body:has(.about-page, .catalog-page) .footer-col h3 { font: 500 18px 'Playfair Display', serif; color: var(--ink) }
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) .footer-grid { gap: 48px; grid-template-columns: repeat(3, minmax(0, 1fr)) }
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) .footer-grid p,
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) .footer-col a { color: var(--muted); line-height: 1.7; overflow-wrap: anywhere }
+body:has(.about-page, .catalog-page, .blog-page, .blog-article) .footer-col h3 { font: 500 18px 'Playfair Display', serif; color: var(--ink) }
 @media (max-width: 1023px) {
   .about-container { padding-inline: 20px }
   .about-contact-grid { grid-template-columns: 1fr; gap: 64px; padding-block: 96px }
@@ -84,5 +76,5 @@ body:has(.about-page, .catalog-page) .footer-col h3 { font: 500 18px 'Playfair D
   .about-map { padding-bottom: 96px }
   .about-map iframe { height: 380px }
   .about-partners { padding: 96px 20px }
-  body:has(.about-page, .catalog-page) .footer-grid { grid-template-columns: 1fr }
+  body:has(.about-page, .catalog-page, .blog-page, .blog-article) .footer-grid { grid-template-columns: 1fr }
 }

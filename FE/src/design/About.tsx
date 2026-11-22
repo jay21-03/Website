@@ -35,10 +35,15 @@ export default function About() {
   });
 
   const content = withAboutDefaults(draft?.content || query.data?.content);
-  const heroUrl = (draft ? draft.media.heroUrl : query.data?.heroUrl) || null;
-  const portraitUrl = (draft ? draft.media.portraitUrl : query.data?.portraitUrl) || portrait;
+  const heroUrl =
+    (draft ? draft.media.heroUrl : query.data?.heroUrl) || null;
+  const portraitUrl =
+    (draft ? draft.media.portraitUrl : query.data?.portraitUrl)
+    || portrait;
   const certificateUrl = (draft ? draft.media.certificateUrl : query.data?.certificateUrl) || null;
-  const visionUrl = (draft ? draft.media.visionUrl : query.data?.visionUrl) || artisan;
+  const visionUrl =
+    (draft ? draft.media.visionUrl : query.data?.visionUrl)
+    || artisan;
 
   const [certificateError, setCertificateError] = useState(false);
 

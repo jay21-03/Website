@@ -21,17 +21,35 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BlogService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BlogService.class);
-    public record Post(Long id, String slug, String title, String bodyMarkdown, String seoTitle,
-                       String seoDescription, String ogTitle, String ogDescription, String imageSlot,
-                       String status, Instant publishAt, String imageUrl) {}
+    public record Post(
+            Long id, String slug, String title, String bodyMarkdown,
+            String seoTitle, String seoDescription,
+            String ogTitle, String ogDescription, String imageSlot,
+            String status, Instant publishAt, String imageUrl,
+            String titleEn, String bodyMarkdownEn,
+            String seoTitleEn, String seoDescriptionEn,
+            String ogTitleEn, String ogDescriptionEn
+    ) {}
 
-    public record Input(@NotBlank @Pattern(regexp = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*") @Size(max = 160) String slug,
-                        @NotBlank @Size(max = 180) String title,
-                        @NotBlank @Size(max = 50000) String bodyMarkdown,
-                        @Size(max = 180) String seoTitle, @Size(max = 500) String seoDescription,
-                        @Size(max = 180) String ogTitle, @Size(max = 500) String ogDescription,
-                        @Size(max = 64) @Pattern(regexp = "[A-Z][A-Z0-9_]*") String imageSlot,
-                        @NotBlank String status, Instant publishAt) {}
+    public record Input(
+            @NotBlank @Pattern(regexp = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+            @Size(max = 160) String slug,
+            @NotBlank @Size(max = 180) String title,
+            @NotBlank @Size(max = 50000) String bodyMarkdown,
+            @Size(max = 180) String seoTitle,
+            @Size(max = 500) String seoDescription,
+            @Size(max = 180) String ogTitle,
+            @Size(max = 500) String ogDescription,
+            @Size(max = 64) @Pattern(regexp = "[A-Z][A-Z0-9_]*") String imageSlot,
+            @NotBlank String status,
+            Instant publishAt,
+            @Size(max = 180) String titleEn,
+            @Size(max = 50000) String bodyMarkdownEn,
+            @Size(max = 180) String seoTitleEn,
+            @Size(max = 500) String seoDescriptionEn,
+            @Size(max = 180) String ogTitleEn,
+            @Size(max = 500) String ogDescriptionEn
+    ) {}
 
     private final JdbcTemplate jdbc;
     private final SeoMetadataService metadata;
@@ -52,9 +70,11 @@ public class BlogService {
     @Transactional(readOnly = true)
     public List<Post> publicPosts() {
         return jdbc.query("""
-                SELECT id,slug,title,body_markdown,seo_title,seo_description,og_title,og_description,image_slot,status,publish_at,image_key
+                SELECT id,slug,title,body_markdown,seo_title,seo_description,
+                       og_title,og_description,image_slot,status,publish_at,image_key,
+                       title_en,body_markdown_en,seo_title_en,seo_description_en,
+                       og_title_en,og_description_en
                 FROM blog_posts WHERE (status='PUBLISHED' OR status='SCHEDULED' AND publish_at <= now())
-                  AND (slug <> 'mua-gom-bau-truc-lam-qua-tet' OR now() >= timestamptz '2026-12-01 00:00:00+07')
                 ORDER BY publish_at DESC NULLS LAST, id DESC
                 """, this::map);
     }
@@ -68,7 +88,10 @@ public class BlogService {
     @Transactional(readOnly = true)
     public List<Post> adminPosts() {
         return jdbc.query("""
-                SELECT id,slug,title,body_markdown,seo_title,seo_description,og_title,og_description,image_slot,status,publish_at,image_key
+                SELECT id,slug,title,body_markdown,seo_title,seo_description,
+                       og_title,og_description,image_slot,status,publish_at,image_key,
+                       title_en,body_markdown_en,seo_title_en,seo_description_en,
+                       og_title_en,og_description_en
                 FROM blog_posts ORDER BY id DESC
                 """, this::map);
     }
@@ -79,9 +102,6 @@ public class BlogService {
             throw new BusinessException("BLOG_STATUS_INVALID", "Invalid publication status.");
         if ("SCHEDULED".equals(input.status()) && input.publishAt() == null)
             throw new BusinessException("BLOG_SCHEDULE_REQUIRED", "Scheduled posts need a publication time.");
-        if ("mua-gom-bau-truc-lam-qua-tet".equals(input.slug()) &&
-                "PUBLISHED".equals(input.status()) && Instant.now().isBefore(Instant.parse("2026-11-30T17:00:00Z")))
-            throw new BusinessException("BLOG_PUBLICATION_TOO_EARLY", "This article cannot publish before December 2026.");
         if (input.imageSlot() != null && !input.imageSlot().isBlank()) {
             try {
                 if (metadata.imageUrl(input.imageSlot()) == null) throw new IllegalArgumentException();
@@ -92,10 +112,22 @@ public class BlogService {
         var publication = input.publishAt() == null ? null : java.sql.Timestamp.from(input.publishAt());
         if (id == null) {
             id = jdbc.queryForObject("""
-                    INSERT INTO blog_posts(slug,title,body_markdown,seo_title,seo_description,og_title,og_description,image_slot,status,publish_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id
-                    """, Long.class, input.slug(), input.title(), input.bodyMarkdown(), input.seoTitle(),
-                    input.seoDescription(), input.ogTitle(), input.ogDescription(), input.imageSlot(), input.status(), publication);
+                    INSERT INTO blog_posts(
+                        slug,title,body_markdown,seo_title,seo_description,
+                        og_title,og_description,image_slot,status,publish_at,
+                        title_en,body_markdown_en,seo_title_en,seo_description_en,
+                        og_title_en,og_description_en
+                    )
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    RETURNING id
+                    """, Long.class,
+                    input.slug(), input.title(), input.bodyMarkdown(),
+                    input.seoTitle(), input.seoDescription(),
+                    input.ogTitle(), input.ogDescription(),
+                    input.imageSlot(), input.status(), publication,
+                    input.titleEn(), input.bodyMarkdownEn(),
+                    input.seoTitleEn(), input.seoDescriptionEn(),
+                    input.ogTitleEn(), input.ogDescriptionEn());
         } else {
             long existingId = id;
             var existing = adminPosts().stream().filter(post -> post.id() == existingId).findFirst()
@@ -103,10 +135,21 @@ public class BlogService {
             if (!existing.slug().equals(input.slug()))
                 throw new BusinessException("BLOG_SLUG_IMMUTABLE", "Published links are stable; create a new draft for a new URL.");
             jdbc.update("""
-                    UPDATE blog_posts SET title=?,body_markdown=?,seo_title=?,seo_description=?,og_title=?,og_description=?,
-                        image_slot=?,status=?,publish_at=?,updated_at=now() WHERE id=?
-                    """, input.title(), input.bodyMarkdown(), input.seoTitle(), input.seoDescription(), input.ogTitle(),
-                    input.ogDescription(), input.imageSlot(), input.status(), publication, id);
+                    UPDATE blog_posts SET
+                        title=?,body_markdown=?,seo_title=?,seo_description=?,
+                        og_title=?,og_description=?,image_slot=?,status=?,
+                        publish_at=?,title_en=?,body_markdown_en=?,
+                        seo_title_en=?,seo_description_en=?,
+                        og_title_en=?,og_description_en=?,updated_at=now()
+                    WHERE id=?
+                    """,
+                    input.title(), input.bodyMarkdown(),
+                    input.seoTitle(), input.seoDescription(),
+                    input.ogTitle(), input.ogDescription(),
+                    input.imageSlot(), input.status(), publication,
+                    input.titleEn(), input.bodyMarkdownEn(),
+                    input.seoTitleEn(), input.seoDescriptionEn(),
+                    input.ogTitleEn(), input.ogDescriptionEn(), id);
         }
         Long savedId = id;
         return adminPosts().stream().filter(post -> post.id().equals(savedId)).findFirst().orElseThrow();
@@ -145,15 +188,32 @@ public class BlogService {
             storage.delete(key);
             throw exception;
         }
-        return new Post(current.id(), current.slug(), current.title(), current.bodyMarkdown(), current.seoTitle(),
-                current.seoDescription(), current.ogTitle(), current.ogDescription(), null,
-                current.status(), current.publishAt(), storage.publicUrl(key));
+        return new Post(
+                current.id(), current.slug(), current.title(),
+                current.bodyMarkdown(), current.seoTitle(),
+                current.seoDescription(), current.ogTitle(),
+                current.ogDescription(), null, current.status(),
+                current.publishAt(), storage.publicUrl(key),
+                current.titleEn(), current.bodyMarkdownEn(),
+                current.seoTitleEn(), current.seoDescriptionEn(),
+                current.ogTitleEn(), current.ogDescriptionEn()
+        );
     }
 
     private Post map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
-        return new Post(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5),
-                rs.getString(6), rs.getString(7), rs.getString(8), rs.getString(9), rs.getString(10),
-                rs.getTimestamp(11) == null ? null : rs.getTimestamp(11).toInstant(),
-                rs.getString(12) == null ? metadata.imageUrl(rs.getString(9)) : storage.publicUrl(rs.getString(12)));
+        return new Post(
+                rs.getLong(1), rs.getString(2), rs.getString(3),
+                rs.getString(4), rs.getString(5), rs.getString(6),
+                rs.getString(7), rs.getString(8), rs.getString(9),
+                rs.getString(10),
+                rs.getTimestamp(11) == null ? null
+                        : rs.getTimestamp(11).toInstant(),
+                rs.getString(12) == null
+                        ? metadata.imageUrl(rs.getString(9))
+                        : storage.publicUrl(rs.getString(12)),
+                rs.getString(13), rs.getString(14),
+                rs.getString(15), rs.getString(16),
+                rs.getString(17), rs.getString(18)
+        );
     }
 }

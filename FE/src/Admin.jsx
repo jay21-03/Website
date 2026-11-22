@@ -16,7 +16,6 @@ import { BlogBody } from './design/BlogBody'
 import pVase from './design/assets/p-vase.jpg'
 import pKit from './design/assets/p-kit.jpg'
 import wsFamily from './design/assets/ws-family.jpg'
-import wsCouple from './design/assets/ws-couple.jpg'
 import pApsara from './design/assets/p-apsara.jpg'
 import wsTour from './design/assets/ws-tour.jpg'
 import { formatNotification } from './utils/notifications'
@@ -717,6 +716,7 @@ function HomepageContent({ notify, lang = 'vi' }) {
     try {
       const updated = await api.uploadHomeMedia(slot, file)
       replaceMedia(updated)
+      await queryClient.invalidateQueries({ queryKey: ['home'] })
       const config = homepageMediaConfig.find(item => item.slot === slot)
       notify(adminText(lang, `Đã cập nhật ${config?.vi || 'ảnh trang chủ'}.`, `${config?.en || 'Homepage image'} updated.`))
       return true
@@ -735,6 +735,7 @@ function HomepageContent({ notify, lang = 'vi' }) {
     try {
       const updated = await api.clearHomeMedia(slot)
       replaceMedia(updated)
+      await queryClient.invalidateQueries({ queryKey: ['home'] })
       notify(adminText(lang, `Đã đặt lại ${config?.vi || 'ảnh trang chủ'} về mặc định.`, `${config?.en || 'Homepage image'} reset to default.`))
     } catch (e) {
       notify(e.message)
@@ -949,7 +950,7 @@ const aboutMediaConfig = [
     field: 'heroUrl',
     vi: 'Ảnh bìa trang Về chúng tôi',
     en: 'About hero image',
-    fallback: heroPottery,
+    fallback: null,
     shape: 'wide'
   },
   {
@@ -1000,12 +1001,13 @@ function SitePresentationEditor({ notify, lang = 'vi', initialPage = 'brand' }) 
   const [previewScale, setPreviewScale] = useState(0.3)
   const [previewFocus, setPreviewFocus] = useState(null)
   const focusSequence = useRef(0)
-  const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['about', 'Về chúng tôi', 'About us'], ['catalog', 'Sản phẩm', 'Products'], ['detail', 'Chi tiết sản phẩm', 'Product detail'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
+  const pages = [['brand', 'Thương hiệu', 'Brand'], ['home', 'Trang chủ', 'Homepage'], ['about', 'Về chúng tôi', 'About us'], ['catalog', 'Sản phẩm', 'Products'], ['blog', 'Chuyện Làng Gốm', 'Journal'], ['detail', 'Chi tiết sản phẩm', 'Product detail'], ['cart', 'Giỏ hàng', 'Cart'], ['checkout', 'Thanh toán', 'Checkout'], ['orders', 'Đơn hàng', 'Orders'], ['workshop', 'Workshop', 'Workshop'], ['support', 'Liên hệ', 'Contact'], ['faq', 'FAQ', 'FAQ'], ['policy', 'Chính sách', 'Policy']]
   const mediaSlots = [
     { slot: 'SITE_LOGO', vi: 'Logo thương hiệu', en: 'Brand logo', fallbackIcon: true, shape: 'wide' },
-    { slot: 'CATALOG_HERO', vi: 'Ảnh bìa Sản phẩm', en: 'Products hero image', fallback: pVase, shape: 'wide' },
-    { slot: 'WORKSHOP_HERO', vi: 'Ảnh bìa Workshop', en: 'Workshop hero image', fallback: wsCouple, shape: 'wide' },
-    { slot: 'SUPPORT_HERO', vi: 'Ảnh bìa Liên hệ', en: 'Contact hero image', fallback: heroPottery, shape: 'wide' },
+    { slot: 'CATALOG_HERO', vi: 'Ảnh bìa Sản phẩm', en: 'Products hero image', shape: 'wide' },
+    { slot: 'BLOG_HERO', vi: 'Ảnh bìa Chuyện Làng Gốm', en: 'Journal hero image', shape: 'wide' },
+    { slot: 'WORKSHOP_HERO', vi: 'Ảnh bìa Workshop', en: 'Workshop hero image', shape: 'wide' },
+    { slot: 'SUPPORT_HERO', vi: 'Ảnh bìa Liên hệ', en: 'Contact hero image', shape: 'wide' },
     { slot: 'CHECKOUT_HERO', vi: 'Ảnh thanh toán', en: 'Checkout image', emptyVi: 'Trang thanh toán hiện không có ảnh minh họa.', emptyEn: 'Checkout currently has no illustration.', shape: 'wide' }
   ]
   const iconSlots = {
@@ -1151,7 +1153,7 @@ function SitePresentationEditor({ notify, lang = 'vi', initialPage = 'brand' }) 
   const paletteColors = colorNames.map(key => active.colors[key])
   const rawFields = page === 'detail' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => !['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : page === 'catalog' ? Object.fromEntries(Object.entries(presentationFields.catalog).filter(([key]) => ['title', 'subtitle', 'contactBody', 'contactAction'].includes(key))) : presentationFields[page] || {}
   const fields = ['faq', 'support'].includes(page) ? Object.fromEntries(Object.entries(rawFields).filter(([key]) => !/^question\d+$|^answer\d+$/.test(key))) : rawFields
-  const previewRoute = page === 'detail' ? (previewProduct.data?.content?.[0]?.id ? `/products/${previewProduct.data.content[0].id}` : '') : { brand: '/', home: '/', about: '/ve-chung-toi', catalog: '/san-pham', cart: '/cart', checkout: '/checkout', orders: '/orders', workshop: '/trai-nghiem', support: '/lien-he', faq: '/faq', policy: '/chinh-sach' }[page]
+  const previewRoute = page === 'detail' ? (previewProduct.data?.content?.[0]?.id ? `/products/${previewProduct.data.content[0].id}` : '') : { brand: '/', home: '/', about: '/ve-chung-toi', catalog: '/san-pham', blog: '/blog', cart: '/cart', checkout: '/checkout', orders: '/orders', workshop: '/trai-nghiem', support: '/lien-he', faq: '/faq', policy: '/chinh-sach' }[page]
   const previewUrl = previewRoute ? `${previewRoute}?${new URLSearchParams({ presentationPreview: '1', mode: previewMode, lang: previewLang })}` : ''
   const dirty = savedSettings && JSON.stringify(settings) !== JSON.stringify(savedSettings)
 
@@ -1162,6 +1164,18 @@ function SitePresentationEditor({ notify, lang = 'vi', initialPage = 'brand' }) 
     <div className="presentation-workspace">
     <div className="presentation-editor">
     <h3>{adminText(lang, 'Chữ trên trang', 'Page text')} · {pageName}</h3>
+    {page === 'blog' && (
+      <p className="admin-help">
+        {adminText(
+          lang,
+          'Tiêu đề, nội dung và ảnh bìa từng bài viết được quản lý tại ',
+          'Story titles, content and cover images are managed under '
+        )}
+        <Link to="/admin?section=blog">
+          {adminText(lang, 'Quản lý Blog', 'Blog management')}
+        </Link>.
+      </p>
+    )}
     {page === 'detail' && <p className="admin-help">{adminText(lang, 'Tên, giá và mô tả riêng của từng sản phẩm được sửa trong mục Sản phẩm.', 'Edit each product’s name, price and description in Products.')}</p>}
     {page === 'about' && <AboutContent notify={notify} lang={lang} previewMode={previewMode} defaultColor={paletteColors[3]} draft={aboutPreview} onDraft={setAboutPreview} onFocusPreview={focusPreview} />}
     {page !== 'about' && <>
@@ -1188,7 +1202,7 @@ function SitePresentationEditor({ notify, lang = 'vi', initialPage = 'brand' }) 
       <div className="presentation-save wide"><span role="status">{dirty ? adminText(lang, 'Có thay đổi chưa lưu', 'Unsaved changes') : adminText(lang, 'Đã lưu nội dung', 'Content saved')}</span><button className="admin-primary" disabled={saving || !dirty}>{saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu thay đổi', 'Save changes')}</button></div>
     </form>
     {iconSlots[page] && <section className="presentation-images"><h3>{adminText(lang, 'Biểu tượng tải lên', 'Uploaded icons')}</h3><p>{adminText(lang, 'Ảnh tải lên sẽ thay biểu tượng đã chọn ở trên. Đặt lại để dùng biểu tượng có sẵn. Dùng PNG/WebP nền trong suốt để hiển thị đẹp trên cả hai chế độ; màu ảnh không đổi theo bộ chọn màu.', 'An uploaded image replaces the selected icon above. Reset it to use the built-in icon. A transparent PNG/WebP works best in both modes; the color picker does not recolor uploaded images.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{iconSlots[page].map(([slot, vi, en]) => <HomepageMediaCard key={slot} config={{ slot, vi, en, shape: 'icon', emptyVi: 'Đang dùng biểu tượng có sẵn', emptyEn: 'Using the built-in icon' }} media={{ url: media[slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} compact />)}</div></section>}
-    {['brand', 'catalog', 'workshop', 'support', 'checkout'].includes(page) && <section className="presentation-images"><h3>{adminText(lang, 'Hình ảnh trên trang', 'Page images')}</h3><p>{adminText(lang, 'Ảnh được lưu ngay khi tải lên. Chế độ tối dùng ảnh riêng nếu bạn tải lên; nếu để trống sẽ dùng ảnh chế độ sáng.', 'Images save when uploaded. Dark mode uses its own image if uploaded; otherwise it uses the light mode image.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{mediaSlots.filter(item => item.slot.startsWith(page === 'brand' ? 'SITE_' : page.toUpperCase())).map(config => { const slot = previewMode === 'dark' ? `${config.slot}_DARK` : config.slot; return <HomepageMediaCard key={slot} config={{ ...config, slot, fallback: previewMode === 'dark' ? media[config.slot] || config.fallback : config.fallback }} media={{ url: media[slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} /> })}</div></section>}
+    {['brand', 'catalog', 'blog', 'workshop', 'support', 'checkout'].includes(page) && <section className="presentation-images"><h3>{adminText(lang, 'Hình ảnh trên trang', 'Page images')}</h3><p>{adminText(lang, 'Ảnh được lưu ngay khi tải lên. Chế độ tối dùng ảnh riêng nếu bạn tải lên; nếu để trống sẽ dùng ảnh chế độ sáng.', 'Images save when uploaded. Dark mode uses its own image if uploaded; otherwise it uses the light mode image.')}</p><div className="homepage-media-grid homepage-media-grid-primary">{mediaSlots.filter(item => item.slot.startsWith(page === 'brand' ? 'SITE_' : page.toUpperCase())).map(config => { const slot = previewMode === 'dark' ? `${config.slot}_DARK` : config.slot; return <HomepageMediaCard key={slot} config={{ ...config, slot, fallback: previewMode === 'dark' ? media[config.slot] || config.fallback : config.fallback }} media={{ url: media[slot] || null }} busy={Boolean(busySlot)} onUpload={upload} onClear={clear} lang={lang} /> })}</div></section>}
     </>}
     </div>
     <aside className="presentation-preview" aria-label={adminText(lang, 'Xem trước', 'Preview')}>
@@ -1606,6 +1620,7 @@ function FaqAdmin({ notify, lang = 'vi' }) {
   const [open, setOpen] = useState(false)
   const load = useCallback(() => api.adminFaqItems().then(setItems).catch(error => notify(error.message)), [notify])
   useEffect(() => { load() }, [load])
+  const closeEditor = () => { setOpen(false); setEditing(null) }
   async function save(event) {
     event.preventDefault()
     const values = Object.fromEntries(new FormData(event.currentTarget))
@@ -1613,7 +1628,7 @@ function FaqAdmin({ notify, lang = 'vi' }) {
     values.visible = values.visible === 'on'
     try {
       editing ? await api.updateFaqItem(editing.id, values) : await api.createFaqItem(values)
-      setOpen(false)
+      closeEditor()
       load()
       notify(adminText(lang, 'Đã lưu câu hỏi.', 'FAQ saved.'))
     } catch (error) { notify(error.message) }
@@ -1623,18 +1638,112 @@ function FaqAdmin({ notify, lang = 'vi' }) {
     try { await api.deleteFaqItem(item.id); load(); notify(adminText(lang, 'Đã xóa câu hỏi.', 'FAQ deleted.')) }
     catch (error) { notify(error.message) }
   }
-  return <Panel title="FAQ" action={<button className="admin-primary" onClick={() => { setEditing(null); setOpen(true) }}>+ {adminText(lang, 'Thêm câu hỏi', 'Add question')}</button>}>
-    {!items ? <p>{adminText(lang, 'Đang tải...', 'Loading...')}</p> : <div className="admin-list">{items.map(item => <div className="admin-list-row" key={item.id}><strong>{lang === 'vi' ? item.questionVi : item.questionEn}</strong><small>#{item.position} · {item.visible ? adminText(lang, 'Hiển thị', 'Visible') : adminText(lang, 'Đã ẩn', 'Hidden')}</small><button onClick={() => { setEditing(item); setOpen(true) }}>{adminText(lang, 'Sửa', 'Edit')}</button><button className="danger" onClick={() => remove(item)}>{adminText(lang, 'Xóa', 'Delete')}</button></div>)}</div>}
-    {open && <Modal title="FAQ" close={() => setOpen(false)}><form className="admin-form" onSubmit={save}>
-      <label>{adminText(lang, 'Câu hỏi VI', 'Vietnamese question')}<input name="questionVi" defaultValue={editing?.questionVi || ''} maxLength={500} required /></label>
-      <label>{adminText(lang, 'Câu trả lời VI', 'Vietnamese answer')}<textarea name="answerVi" defaultValue={editing?.answerVi || ''} maxLength={5000} required /></label>
-      <label>{adminText(lang, 'Câu hỏi EN', 'English question')}<input name="questionEn" defaultValue={editing?.questionEn || ''} maxLength={500} required /></label>
-      <label>{adminText(lang, 'Câu trả lời EN', 'English answer')}<textarea name="answerEn" defaultValue={editing?.answerEn || ''} maxLength={5000} required /></label>
-      <label>{adminText(lang, 'Thứ tự', 'Order')}<input name="position" type="number" min="0" max="10000" defaultValue={editing?.position ?? items?.length ?? 0} required /></label>
-      <label className="check-row"><input name="visible" type="checkbox" defaultChecked={editing?.visible ?? true} /> {adminText(lang, 'Hiển thị', 'Visible')}</label>
-      <button className="admin-primary">{adminText(lang, 'Lưu câu hỏi', 'Save question')}</button>
-    </form></Modal>}
-  </Panel>
+  const visibleCount = items?.filter(item => item.visible).length || 0
+  const hiddenCount = (items?.length || 0) - visibleCount
+
+  return (
+    <Panel
+      title={adminText(lang, 'Câu hỏi thường gặp', 'Frequently asked questions')}
+      className="faq-admin-panel"
+      action={
+        <button className="admin-primary" type="button" onClick={() => { setEditing(null); setOpen(true) }}>
+          + {adminText(lang, 'Thêm câu hỏi', 'Add question')}
+        </button>
+      }
+    >
+      <p className="faq-admin-intro">
+        {adminText(lang, 'Quản lý nội dung song ngữ, thứ tự và trạng thái hiển thị của câu hỏi trên website.', 'Manage bilingual copy, order, and visibility for questions on the storefront.')}
+      </p>
+
+      {items && (
+        <div className="faq-admin-summary" aria-label={adminText(lang, 'Tổng quan câu hỏi', 'FAQ summary')}>
+          <div><span>{adminText(lang, 'Tổng câu hỏi', 'Total questions')}</span><strong>{items.length}</strong></div>
+          <div><span>{adminText(lang, 'Đang hiển thị', 'Visible')}</span><strong>{visibleCount}</strong></div>
+          <div><span>{adminText(lang, 'Đang ẩn', 'Hidden')}</span><strong>{hiddenCount}</strong></div>
+        </div>
+      )}
+
+      {open && (
+        <section className="faq-editor" aria-labelledby="faq-editor-title">
+          <header className="faq-editor-heading">
+            <div>
+              <span>{adminText(lang, editing ? 'Đang chỉnh sửa' : 'Câu hỏi mới', editing ? 'Editing question' : 'New question')}</span>
+              <h3 id="faq-editor-title">{adminText(lang, 'Nội dung song ngữ', 'Bilingual content')}</h3>
+            </div>
+            <button type="button" className="faq-editor-close" onClick={closeEditor}>
+              {adminText(lang, 'Đóng', 'Close')}
+            </button>
+          </header>
+          <form className="faq-admin-form" onSubmit={save}>
+            <div className="faq-language-fields">
+              <section aria-labelledby="faq-vietnamese-title">
+                <h4 id="faq-vietnamese-title">{adminText(lang, 'Tiếng Việt', 'Vietnamese')}</h4>
+                <label>{adminText(lang, 'Câu hỏi', 'Question')}<input name="questionVi" defaultValue={editing?.questionVi || ''} maxLength={500} required /></label>
+                <label>{adminText(lang, 'Câu trả lời', 'Answer')}<textarea name="answerVi" defaultValue={editing?.answerVi || ''} maxLength={5000} rows={5} required /></label>
+              </section>
+              <section aria-labelledby="faq-english-title">
+                <h4 id="faq-english-title">{adminText(lang, 'Tiếng Anh', 'English')}</h4>
+                <label>{adminText(lang, 'Câu hỏi', 'Question')}<input name="questionEn" defaultValue={editing?.questionEn || ''} maxLength={500} required /></label>
+                <label>{adminText(lang, 'Câu trả lời', 'Answer')}<textarea name="answerEn" defaultValue={editing?.answerEn || ''} maxLength={5000} rows={5} required /></label>
+              </section>
+            </div>
+            <div className="faq-editor-options">
+              <label>{adminText(lang, 'Thứ tự hiển thị', 'Display order')}<input name="position" type="number" min="0" max="10000" defaultValue={editing?.position ?? items?.length ?? 0} required /></label>
+              <label className="faq-visible-toggle">
+                <input name="visible" type="checkbox" defaultChecked={editing?.visible ?? true} />
+                <span>{adminText(lang, 'Hiển thị trên website', 'Show on storefront')}</span>
+              </label>
+              <div className="faq-editor-actions">
+                <button type="button" onClick={closeEditor}>{adminText(lang, 'Hủy', 'Cancel')}</button>
+                <button className="admin-primary" type="submit">{adminText(lang, 'Lưu câu hỏi', 'Save question')}</button>
+              </div>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {!items ? (
+        <div className="faq-admin-loading" role="status">{adminText(lang, 'Đang tải câu hỏi...', 'Loading questions...')}</div>
+      ) : items.length === 0 ? (
+        <div className="faq-admin-empty">
+          <h3>{adminText(lang, 'Chưa có câu hỏi nào', 'No questions yet')}</h3>
+          <p>{adminText(lang, 'Tạo câu hỏi đầu tiên để khách hàng dễ tìm được thông tin cần thiết.', 'Add the first question to help customers find the information they need.')}</p>
+          <button type="button" className="admin-primary" onClick={() => { setEditing(null); setOpen(true) }}>
+            + {adminText(lang, 'Thêm câu hỏi', 'Add question')}
+          </button>
+        </div>
+      ) : (
+        <div className="faq-admin-list">
+          {items.map(item => (
+            <article className="faq-admin-item" key={item.id}>
+              <div className="faq-admin-item-meta">
+                <div>
+                  <span className="faq-order">#{item.position}</span>
+                  <span className={`faq-visibility ${item.visible ? 'is-visible' : 'is-hidden'}`}>
+                    {item.visible ? adminText(lang, 'Đang hiển thị', 'Visible') : adminText(lang, 'Đang ẩn', 'Hidden')}
+                  </span>
+                </div>
+                <div className="faq-item-actions">
+                  <button type="button" onClick={() => { setEditing(item); setOpen(true) }}>{adminText(lang, 'Sửa', 'Edit')}</button>
+                  <button type="button" className="danger" onClick={() => remove(item)}>{adminText(lang, 'Xóa', 'Delete')}</button>
+                </div>
+              </div>
+              <details className="faq-item-details">
+                <summary>
+                  <span className="faq-question-vi">{item.questionVi}</span>
+                  <span className="faq-question-en">{item.questionEn}</span>
+                </summary>
+                <div className="faq-item-answers">
+                  <div><span>VI</span><p>{item.answerVi}</p></div>
+                  <div><span>EN</span><p>{item.answerEn}</p></div>
+                </div>
+              </details>
+            </article>
+          ))}
+        </div>
+      )}
+    </Panel>
+  )
 }
 
 function BlogAdmin({ notify, lang = 'vi' }) {
@@ -1642,6 +1751,7 @@ function BlogAdmin({ notify, lang = 'vi' }) {
   const [editing, setEditing] = useState(null)
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState({})
+  const [previewLang, setPreviewLang] = useState('vi')
   const [selectedFiles, setSelectedFiles] = useState([])
   const [slug, setSlug] = useState('')
   const [slugEdited, setSlugEdited] = useState(false)
@@ -1654,7 +1764,7 @@ function BlogAdmin({ notify, lang = 'vi' }) {
     event.preventDefault()
     if (saving) return
     const form = new FormData(event.currentTarget)
-    const file = form.get('image')
+    const file = selectedFiles[0]
     if (file?.size) {
       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
       if (!allowedTypes.includes(file.type)) {
@@ -1676,15 +1786,36 @@ function BlogAdmin({ notify, lang = 'vi' }) {
         try {
           await api.uploadBlogImage(post.id, file)
         } catch (imageError) {
-          setEditing(post)
-          setPreview(post)
           setSelectedFiles([])
-          load()
-          notify(adminText(
-            lang,
-            `Bài viết đã được lưu, nhưng ảnh bìa chưa tải lên: ${imageError.message}`,
-            `The story was saved, but the cover image failed to upload: ${imageError.message}`
-          ))
+          try {
+            const latestPosts = await api.adminBlogPosts()
+            const latestPost = latestPosts.find(item => item.id === post.id)
+            setPosts(latestPosts)
+            if (latestPost?.imageUrl && latestPost.imageUrl !== post.imageUrl) {
+              setOpen(false)
+              notify(adminText(
+                lang,
+                'Bài viết và ảnh bìa đã được lưu. Kết nối bị gián đoạn sau khi máy chủ hoàn tất tải ảnh.',
+                'The story and cover image were saved. The connection was interrupted after the server finished uploading.'
+              ))
+              return
+            }
+            setEditing(latestPost || post)
+            setPreview(latestPost || post)
+            notify(adminText(
+              lang,
+              `Bài viết đã lưu, nhưng máy chủ chưa xác nhận ảnh bìa: ${imageError.message}`,
+              `The story was saved, but the server did not confirm the cover image: ${imageError.message}`
+            ))
+          } catch {
+            setEditing(post)
+            setPreview(post)
+            notify(adminText(
+              lang,
+              'Bài viết đã lưu, nhưng chưa xác nhận được trạng thái ảnh bìa. Tải lại danh sách bài viết trước khi thử tải lại ảnh.',
+              'The story was saved, but the cover image status could not be confirmed. Reload the story list before retrying the upload.'
+            ))
+          }
           return
         }
       }
@@ -1693,7 +1824,7 @@ function BlogAdmin({ notify, lang = 'vi' }) {
       notify(adminText(lang, 'Đã lưu bài viết.', 'Blog post saved.'))
     } catch (error) { notify(error.message) } finally { setSaving(false) }
   }
-  const editPost = post => { setEditing(post); setPreview(post || {}); setSelectedFiles([]); setSlug(post?.slug || ''); setSlugEdited(false); setStatus(post?.status || 'DRAFT'); setOpen(true) }
+  const editPost = post => { setEditing(post); setPreview(post || {}); setPreviewLang('vi'); setSelectedFiles([]); setSlug(post?.slug || ''); setSlugEdited(false); setStatus(post?.status || 'DRAFT'); setOpen(true) }
   const suggestSlug = title => {
     const value = title.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 160).replace(/-$/g, '')
     return /^[a-z]/.test(value) ? value : value ? `bai-${value}`.slice(0, 160).replace(/-$/g, '') : ''
@@ -1701,29 +1832,46 @@ function BlogAdmin({ notify, lang = 'vi' }) {
   const statusLabel = value => ({ DRAFT: adminText(lang, 'Nháp', 'Draft'), SCHEDULED: adminText(lang, 'Lên lịch', 'Scheduled'), PUBLISHED: adminText(lang, 'Đã đăng', 'Published') })[value] || value
   return <Panel title={adminText(lang, 'Bài viết', 'Stories')} action={<button className="admin-primary" onClick={() => editPost(null)}>+ {adminText(lang, 'Viết bài mới', 'New story')}</button>}>
     <p className="admin-help">{adminText(lang, 'Quản lý bài viết ở đây. Chỉ bài đã đăng và bài đến lịch mới xuất hiện tại Chuyện Làng Gốm trên website.', 'Manage stories here. Only published or due scheduled stories appear in the public Journal.')}</p>
-    {!posts ? <p>{adminText(lang, 'Đang tải...', 'Loading...')}</p> : !posts.length ? <p className="blog-admin-empty">{adminText(lang, 'Chưa có bài viết. Chọn “Viết bài mới” để bắt đầu.', 'No stories yet. Select “New story” to begin.')}</p> : <div className="blog-admin-list">{posts.map(post => <article className="blog-admin-row" key={post.id}>{post.imageUrl ? <img src={post.imageUrl} alt="" /> : <div className="blog-admin-placeholder" aria-hidden="true">✦</div>}<div className="blog-admin-row-copy"><strong>{post.title}</strong><small>/blog/{post.slug}</small><span className={`blog-status blog-status-${post.status.toLowerCase()}`}>{statusLabel(post.status)}{post.status === 'SCHEDULED' && post.publishAt ? ` · ${new Date(post.publishAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}` : ''}</span></div><button type="button" onClick={() => editPost(post)}>{adminText(lang, 'Chỉnh sửa', 'Edit')}</button></article>)}</div>}
-    {open && <Modal title={editing ? adminText(lang, 'Chỉnh sửa bài viết', 'Edit story') : adminText(lang, 'Viết bài mới', 'New story')} close={() => setOpen(false)}><form className="admin-form blog-admin-form" onInput={event => setPreview(current => ({ ...current, [event.target.name]: event.target.value }))} onSubmit={save}>
+    {!posts ? <p>{adminText(lang, 'Đang tải...', 'Loading...')}</p> : !posts.length ? <p className="blog-admin-empty">{adminText(lang, 'Chưa có bài viết. Chọn “Viết bài mới” để bắt đầu.', 'No stories yet. Select “New story” to begin.')}</p> : <div className="blog-admin-list">{posts.map(post => <article className="blog-admin-row" key={post.id}>{post.imageUrl && <img src={post.imageUrl} alt="" />}<div className="blog-admin-row-copy"><strong>{lang === 'en' ? post.titleEn || post.title : post.title}</strong><small>/blog/{post.slug}</small><span className={`blog-status blog-status-${post.status.toLowerCase()}`}>{statusLabel(post.status)}{post.status === 'SCHEDULED' && post.publishAt ? ` · ${new Date(post.publishAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}` : ''}</span></div><button type="button" onClick={() => editPost(post)}>{adminText(lang, 'Chỉnh sửa', 'Edit')}</button></article>)}</div>}
+    {open && <Modal title={editing ? adminText(lang, 'Chỉnh sửa bài viết', 'Edit story') : adminText(lang, 'Viết bài mới', 'New story')} close={() => setOpen(false)}><form className="admin-form blog-admin-form" onInput={event => {
+      const { name, value } = event.target
+      if (['title', 'bodyMarkdown', 'titleEn', 'bodyMarkdownEn'].includes(name)) setPreview(current => ({ ...current, [name]: value }))
+    }} onSubmit={save}>
       <div className="blog-admin-fields">
-        <label>{adminText(lang, 'Tiêu đề bài viết', 'Story title')}<input name="title" defaultValue={editing?.title || ''} onChange={event => { if (!editing && !slugEdited) setSlug(suggestSlug(event.target.value)) }} maxLength={180} required /></label>
+        <label>{adminText(lang, 'Tiêu đề (VI)', 'Title (VI)')}<input name="title" defaultValue={editing?.title || ''} onChange={event => { if (!editing && !slugEdited) setSlug(suggestSlug(event.target.value)) }} maxLength={180} required /></label>
+        <label>{adminText(lang, 'Tiêu đề (EN)', 'Title (EN)')}<input name="titleEn" defaultValue={editing?.titleEn || ''} maxLength={180} /></label>
         <p className="blog-url-hint">/blog/{slug || 'ten-bai-viet'}</p>
-        <label>{adminText(lang, 'Nội dung (Markdown)', 'Content (Markdown)')}<textarea name="bodyMarkdown" defaultValue={editing?.bodyMarkdown || ''} rows={16} maxLength={50000} required /></label>
+        <label>{adminText(lang, 'Nội dung (VI) — Markdown', 'Content (VI) — Markdown')}<textarea name="bodyMarkdown" defaultValue={editing?.bodyMarkdown || ''} rows={16} maxLength={50000} required /></label>
+        <label>{adminText(lang, 'Nội dung (EN) — Markdown', 'Content (EN) — Markdown')}<textarea name="bodyMarkdownEn" defaultValue={editing?.bodyMarkdownEn || ''} rows={16} maxLength={50000} /></label>
         <label>{adminText(lang, 'Ảnh bìa', 'Cover image')}<input name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} /></label>
         <div className="blog-publish-controls"><label>{adminText(lang, 'Hiển thị bài viết', 'Publication')}<select name="status" value={status} onChange={event => setStatus(event.target.value)}><option value="DRAFT">{adminText(lang, 'Lưu nháp', 'Keep as draft')}</option><option value="SCHEDULED">{adminText(lang, 'Lên lịch đăng', 'Schedule')}</option><option value="PUBLISHED">{adminText(lang, 'Đăng ngay', 'Publish now')}</option></select></label>{status === 'SCHEDULED' && <label>{adminText(lang, 'Ngày và giờ đăng', 'Publication date and time')}<input name="publishAt" type="datetime-local" defaultValue={businessDateTimeLocal(editing?.publishAt)} required /></label>}</div>
-        <details className="blog-seo-options"><summary>{adminText(lang, 'Tùy chọn đường dẫn, SEO & chia sẻ', 'URL, SEO & sharing options')}</summary><p>{adminText(lang, 'Đường dẫn tự tạo từ tiêu đề. Có thể sửa trước khi lưu lần đầu; để trống các mục khác để dùng nội dung bài viết.', 'The URL is suggested from the title. Adjust it before the first save; leave other fields blank to use the story content.')}</p><label>{adminText(lang, 'Đường dẫn bài viết', 'Story URL')}<span className="blog-url-field"><span>/blog/</span><input name="slug" value={slug} onChange={event => { setSlug(event.target.value); setSlugEdited(true) }} pattern="[a-z][a-z0-9]*(?:-[a-z0-9]+)*" maxLength={160} required readOnly={Boolean(editing)} placeholder="ten-bai-viet" /></span></label><label>SEO Title<input name="seoTitle" defaultValue={editing?.seoTitle || ''} maxLength={180} /></label><label>Meta Description<textarea name="seoDescription" defaultValue={editing?.seoDescription || ''} maxLength={500} /></label><label>OG Title<input name="ogTitle" defaultValue={editing?.ogTitle || ''} maxLength={180} /></label><label>OG Description<textarea name="ogDescription" defaultValue={editing?.ogDescription || ''} maxLength={500} /></label></details>
+        <details className="blog-seo-options"><summary>{adminText(lang, 'Tùy chọn đường dẫn, SEO & chia sẻ', 'URL, SEO & sharing options')}</summary><p>{adminText(lang, 'Đường dẫn tự tạo từ tiêu đề. Có thể sửa trước khi lưu lần đầu; để trống các mục khác để dùng nội dung bài viết.', 'The URL is suggested from the title. Adjust it before the first save; leave other fields blank to use the story content.')}</p><label>{adminText(lang, 'Đường dẫn bài viết', 'Story URL')}<span className="blog-url-field"><span>/blog/</span><input name="slug" value={slug} onChange={event => { setSlug(event.target.value); setSlugEdited(true) }} pattern="[a-z][a-z0-9]*(?:-[a-z0-9]+)*" maxLength={160} required readOnly={Boolean(editing)} placeholder="ten-bai-viet" /></span></label><label>SEO Title<input name="seoTitle" defaultValue={editing?.seoTitle || ''} maxLength={180} /></label><label>Meta Description<textarea name="seoDescription" defaultValue={editing?.seoDescription || ''} maxLength={500} /></label><label>OG Title<input name="ogTitle" defaultValue={editing?.ogTitle || ''} maxLength={180} /></label><label>OG Description<textarea name="ogDescription" defaultValue={editing?.ogDescription || ''} maxLength={500} /></label><label>SEO Title (EN)<input name="seoTitleEn" defaultValue={editing?.seoTitleEn || ''} maxLength={180} /></label><label>Meta Description (EN)<textarea name="seoDescriptionEn" defaultValue={editing?.seoDescriptionEn || ''} maxLength={500} /></label><label>OG Title (EN)<input name="ogTitleEn" defaultValue={editing?.ogTitleEn || ''} maxLength={180} /></label><label>OG Description (EN)<textarea name="ogDescriptionEn" defaultValue={editing?.ogDescriptionEn || ''} maxLength={500} /></label></details>
         <button className="admin-primary" disabled={saving}>{saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu bài viết', 'Save story')}</button>
       </div>
-      <div className="blog-admin-preview"><strong>{adminText(lang, 'Xem trước bài viết', 'Post preview')}</strong>{(previews[0]?.url || editing?.imageUrl) && <img src={previews[0]?.url || editing.imageUrl} alt="" />}<h2>{preview.title || adminText(lang, 'Tiêu đề bài viết', 'Story title')}</h2><BlogBody markdown={preview.bodyMarkdown} /></div>
+      <div className="blog-admin-preview">
+        <strong>{adminText(lang, 'Xem trước bài viết', 'Post preview')}</strong>
+        <div className="row-actions">
+          <button type="button" onClick={() => setPreviewLang('vi')} aria-pressed={previewLang === 'vi'}>Tiếng Việt</button>
+          <button type="button" onClick={() => setPreviewLang('en')} aria-pressed={previewLang === 'en'}>English</button>
+        </div>
+        {(previews[0]?.url || editing?.imageUrl) && <img src={previews[0]?.url || editing?.imageUrl} alt="" />}
+        <h2>{previewLang === 'en' ? preview.titleEn || preview.title || 'Story title' : preview.title || 'Tiêu đề bài viết'}</h2>
+        <BlogBody markdown={previewLang === 'en' ? preview.bodyMarkdownEn || preview.bodyMarkdown : preview.bodyMarkdown} />
+      </div>
     </form></Modal>}
   </Panel>
 }
 
 function SeoSettings({ notify, lang = 'vi' }) {
+  const queryClient = useQueryClient()
   const [records, setRecords] = useState(null)
   const [media, setMedia] = useState({})
   const [collections, setCollections] = useState([])
   const [path, setPath] = useState('/')
   const [draft, setDraft] = useState({})
   const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [selectedImageName, setSelectedImageName] = useState('')
   useEffect(() => {
     Promise.all([api.adminSeoMetadata(), api.adminSitePresentation(), loadAllAdminCollections()])
       .then(([values, presentation, groups]) => { setRecords(values); setMedia(presentation.media || {}); setCollections(groups) })
@@ -1738,6 +1886,7 @@ function SeoSettings({ notify, lang = 'vi' }) {
     try {
       const saved = await api.updateSeoMetadata({ ...draft, path })
       setRecords(current => ({ ...current, [path]: saved }))
+      await queryClient.invalidateQueries({ queryKey: ['seo-metadata'] })
       notify(adminText(lang, 'Đã lưu SEO và chia sẻ.', 'SEO and sharing settings saved.'))
     } catch (error) { notify(error.message) }
     finally { setSaving(false) }
@@ -1745,33 +1894,164 @@ function SeoSettings({ notify, lang = 'vi' }) {
   async function upload(event) {
     const file = event.target.files?.[0]
     if (!file) return
+    const input = event.currentTarget
+    setSelectedImageName(file.name)
+    setUploadingImage(true)
     try {
       const result = await api.uploadSiteMedia('SEO_SHARE', file)
       setMedia(current => ({ ...current, SEO_SHARE: result.url }))
       setDraft(current => ({ ...current, imageSlot: 'SEO_SHARE' }))
+      await queryClient.invalidateQueries({ queryKey: ['site-presentation'] })
       notify(adminText(lang, 'Ảnh đã tải lên. Lưu cấu hình để dùng ảnh này.', 'Image uploaded. Save settings to use it.'))
-    } catch (error) { notify(error.message) }
+    } catch (error) {
+      setSelectedImageName('')
+      notify(error.message)
+    } finally {
+      setUploadingImage(false)
+      input.value = ''
+    }
   }
   const update = (key, value) => setDraft(current => ({ ...current, [key]: value }))
   const title = draft.title || (path === 'default' ? 'Đàng Xem' : records?.[path]?.title || 'Đàng Xem')
   const description = draft.description || records?.[path]?.description || ''
   const previewImage = media[draft.imageSlot] || ''
-  return <Panel title={adminText(lang, 'SEO & Chia sẻ', 'SEO & Sharing')}>
-    {!records ? <p>{adminText(lang, 'Đang tải cấu hình...', 'Loading settings...')}</p> : <form className="admin-form" onSubmit={save}>
-      <label>{adminText(lang, 'Trang', 'Page')}<select value={path} onChange={event => setPath(event.target.value)}>{paths.map(value => <option key={value} value={value}>{value === 'default' ? adminText(lang, 'Mặc định', 'Default') : value}</option>)}</select></label>
-      <p className="admin-help">Canonical: {path === 'default' ? adminText(lang, 'Áp dụng khi trang chưa có cấu hình riêng', 'Used when a page has no override') : `https://dangxembautruc.com${path}`}</p>
-      <p className="admin-help">{path === '/blog' ? adminText(lang, 'Blog chỉ được index khi có bài đã xuất bản.', 'Blog is indexed when at least one post is published.') : path === 'default' ? adminText(lang, 'Mặc định cho trang công khai.', 'Default for public pages.') : adminText(lang, 'Trang công khai; sản phẩm và danh mục ẩn sẽ trả 404.', 'Public page; hidden products and collections return 404.')}</p>
-      <label>SEO Title<input value={draft.title || ''} onChange={event => update('title', event.target.value)} maxLength={180} /></label>
-      <label>Meta Description<textarea value={draft.description || ''} onChange={event => update('description', event.target.value)} maxLength={500} /></label>
-      <label>Open Graph Title<input value={draft.ogTitle || ''} onChange={event => update('ogTitle', event.target.value)} maxLength={180} /></label>
-      <label>Open Graph Description<textarea value={draft.ogDescription || ''} onChange={event => update('ogDescription', event.target.value)} maxLength={500} /></label>
-      <label>{adminText(lang, 'Ảnh chia sẻ', 'Sharing image')}<select value={draft.imageSlot || ''} onChange={event => update('imageSlot', event.target.value)}><option value="">{adminText(lang, 'Ảnh mặc định của trang', 'Page default image')}</option>{Object.entries(media).filter(([, url]) => url).map(([slot]) => <option key={slot} value={slot}>{slot}</option>)}</select></label>
-      {path === 'default' && <label>{adminText(lang, 'Tải ảnh chia sẻ mặc định', 'Upload default sharing image')}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} /><small>{adminText(lang, 'Ảnh tải lên được lưu ngay và dùng chung cho các trang chọn SEO_SHARE.', 'Upload saves immediately and updates every page using SEO_SHARE.')}</small></label>}
-      <div className="admin-fieldset"><strong>{adminText(lang, 'Xem trước Google', 'Google preview')}</strong><p>{title}</p><small>dangxembautruc.com{path === 'default' ? '' : path}</small><p>{description}</p></div>
-      <div className="admin-fieldset"><strong>{adminText(lang, 'Xem trước Facebook/Zalo', 'Facebook/Zalo preview')}</strong>{previewImage && <img src={previewImage} alt="" style={{ maxWidth: 320, width: '100%' }} />}<p>{draft.ogTitle || title}</p><p>{draft.ogDescription || description}</p></div>
-      <button className="admin-primary" disabled={saving}>{saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu SEO & Chia sẻ', 'Save SEO & Sharing')}</button>
-    </form>}
-  </Panel>
+  return (
+    <Panel
+      title={adminText(lang, 'SEO & Chia sẻ', 'SEO & Sharing')}
+      className="seo-settings-panel"
+    >
+      <p className="seo-settings-intro">
+        {adminText(lang, 'Tùy chỉnh tiêu đề, mô tả và ảnh hiển thị khi chia sẻ từng trang.', 'Customize the title, description, and image shown when each page is shared.')}
+      </p>
+      {!records ? (
+        <div className="seo-settings-loading" role="status">{adminText(lang, 'Đang tải cấu hình...', 'Loading settings...')}</div>
+      ) : (
+        <form className="seo-settings-form" onSubmit={save}>
+          <div className="seo-settings-editor">
+            <section className="seo-page-context" aria-label={adminText(lang, 'Trang đang cấu hình', 'Page being configured')}>
+              <label>
+                {adminText(lang, 'Trang', 'Page')}
+                <select value={path} onChange={event => setPath(event.target.value)}>
+                  {paths.map(value => (
+                    <option key={value} value={value}>
+                      {value === 'default' ? adminText(lang, 'Mặc định', 'Default') : value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="seo-context-copy">
+                <strong>{path === 'default' ? adminText(lang, 'Cấu hình dùng chung', 'Shared defaults') : path}</strong>
+                <span>
+                  {path === 'default'
+                    ? adminText(lang, 'Dùng khi trang chưa có cấu hình riêng.', 'Used when a page has no custom settings.')
+                    : `https://dangxembautruc.com${path}`}
+                </span>
+                {path === '/blog' && <small>{adminText(lang, 'Blog chỉ được index khi có bài đã xuất bản.', 'The Journal is indexed only when a story has been published.')}</small>}
+                {path !== '/blog' && path !== 'default' && <small>{adminText(lang, 'Trang công khai; sản phẩm và danh mục ẩn sẽ trả 404.', 'Public page; hidden products and collections return 404.')}</small>}
+              </div>
+            </section>
+
+            <section className="seo-field-group">
+              <div className="seo-section-heading">
+                <h3>{adminText(lang, 'Kết quả tìm kiếm', 'Search result')}</h3>
+                <p>{adminText(lang, 'Thông tin dùng cho tiêu đề và mô tả trên công cụ tìm kiếm.', 'Content used for search titles and descriptions.')}</p>
+              </div>
+              <label className="seo-field">
+                <span>SEO Title <small>{(draft.title || '').length}/180</small></span>
+                <input value={draft.title || ''} onChange={event => update('title', event.target.value)} maxLength={180} />
+              </label>
+              <label className="seo-field">
+                <span>Meta Description <small>{(draft.description || '').length}/500</small></span>
+                <textarea value={draft.description || ''} onChange={event => update('description', event.target.value)} maxLength={500} rows={4} />
+              </label>
+            </section>
+
+            <section className="seo-field-group">
+              <div className="seo-section-heading">
+                <h3>{adminText(lang, 'Chia sẻ mạng xã hội', 'Social sharing')}</h3>
+                <p>{adminText(lang, 'Nội dung xem trước khi gửi liên kết qua Facebook hoặc Zalo.', 'Preview shown when sharing a link on Facebook or Zalo.')}</p>
+              </div>
+              <label className="seo-field">
+                <span>Open Graph Title <small>{(draft.ogTitle || '').length}/180</small></span>
+                <input value={draft.ogTitle || ''} onChange={event => update('ogTitle', event.target.value)} maxLength={180} />
+              </label>
+              <label className="seo-field">
+                <span>Open Graph Description <small>{(draft.ogDescription || '').length}/500</small></span>
+                <textarea value={draft.ogDescription || ''} onChange={event => update('ogDescription', event.target.value)} maxLength={500} rows={4} />
+              </label>
+              <label className="seo-field">
+                <span>{adminText(lang, 'Ảnh chia sẻ', 'Sharing image')}</span>
+                <select value={draft.imageSlot || ''} onChange={event => update('imageSlot', event.target.value)}>
+                  <option value="">{adminText(lang, 'Ảnh mặc định của trang', 'Page default image')}</option>
+                  {Object.entries(media).filter(([, url]) => url).map(([slot]) => <option key={slot} value={slot}>{slot}</option>)}
+                </select>
+              </label>
+              <label className="seo-field seo-upload-field">
+                <span>{adminText(lang, 'Tải ảnh chia sẻ lên', 'Upload a sharing image')}</span>
+                <span className="seo-upload-control">
+                  <input
+                    className="seo-upload-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    aria-label={adminText(lang, 'Chọn tệp ảnh chia sẻ', 'Choose a sharing image file')}
+                    onChange={upload}
+                    disabled={uploadingImage}
+                  />
+                  <span className="seo-upload-trigger">
+                    {uploadingImage
+                      ? adminText(lang, 'Đang tải...', 'Uploading...')
+                      : adminText(lang, 'Chọn ảnh', 'Choose image')}
+                  </span>
+                  <span className="seo-upload-filename" aria-live="polite">
+                    {selectedImageName || adminText(lang, 'Chưa chọn tệp mới', 'No new file selected')}
+                  </span>
+                </span>
+                <small>
+                  {adminText(
+                    lang,
+                    'Ảnh được lưu vào mục SEO_SHARE dùng chung và tự chọn cho trang này. Trang khác đang dùng SEO_SHARE cũng sẽ hiển thị ảnh mới. Nhấn Lưu SEO & Chia sẻ để áp dụng.',
+                    'The image is saved to the shared SEO_SHARE slot and selected for this page. Other pages using SEO_SHARE will also show the new image. Save SEO & Sharing to apply it.'
+                  )}
+                </small>
+              </label>
+            </section>
+
+            <button className="admin-primary seo-save-button" disabled={saving}>
+              {saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu SEO & Chia sẻ', 'Save SEO & Sharing')}
+            </button>
+          </div>
+
+          <aside className="seo-preview-column" aria-label={adminText(lang, 'Bản xem trước', 'Previews')}>
+            <section className="seo-preview-section">
+              <div className="seo-section-heading">
+                <h3>{adminText(lang, 'Xem trước Google', 'Google preview')}</h3>
+              </div>
+              <div className="seo-google-preview">
+                <span>dangxembautruc.com{path === 'default' ? '' : path}</span>
+                <strong>{title}</strong>
+                <p>{description || adminText(lang, 'Mô tả trang sẽ hiển thị tại đây.', 'The page description will appear here.')}</p>
+              </div>
+            </section>
+            <section className="seo-preview-section">
+              <div className="seo-section-heading">
+                <h3>{adminText(lang, 'Xem trước Facebook / Zalo', 'Facebook / Zalo preview')}</h3>
+              </div>
+              <div className="seo-social-preview">
+                {previewImage
+                  ? <img src={previewImage} alt="" />
+                  : <div className="seo-image-placeholder">{adminText(lang, 'Chưa chọn ảnh chia sẻ', 'No sharing image selected')}</div>}
+                <div>
+                  <span>dangxembautruc.com{path === 'default' ? '' : path}</span>
+                  <strong>{draft.ogTitle || title}</strong>
+                  <p>{draft.ogDescription || description || adminText(lang, 'Mô tả chia sẻ sẽ hiển thị tại đây.', 'The sharing description will appear here.')}</p>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </form>
+      )}
+    </Panel>
+  )
 }
 
 function SupportSettings({ notify, lang = 'vi' }) {

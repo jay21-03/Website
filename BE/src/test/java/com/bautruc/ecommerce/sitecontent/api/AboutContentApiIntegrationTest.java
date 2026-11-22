@@ -408,6 +408,14 @@ WHERE slot LIKE 'ABOUT_%' OR slot IN ('CATALOG_HERO', 'WORKSHOP_HERO', 'SUPPORT_
                 .andExpect(status().isOk());
         mvc.perform(get("/api/v1/site/presentation"))
                 .andExpect(jsonPath("$.data.media.SITE_LOGO_DARK").isNotEmpty());
+        for (String slot : new String[] {"SEO_SHARE", "BLOG_HERO", "BLOG_HERO_DARK"}) {
+            mvc.perform(multipart("/api/v1/admin/site/media/" + slot)
+                            .file(file).cookie(admin).with(csrf().asHeader())
+                            .with(request -> { request.setMethod("PUT"); return request; }))
+                    .andExpect(status().isOk());
+            mvc.perform(get("/api/v1/site/presentation"))
+                    .andExpect(jsonPath("$.data.media." + slot).isNotEmpty());
+        }
     }
 
     private User user(String key, UserRole role) {

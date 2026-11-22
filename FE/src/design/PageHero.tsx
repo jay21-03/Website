@@ -1,11 +1,9 @@
 import type { ReactNode } from "react";
-import { ClayImage } from "./ClayImage";
 import { Reveal } from "./Reveal";
 
 export function PageHero({
   title,
   subtitle,
-  seed,
   imageUrl,
   children,
 }: {
@@ -18,8 +16,7 @@ export function PageHero({
   return (
     <section className="grain relative isolate overflow-hidden border-b border-primary/30">
       <div className="absolute inset-0 -z-10">
-        <ClayImage seed={seed} alt="" w={1600} h={900} className="rounded-none opacity-35" />
-        {imageUrl && <img key={imageUrl} src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" onError={event => { event.currentTarget.style.display = "none" }} />}
+        {imageUrl && <img key={imageUrl} src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" onError={event => { event.currentTarget.style.display = "none"; }} />}
         <div className="absolute inset-0 bg-background/70" />
       </div>
       <div className="mx-auto max-w-7xl px-5 py-24 sm:py-32 lg:px-8">

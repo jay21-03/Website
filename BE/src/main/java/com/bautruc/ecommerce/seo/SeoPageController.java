@@ -156,7 +156,22 @@ public class SeoPageController {
 
     @GetMapping(value = "/blog", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> blogIndex() {
-        return page("/blog", "Câu chuyện gốm Chăm Bàu Trúc", "Bài viết về làng gốm và sản phẩm Bàu Trúc.", null);
+        var content = presentation.current().content();
+        var title = content == null || content.pages() == null
+            ? null
+            : content.pages().getOrDefault("blog", Map.of()).get("heroTitle");
+
+        String heading = title == null
+            ? "Câu chuyện gốm Chăm Bàu Trúc"
+            : title.vi();
+
+        return page(
+            "/blog",
+            heading,
+            "Bài viết về làng gốm và sản phẩm Bàu Trúc.",
+            null,
+            heading
+        );
     }
 
     @GetMapping(value = "/blog/{slug}", produces = MediaType.TEXT_HTML_VALUE)
@@ -304,7 +319,15 @@ public class SeoPageController {
             return "<ul>" + String.join("", names) + "</ul>";
         }
         if (path.equals("/blog")) {
-            return "<ul>" + blog.publicPosts().stream().map(post -> "<li><a href=\"/blog/" + post.slug() + "\">" +
+            var content = presentation.current().content();
+            var subtitle = content == null || content.pages() == null
+                    ? null
+                    : content.pages().getOrDefault("blog", Map.of()).get("heroSubtitle");
+
+            String intro = subtitle == null
+                    ? ""
+                    : "<p>" + escape(subtitle.vi()) + "</p>";
+            return intro + "<ul>" + blog.publicPosts().stream().map(post -> "<li><a href=\"/blog/" + post.slug() + "\">" +
                     escape(post.title()) + "</a></li>").collect(java.util.stream.Collectors.joining()) + "</ul>";
         }
         if (path.startsWith("/blog/")) return markdownBody(blog.publicPost(path.substring(6)).bodyMarkdown());
