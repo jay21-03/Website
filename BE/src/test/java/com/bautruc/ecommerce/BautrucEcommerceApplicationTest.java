@@ -48,7 +48,7 @@ class BautrucEcommerceApplicationTest {
     @Test
     void contextLoadsWithPostgreSqlAndFlyway() {
         assertThat(dataSource).isNotNull();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("23");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("35");
         List<String> appliedVersions = jdbcTemplate.queryForList(
                 """
                 select version
@@ -58,7 +58,7 @@ class BautrucEcommerceApplicationTest {
                 """,
                 String.class
         );
-        assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23");
+        assertThat(appliedVersions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35");
         Long sequenceCount = jdbcTemplate.queryForObject(
                 "select count(*) from pg_class where relkind = 'S' and relname = 'app_global_id_seq'",
                 Long.class
@@ -104,6 +104,8 @@ class BautrucEcommerceApplicationTest {
                 Long.class
         );
         assertThat(supportSettingsTableCount).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from faq_items", Long.class)).isGreaterThanOrEqualTo(9);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from faq_items where answer_vi like '%[%'", Long.class)).isZero();
         String idDefault = jdbcTemplate.queryForObject(
                 """
                 select column_default

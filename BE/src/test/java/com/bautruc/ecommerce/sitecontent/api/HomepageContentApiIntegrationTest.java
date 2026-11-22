@@ -404,16 +404,16 @@ class HomepageContentApiIntegrationTest {
 
     private long collection() {
         return jdbc.queryForObject("""
-                INSERT INTO collections(name_vi,name_en,status,created_at,updated_at)
-                VALUES('Trang chu','Homepage','ACTIVE',now(),now())
+                INSERT INTO collections(name_vi,name_en,status,slug,created_at,updated_at)
+                VALUES('Trang chu','Homepage','ACTIVE',gen_random_uuid()::text,now(),now())
                 RETURNING id
                 """, Long.class);
     }
 
     private long product(String name, String status, long collectionId) {
         return jdbc.queryForObject("""
-                INSERT INTO products(name_vi,name_en,description_vi,description_en,base_price,status,collection_id,created_at,updated_at)
-                VALUES(?,?,?,?,100000,?,?,now(),now())
+                INSERT INTO products(name_vi,name_en,description_vi,description_en,base_price,status,collection_id,slug,created_at,updated_at)
+                VALUES(?,?,?,?,100000,?,?,gen_random_uuid()::text,now(),now())
                 RETURNING id
                 """, Long.class, name, name, "Mo ta " + name, "Description " + name, status, collectionId);
     }

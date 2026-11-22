@@ -31,6 +31,7 @@ export const presentationFields = {
     eyebrow: pair('Làng gốm Bàu Trúc · Khánh Hòa', 'Bàu Trúc pottery village · Khánh Hòa'),
     heroTagline: pair('Gốm thủ công Chăm Bàu Trúc | Di sản UNESCO 2022', 'Handmade Cham pottery from Bàu Trúc | UNESCO Heritage 2022'),
     heroBody: pair('Mỗi sản phẩm là một phiên bản duy nhất — được tạo ra hoàn toàn bằng đôi bàn tay của nghệ nhân Chăm, từ đất sét tự nhiên làng Bàu Trúc, Khánh Hòa.', 'Every piece is one of a kind — shaped entirely by the hands of Cham artisans from natural clay of Bàu Trúc village, Khánh Hòa.'),
+    introBody: pair('Đàng Xem là xưởng gốm gia đình trong làng gốm Chăm Bàu Trúc, Khánh Hòa (trước thuộc Ninh Thuận), ngôi làng được xem là cổ nhất Đông Nam Á. Ngày 29/11/2022, nghệ thuật làm gốm của người Chăm được UNESCO ghi danh vào Danh sách di sản văn hóa phi vật thể cần bảo vệ khẩn cấp. Ở xưởng, gốm vẫn được làm theo cách cũ: nghệ nhân đi vòng quanh khối đất để nặn, không dùng bàn xoay, rồi nung lộ thiên bằng củi và rơm. Mỗi món ra lò mang màu đất và vân khói riêng, không chiếc nào giống chiếc nào. Bạn có thể mang một phần di sản ấy về nhà qua bộ sưu tập bình, tượng, phù điêu và tiểu cảnh gốm giao toàn quốc, hoặc ghé tận xưởng, ngồi cạnh nghệ nhân và tự tay nặn món gốm của riêng mình.', 'Đàng Xem is a family pottery workshop in the Cham village of Bàu Trúc, Khánh Hòa (formerly Ninh Thuận), one of Southeast Asia’s oldest active pottery villages. On 29 November 2022, Cham pottery making was inscribed on UNESCO’s List of Intangible Cultural Heritage in Need of Urgent Safeguarding. Artisans still shape clay by walking around it without a wheel, then fire pieces outdoors with wood and straw. Each piece carries its own earth tones and smoke patterns. Explore our pottery collection or visit the workshop to make a piece yourself.'),
     productsAction: pair('Khám Phá Sản Phẩm', 'Explore Products'),
     bookingAction: pair('Đặt Lịch Trải Nghiệm', 'Book an Experience'),
     storyAction: pair('Đọc thêm câu chuyện của chúng tôi →', 'Read more of our story →'),
@@ -121,11 +122,13 @@ export const presentationFields = {
   policy: {
     title: pair('Chính sách mua hàng', 'Purchase policy'),
     paymentTitle: pair('Thanh toán', 'Payment'),
-    paymentBody: pair('Đơn hàng sử dụng thanh toán payOS. Ứng dụng không tự đánh dấu thanh toán thành công; trạng thái được cập nhật từ hệ thống backend.', 'Orders use payOS payment. The app does not mark payment success by itself; status is updated by the backend system.'),
-    refundTitle: pair('Hoàn tiền thủ công', 'Manual refund'),
-    refundBody: pair('Hoàn tiền tự động ngoài phạm vi. Khi cần, admin chỉ ghi nhận khoản hoàn tiền đã thực hiện bên ngoài hệ thống.', 'Automatic refund is out of scope. When needed, admins only record refunds already completed outside the system.'),
+    paymentBody: pair('Thanh toán online qua payOS (chuyển khoản/QR) ngay khi đặt hàng. Đơn được xác nhận khi xưởng nhận được tiền.', 'Pay online via payOS (bank transfer/QR) when placing an order. The order is confirmed when the workshop receives payment.'),
+    refundTitle: pair('Đổi trả và hoàn tiền', 'Returns and refunds'),
+    refundBody: pair('Nếu gốm vỡ hoặc nứt khi nhận, vui lòng quay video lúc mở hàng và báo xưởng. Xưởng gửi sản phẩm tương tự nếu còn, hoặc hoàn tiền 100% giá sản phẩm. Khác biệt nhỏ về màu sắc, vân khói là đặc trưng của gốm nung lộ thiên và không thuộc trường hợp đổi trả.', 'If pottery arrives broken or cracked, please record an unboxing video and contact the workshop. We will send a similar item if available, or refund the product price. Small color and smoke-pattern differences are natural features of open-fired pottery and are not grounds for return.'),
     shippingTitle: pair('Vận chuyển', 'Shipping'),
-    shippingBody: pair('Phí vận chuyển và theo dõi vận chuyển chưa thuộc phạm vi hệ thống hiện tại.', 'Shipping fee and shipment tracking are outside the current system scope.')
+    shippingBody: pair('Gốm được bọc nhiều lớp chống sốc. Xưởng báo phí giao hàng trước khi gửi.', 'Pottery is wrapped in multiple protective layers. The workshop confirms the shipping fee before dispatch.'),
+    experienceTitle: pair('Đặt lịch trải nghiệm', 'Workshop booking'),
+    experienceBody: pair('Đặt trước qua biểu mẫu hoặc Zalo. Nếu cần đổi hoặc hủy lịch, vui lòng liên hệ xưởng.', 'Book in advance through the form or Zalo. Contact the workshop to change or cancel a booking.')
   },
   checkout: {
     title: pair('Thanh toán', 'Checkout'),

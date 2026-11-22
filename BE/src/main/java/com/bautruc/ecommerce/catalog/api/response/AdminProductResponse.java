@@ -7,6 +7,9 @@ import com.bautruc.ecommerce.catalog.domain.ProductStatus;
 
 public record AdminProductResponse(
         Long id,
+        String slug,
+        String seoTitle,
+        String seoDescription,
         String nameVi,
         String nameEn,
         String descriptionVi,

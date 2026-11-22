@@ -230,8 +230,8 @@ class OrderPaymentApiIntegrationTest {
     }
 
     private long stockedProduct(long price, long quantity) {
-        Long collectionId = jdbc.queryForObject("insert into collections(name_vi,name_en,status,created_at,updated_at) values('Gốm','Pottery','ACTIVE',now(),now()) returning id", Long.class);
-        Long productId = jdbc.queryForObject("insert into products(name_vi,name_en,base_price,status,collection_id,created_at,updated_at) values('Bình gốm','Ceramic vase',?,'ACTIVE',?,now(),now()) returning id", Long.class, price, collectionId);
+        Long collectionId = jdbc.queryForObject("insert into collections(name_vi,name_en,slug,status,created_at,updated_at) values('Gốm','Pottery',concat('test-',gen_random_uuid()),'ACTIVE',now(),now()) returning id", Long.class);
+        Long productId = jdbc.queryForObject("insert into products(name_vi,name_en,slug,base_price,status,collection_id,created_at,updated_at) values('Bình gốm','Ceramic vase',concat('test-',gen_random_uuid()),?,'ACTIVE',?,now(),now()) returning id", Long.class, price, collectionId);
         jdbc.update("insert into inventories(product_id,quantity,reserved_quantity,low_stock_threshold,updated_at) values(?,?,0,5,now())", productId, quantity);
         return productId;
     }

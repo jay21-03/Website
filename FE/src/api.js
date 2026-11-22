@@ -91,6 +91,9 @@ export const api = {
   about: () => request('/about'),
   sitePresentation: () => request('/site/presentation'),
   adminSitePresentation: () => request('/admin/site/presentation'),
+  adminSeoMetadata: () => request('/admin/seo/metadata'),
+  seoMetadata: () => request('/seo/metadata'),
+  updateSeoMetadata: values => request('/admin/seo/metadata', { method: 'PUT', body: JSON.stringify(values) }),
   updateSitePresentation: values => request('/admin/site/presentation', { method: 'PUT', body: JSON.stringify(values) }),
   uploadSiteMedia: (slot, file) => {
     const body = new FormData()
@@ -111,6 +114,17 @@ export const api = {
     return request(`/products?${queryString({ page: 0, size: 20, ...normalized })}`)
   },
   product: id => request(`/products/${encodeURIComponent(id)}`),
+  blogPosts: () => request('/blog'),
+  blogPost: slug => request(`/blog/${encodeURIComponent(slug)}`),
+  faqItems: () => request('/faq'),
+  adminFaqItems: () => request('/admin/faq'),
+  createFaqItem: values => request('/admin/faq', { method: 'POST', body: JSON.stringify(values) }),
+  updateFaqItem: (id, values) => request(`/admin/faq/${id}`, { method: 'PUT', body: JSON.stringify(values) }),
+  deleteFaqItem: id => request(`/admin/faq/${id}`, { method: 'DELETE' }),
+  adminBlogPosts: () => request('/admin/blog'),
+  createBlogPost: values => request('/admin/blog', { method: 'POST', body: JSON.stringify(values) }),
+  updateBlogPost: (id, values) => request(`/admin/blog/${id}`, { method: 'PUT', body: JSON.stringify(values) }),
+  uploadBlogImage: (id, file) => { const body = new FormData(); body.append('file', file); return request(`/admin/blog/${id}/image`, { method: 'PUT', body }) },
   productReviews: (id, page = 0) => request(`/products/${encodeURIComponent(id)}/reviews?page=${page}&size=10`),
   myProductReview: id => request(`/me/products/${encodeURIComponent(id)}/review`),
   createProductReview: (id, values) => request(`/me/products/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify(values) }),

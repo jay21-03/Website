@@ -109,6 +109,6 @@ class HomepageContentServiceTest {
     }
 
     private HomepageProductView product(Long id) {
-        return new HomepageProductView(id, "VI " + id, "EN " + id, null, null, 1000, 1000, null);
+        return new HomepageProductView(id, "fixture-" + id, "VI " + id, "EN " + id, null, null, 1000, 1000, null);
     }
 }

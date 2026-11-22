@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest'
 const template = readFileSync(resolve(process.cwd(), '../BE/infra/aws/edge.yml'), 'utf8')
 const source = template.match(/ {6}FunctionCode: \|\r?\n([\s\S]*?)\r?\n {2}MainDistribution:/)[1]
   .split(/\r?\n/).map(line => line.replace(/^ {8}/, '')).join('\n')
-const handler = runInNewContext(`${source}; handler`)
+const origins = []
+const handler = runInNewContext(`${source.replace("import cf from 'cloudfront';", '')}; handler`, { cf: { selectRequestOriginById: id => origins.push(id) } })
 const request = (uri, host = 'dangxembautruc.com', querystring = {}) => ({ request: { uri, headers: { host: { value: host } }, querystring } })
 
 describe('CloudFront SEO routing', () => {
@@ -18,10 +19,11 @@ describe('CloudFront SEO routing', () => {
     expect(handler(request('/products')).headers.location.value).toBe('https://dangxembautruc.com/san-pham')
   })
 
-  it('keeps valid SPA routes and backend requests', () => {
-    expect(handler(request('/trai-nghiem')).uri).toBe('/index.html')
-    expect(handler(request('/products/4927')).uri).toBe('/index.html')
-    expect(handler(request('/san-pham/binh-gom-trang-tri')).uri).toBe('/index.html')
+  it('routes SEO HTML to the existing backend origin and preserves API and assets', () => {
+    for (const uri of ['/trai-nghiem', '/products/4927', '/san-pham/binh-gom-trang-tri', '/san-pham/binh-gom-4927', '/blog/lang-gom-bau-truc-o-dau', '/sitemap.xml']) {
+      expect(handler(request(uri)).uri).toBe(uri)
+    }
+    expect(origins).toEqual(Array(6).fill('BackendElasticBeanstalkOrigin'))
     expect(handler(request('/api/v1/products')).uri).toBe('/api/v1/products')
     expect(handler(request('/robots.txt')).uri).toBe('/robots.txt')
   })

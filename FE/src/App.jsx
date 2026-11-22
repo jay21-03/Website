@@ -11,6 +11,7 @@ import { ChatWidget } from './ChatWidget'
 import ReferenceHome from './design/Home'
 import { ExperienceIntro } from './design/ExperienceIntro'
 import About from './design/About'
+import { BlogBody } from './design/BlogBody'
 import { SiteHeader } from './design/SiteHeader'
 import { MobileActionBar } from './design/MobileActionBar'
 import { PageHero } from './design/PageHero'
@@ -30,9 +31,7 @@ const fallbackImage = '/assets/images/vase.jpg'
 const money = formatCurrencyVnd
 const date = formatBusinessDateTime
 const pick = (lang, vi, en) => lang === 'vi' ? vi : en
-const collectionSlug = name => name.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-const categorySlugs = new Set(['binh-gom-trang-tri', 'tuong-gom-nghe-thuat', 'phu-dieu-mat-na-gom', 'mo-hinh-thap-cham', 'tieu-canh-gom-san-vuon', 'do-gom-gia-dung'])
-const collectionPath = item => categorySlugs.has(collectionSlug(item.nameVi)) ? `/san-pham/${collectionSlug(item.nameVi)}` : `/san-pham?collectionId=${item.id}`
+const collectionPath = item => item.slug ? `/san-pham/${item.slug}` : `/san-pham?collectionId=${item.id}`
 const contact = {
   email: 'dangxembautrucpottery@gmail.com',
   phones: ['0343478155', '0966477160'],
@@ -319,8 +318,9 @@ function DirectGoogleLogin() {
 
 function BilingualFooter() {
   const { lang, support, homepage, presentation } = useStore()
-  const slogan = pick(lang, homepage?.sloganVi || 'Tinh hoa gốm Chăm – Gìn giữ hồn di sản', homepage?.sloganEn || 'The essence of Cham pottery – preserving the soul of heritage')
-  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">{presentation?.media?.SITE_LOGO && <img src={presentation.media.SITE_LOGO} alt="" className="presentation-footer-logo" onError={event => { event.currentTarget.hidden = true }} />}{presentationNode(presentation?.content, 'brand', 'name', lang)}</Link><p className="footer-slogan">{slogan}</p><p>{presentationNode(presentation?.content, 'brand', 'footerDescription', lang)}</p></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerLinksTitle', lang)}</h3><Link to="/san-pham">{presentationNode(presentation?.content, 'brand', 'navProducts', lang)}</Link><Link to="/trai-nghiem">{presentationNode(presentation?.content, 'brand', 'navExperience', lang)}</Link><Link to="/cart">{presentationNode(presentation?.content, 'brand', 'footerCart', lang)}</Link><Link to="/orders">{presentationNode(presentation?.content, 'brand', 'footerOrders', lang)}</Link><Link to="/ve-chung-toi">{presentationNode(presentation?.content, 'brand', 'navAbout', lang)}</Link><Link to="/lien-he">{presentationNode(presentation?.content, 'brand', 'footerSupport', lang)}</Link><Link to="/faq">{presentationNode(presentation?.content, 'faq', 'title', lang)}</Link><Link to="/chinh-sach">{presentationNode(presentation?.content, 'brand', 'footerPolicy', lang)}</Link></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerContactTitle', lang)}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
+  const blog = useQuery({ queryKey: ['blog'], queryFn: api.blogPosts, staleTime: 60_000 })
+  const slogan = pick(lang, homepage?.sloganVi || 'Gốm Bàu Trúc – Tinh hoa gốm Chăm từ đôi tay nghệ nhân', homepage?.sloganEn || 'The essence of Cham pottery – preserving the soul of heritage')
+  return <footer className="site-footer"><div className="footer-grid"><div><Link className="brand" to="/">{presentation?.media?.SITE_LOGO && <img src={presentation.media.SITE_LOGO} alt="" className="presentation-footer-logo" onError={event => { event.currentTarget.hidden = true }} />}{presentationNode(presentation?.content, 'brand', 'name', lang)}</Link><p className="footer-slogan">{slogan}</p><p>{presentationNode(presentation?.content, 'brand', 'footerDescription', lang)}</p></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerLinksTitle', lang)}</h3><Link to="/san-pham">{presentationNode(presentation?.content, 'brand', 'navProducts', lang)}</Link><Link to="/trai-nghiem">{presentationNode(presentation?.content, 'brand', 'navExperience', lang)}</Link><Link to="/cart">{presentationNode(presentation?.content, 'brand', 'footerCart', lang)}</Link><Link to="/orders">{presentationNode(presentation?.content, 'brand', 'footerOrders', lang)}</Link><Link to="/ve-chung-toi">{presentationNode(presentation?.content, 'brand', 'navAbout', lang)}</Link><Link to="/lien-he">{presentationNode(presentation?.content, 'brand', 'footerSupport', lang)}</Link><Link to="/faq">{presentationNode(presentation?.content, 'faq', 'title', lang)}</Link>{blog.data?.length > 0 && <Link to="/blog">Blog</Link>}<Link to="/chinh-sach">{presentationNode(presentation?.content, 'brand', 'footerPolicy', lang)}</Link></div><div className="footer-col"><h3>{presentationNode(presentation?.content, 'brand', 'footerContactTitle', lang)}</h3><a href={`mailto:${support.email}`}>{support.email}</a>{support.phones.map(phone => <a key={phone} href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">Zalo: {phone}</a>)}{support.facebook && <a href={support.facebook} target="_blank" rel="noreferrer">Facebook</a>}{support.map && <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a>}{support.openingHours && <p>{support.openingHours}</p>}</div></div></footer>
 }
 function Loading({ text = 'Đang tải dữ liệu...' }) { return <div className="state-box">{text}</div> }
 function Empty({ children }) { return <div className="state-box">{children}</div> }
@@ -328,15 +328,16 @@ function Empty({ children }) { return <div className="state-box">{children}</div
 function CatalogCard({ product, listId, index }) {
   const { lang, collections } = useStore()
   const name = lang === 'vi' ? product.nameVi : product.nameEn
+  const productPath = product.slug ? `/san-pham/${product.slug}` : `/products/${product.id}`
   const category = collections.find(item => item.id === product.collectionId)?.nameVi
   const select = () => trackAnalytics('select_item', { item_list_id: listId, items: [analyticsItem(product, 1, category, index)] })
   return <article className="product-card catalog-card">
-    <Link className="product-image" to={`/products/${product.id}`} onClick={select}><img src={product.thumbnailUrl || fallbackImage} alt={name} loading="lazy" width="700" height="700" onError={event => { if (!event.currentTarget.src.endsWith(fallbackImage)) event.currentTarget.src = fallbackImage }} /></Link>
+    <Link className="product-image" to={productPath} onClick={select}><img src={product.thumbnailUrl || fallbackImage} alt={name} loading="lazy" width="700" height="700" onError={event => { if (!event.currentTarget.src.endsWith(fallbackImage)) event.currentTarget.src = fallbackImage }} /></Link>
     <div className="product-info">
       <h3>{name}</h3><p className="catalog-translation">{lang === 'vi' ? product.nameEn : product.nameVi}</p>
       <p className="catalog-description">{(lang === 'vi' ? product.descriptionVi : product.descriptionEn) || pick(lang, 'Gốm Bàu Trúc được tạo hình bằng tay theo kỹ thuật truyền thống của người Chăm.', 'Bau Truc pottery shaped by hand using traditional Cham techniques.')}</p>
       <p className="catalog-price">{money(product.sellingPrice, lang)}{product.sellingPrice < product.basePrice && <s>{money(product.basePrice, lang)}</s>}</p>
-      <Link className="catalog-more" to={`/products/${product.id}`} onClick={select}>{pick(lang, 'Tìm Hiểu Thêm', 'Learn More')} <span aria-hidden="true">→</span></Link>
+      <Link className="catalog-more" to={productPath} onClick={select}>{pick(lang, 'Tìm Hiểu Thêm', 'Learn More')} <span aria-hidden="true">→</span></Link>
     </div>
   </article>
 }
@@ -346,7 +347,7 @@ function Home() {
 }
 function Products() {
   const { collections, catalogLoading, lang, presentation } = useStore(); const { categorySlug } = useParams(); const navigate = useNavigate(); const [searchParams] = useSearchParams(); const [filters, setFilters] = useState(() => ({ keyword: searchParams.get('keyword') || '', collectionId: searchParams.get('collectionId') || '', minPrice: searchParams.get('minPrice') || '', maxPrice: searchParams.get('maxPrice') || '', page: Number(searchParams.get('page') || 0), size: 20, sort: searchParams.get('sort') || 'createdAt,desc' }))
-  const categoryCollection = categorySlug && categorySlugs.has(categorySlug) && collections.find(item => collectionSlug(item.nameVi) === categorySlug)
+  const categoryCollection = categorySlug && collections.find(item => item.slug === categorySlug)
   const selectedCollectionId = categorySlug ? String(categoryCollection?.id || '') : searchParams.get('collectionId') || ''
   useEffect(() => { setFilters(current => current.collectionId === selectedCollectionId ? current : { ...current, collectionId: selectedCollectionId, page: 0 }) }, [selectedCollectionId])
   const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
@@ -405,7 +406,7 @@ function CollectionsPage() {
 }
 
 function ProductDetail() {
-  const { id } = useParams(); const { add, lang, presentation, user } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) }); const product = productQuery.data
+  const { id, categorySlug } = useParams(); const identifier = id || categorySlug; const { add, lang, presentation, user } = useStore(); const navigate = useNavigate(); const [selected, setSelected] = useState(0); const [zoom, setZoom] = useState(1); const [touchStart, setTouchStart] = useState(null); const [activeTab, setActiveTab] = useState('description'); const productQuery = useQuery({ queryKey: ['product', identifier], queryFn: () => api.product(identifier), enabled: Boolean(identifier) }); const product = productQuery.data
   const copy = key => presentationNode(presentation?.content, 'catalog', key, lang)
   const analyticsConsent = useAnalyticsConsent()
   const trackedProductId = useRef(null)
@@ -421,7 +422,7 @@ function ProductDetail() {
       if (trackAnalytics('view_item_list', { item_list_id: 'related_products', items: relatedProducts.map((item, index) => analyticsItem(item, 1, undefined, index)) })) lastRelated.current = key
     })
   }, [analyticsConsent, product?.id, relatedQuery.isSuccess, relatedQuery.isFetching, relatedProducts])
-  useEffect(() => { setSelected(0); setZoom(1); setTouchStart(null); setActiveTab('description') }, [id])
+  useEffect(() => { setSelected(0); setZoom(1); setTouchStart(null); setActiveTab('description') }, [identifier])
   const images = product?.images?.length ? product.images : [{ id: 'fallback', url: product?.thumbnailUrl || fallbackImage, thumbnail: true }]
   const activeImage = images[Math.min(selected, images.length - 1)] || images[0]
   const selectImage = index => { setSelected(index); setZoom(1) }
@@ -891,15 +892,28 @@ function OrderDetail() {
   useEffect(() => { if (analyticsConsent) trackPaidPurchase(order) }, [analyticsConsent, order])
   return <Layout><main className="page"><div className="page-title"><span className="kicker">{pick(lang, 'Chi tiết đơn hàng', 'Order detail')}</span><h1>{order?.orderCode || pick(lang, 'Đơn hàng', 'Order')}</h1></div>{authLoading || query.isLoading ? <Loading text={pick(lang, 'Đang tải đơn hàng...', 'Loading order...')} /> : !user || user.role !== 'USER' ? <Empty>{pick(lang, 'Vui lòng đăng nhập bằng tài khoản khách hàng.', 'Please sign in with a customer account.')}</Empty> : query.isError && query.error.status === 404 ? <Empty>{pick(lang, 'Không tìm thấy đơn hàng.', 'Order not found.')}</Empty> : query.isError ? <div className="state-box error" role="alert">{query.error.message}<button onClick={() => query.refetch()}>{pick(lang, 'Thử lại', 'Retry')}</button></div> : <div className="order-detail"><section><h3>{pick(lang, 'Thông tin nhận hàng', 'Recipient information')}</h3><p>{order.receiverName} · {order.phone}</p>{order.email && <p>{order.email}</p>}<p>{order.address}</p>{order.note && <p>{pick(lang, 'Ghi chú', 'Note')}: {order.note}</p>}<p>{pick(lang, 'Ngày tạo', 'Created at')}: {date(order.createdAt, lang)}</p><p>{pick(lang, 'Đơn hàng', 'Order')}: <b>{orderStatusLabel(order.orderStatus, lang)}</b></p><p>{pick(lang, 'Thanh toán', 'Payment')}: <b>{paymentStatusLabel(order.paymentStatus, lang)}</b></p>{pendingPayment && <small>{pick(lang, 'Trang này tự cập nhật trạng thái thanh toán mỗi 5 giây.', 'This page refreshes payment status every 5 seconds.')}</small>}<div className="payment-panel"><h3>{pick(lang, 'Thanh toán payOS', 'payOS payment')}</h3><div className="summary-line"><span>{pick(lang, 'Trạng thái', 'Status')}</span><b>{paymentStatusLabel(order.paymentStatus, lang)}</b></div><div className="summary-line"><span>{pick(lang, 'Số tiền thanh toán', 'Payment amount')}</span><b>{money(order.paymentAmount ?? order.totalAmount, lang)}</b></div>{order.expiresAt && <div className="summary-line"><span>{pick(lang, 'Hết hạn', 'Expires at')}</span><b>{date(order.expiresAt, lang)}</b></div>}{order.qrCode && <img className="payment-qr" src={order.qrCode} alt={pick(lang, 'Mã QR thanh toán payOS', 'payOS payment QR code')} />}{order.checkoutUrl ? <a className="button dark full" href={order.checkoutUrl} target="_blank" rel="noreferrer">{pick(lang, 'Thanh toán qua payOS', 'Pay with payOS')}</a> : pendingPayment && <p className="payment-note">{pick(lang, 'Cổng thanh toán đang chờ cấu hình hoặc thông tin thanh toán chưa khả dụng. Trạng thái đơn hàng vẫn được lấy từ hệ thống.', 'Payment gateway configuration or payment details are not available yet. Order state remains system-authoritative.')}</p>}</div></section><aside className="order-summary">{order.items.map(item => <div className="summary-line" key={item.productId}><span>{lang === 'vi' ? item.productNameVi : item.productNameEn} × {item.quantity}<small>{money(item.sellingPrice, lang)} / {pick(lang, 'sản phẩm', 'item')}</small></span><b>{money(item.totalPrice, lang)}</b></div>)}<div className="summary-line"><span>{pick(lang, 'Tạm tính', 'Subtotal')}</span><b>{money(order.subtotal, lang)}</b></div><div className="summary-line total"><span>{pick(lang, 'Tổng cộng', 'Total')}</span><b>{money(order.totalAmount, lang)}</b></div></aside></div>}</main></Layout>
 }
+function BlogIndex() {
+  const { lang } = useStore()
+  const posts = useQuery({ queryKey: ['blog'], queryFn: api.blogPosts })
+  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">Blog</span><h1>{pick(lang, 'Câu chuyện gốm Chăm Bàu Trúc', 'Bau Truc pottery stories')}</h1></div>{posts.isLoading ? <Loading /> : posts.isError ? <Empty>{pick(lang, 'Không tải được bài viết.', 'Could not load posts.')}</Empty> : <section className="collection-grid">{posts.data.map(post => <article className="collection-card" key={post.id}><h2><Link to={`/blog/${post.slug}`}>{post.title}</Link></h2><p>{post.seoDescription}</p></article>)}</section>}</main></Layout>
+}
+function BlogPost() {
+  const { slug } = useParams()
+  const { lang } = useStore()
+  const post = useQuery({ queryKey: ['blog', slug], queryFn: () => api.blogPost(slug) })
+  if (post.isError && post.error?.status === 404) return <NotFound />
+  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">Blog</span><h1>{post.data?.title || pick(lang, 'Đang tải...', 'Loading...')}</h1></div>{post.isLoading ? <Loading /> : post.isError ? <Empty>{pick(lang, 'Không tải được bài viết.', 'Could not load post.')}</Empty> : <article className="policy">{post.data.imageUrl && <img src={post.data.imageUrl} alt={post.data.title} style={{ maxWidth: '100%', height: 'auto' }} />}<BlogBody markdown={post.data.bodyMarkdown} /></article>}</main></Layout>
+}
 function Faq() {
   const { lang, presentation } = useStore()
   const copy = key => presentationNode(presentation?.content, 'faq', key, lang)
-  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">FAQ</span><h1>{copy('title')}</h1></div><section className="faq-list">{[1, 2, 3].map(number => <details key={number} open={number === 1}><summary>{copy(`question${number}`)}</summary><p>{copy(`answer${number}`)}</p></details>)}</section></main></Layout>
+  const items = useQuery({ queryKey: ['faq'], queryFn: api.faqItems })
+  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">FAQ</span><h1>{copy('title')}</h1></div><section className="faq-list">{items.data?.map((item, index) => <details key={item.id} open={index === 0}><summary>{lang === 'vi' ? item.questionVi : item.questionEn}</summary><p>{lang === 'vi' ? item.answerVi : item.answerEn}</p></details>)}</section></main></Layout>
 }
 function Policy() {
-  const { lang, presentation } = useStore()
+  const { lang, presentation, support } = useStore()
   const copy = key => presentationNode(presentation?.content, 'policy', key, lang)
-  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">{pick(lang, 'Chính sách', 'Policy')}</span><h1>{copy('title')}</h1></div><section className="policy">{['payment', 'refund', 'shipping'].map(section => <Fragment key={section}><h2>{copy(`${section}Title`)}</h2><p>{copy(`${section}Body`)}</p></Fragment>)}</section></main></Layout>
+  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">{pick(lang, 'Chính sách', 'Policy')}</span><h1>{copy('title')}</h1></div><section className="policy">{['payment', 'shipping', 'refund', 'experience'].map(section => <Fragment key={section}><h2>{copy(`${section}Title`)}</h2><p>{copy(`${section}Body`)}</p></Fragment>)}<h2>{pick(lang, 'Liên hệ', 'Contact')}</h2><p>{support.address} · {support.email} · Zalo {support.phones[0]}</p></section></main></Layout>
 }
 function Workshop() {
   const { user, notify, lang, support, presentation } = useStore()
@@ -936,7 +950,7 @@ function Workshop() {
 }
 function AboutPage() { return <Layout><div className="reference-page"><About /></div></Layout> }
 
-function Support() { const { lang, support, presentation } = useStore(); const copy = key => presentationNode(presentation?.content, 'support', key, lang); return <Layout><main className="page support-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="contact-hero" imageUrl={presentation?.media?.SUPPORT_HERO} /></div><div className="support-layout"><section className="contact-card"><h2>{copy('contactTitle')}</h2><p><b>Email:</b> <a href={`mailto:${support.email}`}>{support.email}</a></p><p><b>Zalo:</b> {support.phones.map((phone, index) => <span key={phone}>{index > 0 && ' · '}<a href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">{phone}</a></span>)}</p>{support.facebook && <p><b>Facebook:</b> <a href={support.facebook} target="_blank" rel="noreferrer">{pick(lang, 'Xem trang Facebook', 'Open Facebook page')}</a></p>}<p><b>{pick(lang, 'Địa chỉ', 'Address')}:</b> {support.map ? <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a> : support.address}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}</section><section className="faq-list"><details open><summary>{copy('question1')}</summary><p>{copy('answer1')}</p></details><details><summary>{copy('question2')}</summary><p>{copy('answer2')}</p></details></section></div></main></Layout> }
+function Support() { const { lang, support, presentation } = useStore(); const copy = key => presentationNode(presentation?.content, 'support', key, lang); const faqItems = useQuery({ queryKey: ['faq'], queryFn: api.faqItems }); return <Layout><main className="page support-page"><div className="reference-page"><PageHero title={copy('heroTitle')} subtitle={copy('heroSubtitle')} seed="contact-hero" imageUrl={presentation?.media?.SUPPORT_HERO} /></div><div className="support-layout"><section className="contact-card"><h2>{copy('contactTitle')}</h2><p><b>Email:</b> <a href={`mailto:${support.email}`}>{support.email}</a></p><p><b>Zalo:</b> {support.phones.map((phone, index) => <span key={phone}>{index > 0 && ' · '}<a href={`https://zalo.me/${phone}`} target="_blank" rel="noreferrer">{phone}</a></span>)}</p>{support.facebook && <p><b>Facebook:</b> <a href={support.facebook} target="_blank" rel="noreferrer">{pick(lang, 'Xem trang Facebook', 'Open Facebook page')}</a></p>}<p><b>{pick(lang, 'Địa chỉ', 'Address')}:</b> {support.map ? <a href={support.map} target="_blank" rel="noreferrer">{support.address}</a> : support.address}</p>{support.openingHours && <p><b>{pick(lang, 'Giờ mở cửa', 'Opening hours')}:</b> {support.openingHours}</p>}</section><section className="faq-list">{faqItems.data?.slice(0, 2).map((item, index) => <details key={item.id} open={index === 0}><summary>{lang === 'vi' ? item.questionVi : item.questionEn}</summary><p>{lang === 'vi' ? item.answerVi : item.answerEn}</p></details>)}</section></div></main></Layout> }
 
 function AdminPortal() {
   const store = useStore()
@@ -957,4 +971,53 @@ function NotFound() {
   return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">404</span><h1>{pick(lang, 'Không tìm thấy trang', 'Page not found')}</h1><p>{pick(lang, 'Đường dẫn này không tồn tại.', 'This page does not exist.')}</p><Link className="button dark" to="/">{pick(lang, 'Về trang chủ', 'Back to home')}</Link></div></main></Layout>
 }
 
-export default function App() { return <ThemeProvider><StoreProvider><Routes><Route path="/san-pham" element={<Products />} /><Route path="/san-pham/:categorySlug" element={<Products />} /><Route path="/trai-nghiem" element={<Workshop />} /><Route path="/lien-he" element={<Support />} /><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/products/:id" element={<ProductDetail />} /><Route path="/collections" element={<CollectionsPage />} /><Route path="/workshop" element={<Workshop />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/notifications" element={<CustomerNotifications />} /><Route path="/cart" element={<Cart />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/ve-chung-toi" element={<AboutPage />} /><Route path="/about" element={<Navigate to="/ve-chung-toi" replace />} /><Route path="/support" element={<Support />} /><Route path="/faq" element={<Faq />} /><Route path="/chinh-sach" element={<Policy />} /><Route path="/policy" element={<Navigate to="/chinh-sach" replace />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<NotFound />} /></Routes></StoreProvider></ThemeProvider> }
+function CatalogOrProduct() {
+  const { categorySlug } = useParams()
+  const { collections, catalogLoading } = useStore()
+  if (catalogLoading) return <Layout><main className="page">Đang tải...</main></Layout>
+  return collections.some(item => item.slug === categorySlug) ? <Products /> : <ProductDetail />
+}
+
+function SeoHead() {
+  const { pathname } = useLocation()
+  const { collections, catalogLoading, presentation } = useStore()
+  const metadata = useQuery({ queryKey: ['seo-metadata'], queryFn: api.seoMetadata, staleTime: 60_000 })
+  const collection = collections.find(item => `/san-pham/${item.slug}` === pathname)
+  const productSlug = pathname.startsWith('/san-pham/') && !catalogLoading && !collection ? pathname.slice(10) : null
+  const blogSlug = pathname.startsWith('/blog/') ? pathname.slice(6) : null
+  const product = useQuery({ queryKey: ['product', productSlug], queryFn: () => api.product(productSlug), enabled: Boolean(productSlug), retry: false })
+  const blog = useQuery({ queryKey: ['blog', blogSlug], queryFn: () => api.blogPost(blogSlug), enabled: Boolean(blogSlug), retry: false })
+  useEffect(() => {
+    const publicPath = ['/', '/san-pham', '/trai-nghiem', '/ve-chung-toi', '/lien-he', '/faq', '/chinh-sach', '/blog'].includes(pathname) || pathname.startsWith('/san-pham/') || pathname.startsWith('/blog/')
+    let robots = document.head.querySelector('meta[name="robots"]')
+    if (!robots) { robots = document.createElement('meta'); robots.setAttribute('name', 'robots'); document.head.appendChild(robots) }
+    robots.setAttribute('content', publicPath && !((productSlug && product.isError) || (blogSlug && blog.isError)) ? 'index,follow' : 'noindex')
+    if (!publicPath) { document.head.querySelector('link[rel="canonical"]')?.remove(); return }
+    if (!metadata.data) return
+    const configured = metadata.data[pathname] || {}
+    const defaults = metadata.data.default || {}
+    const item = product.data
+    const article = blog.data
+    const dynamicTitle = item ? (item.seoTitle || `${item.nameVi} | Gốm Bàu Trúc Đàng Xem`) : collection ? (collection.seoTitle || `${collection.nameVi} | Gốm Bàu Trúc Đàng Xem`) : article ? (article.seoTitle || article.title) : null
+    const dynamicDescription = item ? (item.seoDescription || item.descriptionVi || '') : collection ? (collection.seoDescription || collection.descriptionVi || '') : article ? (article.seoDescription || '') : null
+    const title = item || article || collection?.seoTitle ? dynamicTitle : configured.title || dynamicTitle || defaults.title
+    const description = item || article || collection?.seoDescription ? dynamicDescription : configured.description || dynamicDescription || defaults.description
+    if (!title) return
+    const setTag = (selector, tag, attributes) => {
+      let element = document.head.querySelector(selector)
+      if (!element) { element = document.createElement(tag); document.head.appendChild(element) }
+      Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value))
+    }
+    document.title = title
+    if (description) setTag('meta[name="description"]', 'meta', { name: 'description', content: description })
+    setTag('link[rel="canonical"]', 'link', { rel: 'canonical', href: `https://dangxembautruc.com${pathname}` })
+    setTag('meta[property="og:title"]', 'meta', { property: 'og:title', content: article?.ogTitle || configured.ogTitle || dynamicTitle || defaults.ogTitle || title })
+    setTag('meta[property="og:description"]', 'meta', { property: 'og:description', content: article?.ogDescription || configured.ogDescription || dynamicDescription || defaults.ogDescription || description || '' })
+    setTag('meta[property="og:url"]', 'meta', { property: 'og:url', content: `https://dangxembautruc.com${pathname}` })
+    const image = item?.thumbnailUrl || article?.imageUrl || presentation?.media?.[configured.imageSlot || defaults.imageSlot]
+    if (image) setTag('meta[property="og:image"]', 'meta', { property: 'og:image', content: image })
+  }, [pathname, metadata.data, product.data, product.isError, productSlug, blog.data, blog.isError, blogSlug, collection, presentation?.media])
+  return null
+}
+
+export default function App() { return <ThemeProvider><StoreProvider><SeoHead /><Routes><Route path="/san-pham" element={<Products />} /><Route path="/san-pham/:categorySlug" element={<CatalogOrProduct />} /><Route path="/trai-nghiem" element={<Workshop />} /><Route path="/lien-he" element={<Support />} /><Route path="/" element={<Home />} /><Route path="/products" element={<Products />} /><Route path="/products/:id" element={<ProductDetail />} /><Route path="/collections" element={<CollectionsPage />} /><Route path="/workshop" element={<Workshop />} /><Route path="/login" element={<Account />} /><Route path="/account" element={<Account />} /><Route path="/notifications" element={<CustomerNotifications />} /><Route path="/cart" element={<Cart />} /><Route path="/checkout" element={<Checkout />} /><Route path="/orders" element={<Orders />} /><Route path="/orders/:id" element={<OrderDetail />} /><Route path="/ve-chung-toi" element={<AboutPage />} /><Route path="/about" element={<Navigate to="/ve-chung-toi" replace />} /><Route path="/support" element={<Support />} /><Route path="/blog" element={<BlogIndex />} /><Route path="/blog/:slug" element={<BlogPost />} /><Route path="/faq" element={<Faq />} /><Route path="/chinh-sach" element={<Policy />} /><Route path="/policy" element={<Navigate to="/chinh-sach" replace />} /><Route path="/admin" element={<AdminPortal />} /><Route path="*" element={<NotFound />} /></Routes></StoreProvider></ThemeProvider> }

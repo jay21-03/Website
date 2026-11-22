@@ -236,16 +236,16 @@ class AdminCatalogApiIntegrationTest {
 
     private long collection(String nameVi, String nameEn) {
         return jdbc.queryForObject("""
-                INSERT INTO collections(name_vi,name_en,status,created_at,updated_at)
-                VALUES(?,?,'ACTIVE',now(),now())
+                INSERT INTO collections(name_vi,name_en,status,slug,created_at,updated_at)
+                VALUES(?,?,'ACTIVE',gen_random_uuid()::text,now(),now())
                 RETURNING id
                 """, Long.class, nameVi, nameEn);
     }
 
     private long product(String nameVi, String nameEn, long basePrice, String status, long collectionId) {
         return jdbc.queryForObject("""
-                INSERT INTO products(name_vi,name_en,base_price,status,collection_id,created_at,updated_at)
-                VALUES(?,?,?,?,?,now(),now())
+                INSERT INTO products(name_vi,name_en,base_price,status,collection_id,slug,created_at,updated_at)
+                VALUES(?,?,?,?,?,gen_random_uuid()::text,now(),now())
                 RETURNING id
                 """, Long.class, nameVi, nameEn, basePrice, status, collectionId);
     }

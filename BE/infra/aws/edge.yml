@@ -84,6 +84,7 @@ Resources:
         Comment: Rewrite extensionless React Router paths to /index.html
         Runtime: cloudfront-js-2.0
       FunctionCode: |
+        import cf from 'cloudfront';
         function handler(event) {
           var request = event.request;
           var uri = request.uri;
@@ -92,11 +93,13 @@ Resources:
             '/products': '/san-pham',
             '/workshop': '/trai-nghiem',
             '/support': '/lien-he',
-            '/policy': '/chinh-sach'
+            '/policy': '/chinh-sach',
+            '/about': '/ve-chung-toi',
+            '/collections': '/san-pham'
           };
           var canonical = redirects[uri.replace(/\/$/, '')] || uri;
 
-          if (host === 'www.dangxembautruc.com' || canonical !== uri) {
+          if ((host === 'www.dangxembautruc.com' && !/^\/products\/\d+$/.test(uri)) || canonical !== uri) {
             var query = request.querystring || {};
             var parts = [];
             Object.keys(query).forEach(function (key) {
@@ -118,6 +121,15 @@ Resources:
             uri === '/actuator' ||
             uri.indexOf('/actuator/') === 0
           ) {
+            return request;
+          }
+
+          if (/^\/products\/\d+$/.test(uri) ||
+              /^\/san-pham\/[a-z0-9-]+$/.test(uri) ||
+              /^\/blog\/[a-z0-9-]+$/.test(uri) ||
+              uri === '/sitemap.xml' ||
+              ['/', '/san-pham', '/trai-nghiem', '/ve-chung-toi', '/lien-he', '/faq', '/chinh-sach', '/blog'].indexOf(uri) >= 0) {
+            cf.selectRequestOriginById('BackendElasticBeanstalkOrigin');
             return request;
           }
 

@@ -2,5 +2,9 @@ User-agent: *
 Disallow: /admin
 Disallow: /cart
 Disallow: /orders
+Disallow: /checkout
+Disallow: /account
+Disallow: /notifications
+Disallow: /login
 
 Sitemap: https://dangxembautruc.com/sitemap.xml

@@ -6,6 +6,7 @@ import com.bautruc.ecommerce.sitecontent.application.FeaturedProductItem;
 public record HomepageFeaturedProductResponse(
         short slot,
         Long id,
+        String slug,
         String nameVi,
         String nameEn,
         String descriptionVi,
@@ -19,6 +20,7 @@ public record HomepageFeaturedProductResponse(
         return new HomepageFeaturedProductResponse(
                 item.slot(),
                 product.id(),
+                product.slug(),
                 product.nameVi(),
                 product.nameEn(),
                 product.descriptionVi(),
