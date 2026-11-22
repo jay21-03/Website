@@ -9,6 +9,7 @@ import { analyticsItem, whenVisible } from './analytics/ecommerce'
 import { ProductReviews } from './ProductReviews'
 import { ChatWidget } from './ChatWidget'
 import ReferenceHome from './design/Home'
+import { ClayImage } from './design/ClayImage'
 import { ExperienceIntro } from './design/ExperienceIntro'
 import About from './design/About'
 import { BlogBody } from './design/BlogBody'
@@ -281,7 +282,7 @@ function Layout({ children }) {
   const { cart, user, lang, setLang, support, presentation } = useStore()
   const { pathname } = useLocation()
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
-  const account = user ? <>{user.role === 'USER' && <CustomerNotificationLink userId={user.id} lang={lang} />}<Link className="icon-btn" to={user.role === 'ADMIN' ? '/admin' : '/account'}>{user.fullName || pick(lang, 'Tài khoản', 'Account')}</Link></> : <DirectGoogleLogin />
+  const account = user ? <>{user.role === 'USER' && <CustomerNotificationLink userId={user.id} lang={lang} />}<Link className="icon-btn header-account-link" title={user.fullName || pick(lang, 'Tài khoản', 'Account')} to={user.role === 'ADMIN' ? '/admin' : '/account'}>{user.fullName || pick(lang, 'Tài khoản', 'Account')}</Link></> : <DirectGoogleLogin />
   return <DesignContext.Provider value={{ lang, setLang, t: (vi, en) => pick(lang, vi, en), count: cart.items.reduce((sum, item) => sum + item.quantity, 0) }}>
     <SiteHeader account={account} phone={support.phones[0]} brandName={presentationNode(presentation?.content, 'brand', 'name', lang)} logoUrl={presentation?.media?.SITE_LOGO} menuLabels={{ booking: presentationNode(presentation?.content, 'brand', 'menuBooking', lang), call: presentationNode(presentation?.content, 'brand', 'menuCall', lang) }} navLabels={Object.fromEntries([['/', 'navHome'], ['/san-pham', 'navProducts'], ['/blog', 'navBlog'], ['/trai-nghiem', 'navExperience'], ['/ve-chung-toi', 'navAbout'], ['/lien-he', 'navContact']].map(([route, key]) => [route, presentationNode(presentation?.content, 'brand', key, lang)]))} />
     {children}
@@ -1113,7 +1114,51 @@ function NotFound() {
     document.head.appendChild(meta)
     return () => meta.remove()
   }, [])
-  return <Layout><main className="page support-page"><div className="page-title"><span className="kicker">404</span><h1>{pick(lang, 'Không tìm thấy trang', 'Page not found')}</h1><p>{pick(lang, 'Đường dẫn này không tồn tại.', 'This page does not exist.')}</p><Link className="button dark" to="/">{pick(lang, 'Về trang chủ', 'Back to home')}</Link></div></main></Layout>
+  return <Layout>
+    <main className="not-found-page" aria-labelledby="not-found-title">
+      <section className="not-found-layout">
+        <div className="not-found-copy">
+          <p className="not-found-code">
+            <span>404</span>
+            <span className="not-found-code-rule" aria-hidden="true" />
+          </p>
+          <h1 id="not-found-title">{pick(lang, 'Không tìm thấy trang', 'Page not found')}</h1>
+          <p className="not-found-description">
+            {pick(
+              lang,
+              'Đường dẫn này không tồn tại. Hãy quay về trang chủ hoặc tiếp tục khám phá gốm Bàu Trúc.',
+              'This address does not exist. Head home or keep exploring Bàu Trúc pottery.'
+            )}
+          </p>
+          <div className="not-found-actions">
+            <Link className="button dark not-found-home" to="/">
+              {pick(lang, 'Về trang chủ', 'Back to home')}
+              <span aria-hidden="true">→</span>
+            </Link>
+            <Link className="not-found-shop" to="/san-pham">
+              {pick(lang, 'Khám phá sản phẩm', 'Explore pottery')}
+              <span aria-hidden="true">↗</span>
+            </Link>
+          </div>
+        </div>
+        <figure className="not-found-art">
+          <div className="not-found-art-frame">
+            <ClayImage
+              seed="baotruc-artisan"
+              alt={pick(lang, 'Nghệ nhân Bàu Trúc đang tạo hình một chiếc bình gốm', 'A Bàu Trúc artisan shaping a pottery vessel')}
+              w={1000}
+              h={750}
+              className="not-found-photo"
+            />
+          </div>
+          <figcaption className="not-found-caption">
+            <span>{pick(lang, 'Nghệ nhân đang tạo hình gốm Bàu Trúc', 'A Bàu Trúc artisan shaping pottery')}</span>
+            <span>{pick(lang, 'Khánh Hòa, Việt Nam', 'Khanh Hoa, Vietnam')}</span>
+          </figcaption>
+        </figure>
+      </section>
+    </main>
+  </Layout>
 }
 
 function CatalogOrProduct() {

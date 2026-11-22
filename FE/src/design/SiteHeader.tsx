@@ -95,37 +95,35 @@ export function SiteHeader({ account, phone, brandName = "Đàng Xem", logoUrl, 
           : "bg-background/0",
       )}
     >
-      <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-8">
-        <Link to="/" data-preview-target="media:SITE_LOGO" className="flex min-w-0 items-center gap-2.5" onClick={() => setOpen(false)}>
+      <div className="mx-auto grid max-w-7xl grid-cols-[max-content_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-8 xl:gap-5">
+        <Link to="/" data-preview-target="media:SITE_LOGO" className="flex w-max min-w-max items-center gap-2.5" onClick={() => setOpen(false)}>
           {logoUrl && !logoFailed ? <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 object-contain" onError={() => setLogoFailed(true)} /> : <PotIcon className="h-7 w-7 shrink-0 text-primary" />}
-          <span className="truncate font-display text-xl tracking-tight text-foreground sm:text-2xl">
+          <span className="whitespace-nowrap font-display text-xl tracking-tight text-foreground sm:text-2xl">
             {brandName}
           </span>
         </Link>
 
-        <div className="hidden items-center gap-8 lg:flex">
-          <nav className="flex items-center gap-8">
-            {NAV_LINKS.map((l) => (
-              <Link
-                key={l.to}
-                to={l.to}
-                end={l.to === "/"}
+        <nav className="hidden min-w-0 items-center justify-center gap-5 xl:flex">
+          {NAV_LINKS.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              end={l.to === "/"}
+              className="shrink-0 whitespace-nowrap text-sm tracking-wide transition-colors hover:text-primary"
+            >
+              {navLabels[l.to] || t(l.vi, l.en)}
+            </Link>
+          ))}
+        </nav>
 
-                className="text-sm tracking-wide transition-colors hover:text-primary"
-              >
-                {navLabels[l.to] || t(l.vi, l.en)}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            {account}
-            {langSwitch}
-            {themeBtn}
-            {cartBtn}
-          </div>
+        <div className="hidden min-w-0 items-center justify-self-end gap-2 xl:flex">
+          {account}
+          {langSwitch}
+          {themeBtn}
+          {cartBtn}
         </div>
 
-        <div className="flex items-center gap-2 justify-self-end lg:hidden">
+        <div className="flex items-center gap-2 justify-self-end xl:hidden">
           {cartBtn}
           <button
             type="button"
@@ -142,7 +140,7 @@ export function SiteHeader({ account, phone, brandName = "Đàng Xem", logoUrl, 
       {/* Mobile full-screen drawer */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 top-[57px] sm:top-[68px] z-40 overflow-y-auto border-t border-border bg-background transition-all duration-300 lg:hidden",
+          "fixed inset-x-0 bottom-0 top-[57px] sm:top-[68px] z-40 overflow-y-auto border-t border-border bg-background transition-all duration-300 xl:hidden",
           open ? "translate-y-0 opacity-100" : "invisible pointer-events-none -translate-y-2 opacity-0",
         )}
       >

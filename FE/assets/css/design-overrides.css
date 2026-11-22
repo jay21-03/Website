@@ -51,6 +51,9 @@ header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
   .site-header .header-tools .icon-btn { line-height: 1.25; }
   .product-detail-info h1 { font-size: clamp(30px, 8vw, 34px); }
 }
+@media (min-width: 1280px) {
+  .header-account-link { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } .reveal { opacity: 1; transform: none; transition: none; } }
 .presentation-checkout-image { display: block; width: 100%; max-height: 320px; object-fit: cover; margin-bottom: 24px; border-radius: 4px; }
 .presentation-footer-logo { width: 32px; height: 32px; object-fit: contain; margin-right: 8px; vertical-align: middle; }
@@ -815,5 +818,194 @@ header .icon-btn { font-size: 12px; padding: 8px; white-space: nowrap; }
 
   .home-intro-actions .home-intro-primary:hover {
     transform: none;
+  }
+}
+
+.not-found-page {
+  display: grid;
+  min-height: min(480px, calc(100svh - 76px));
+  align-items: center;
+  padding: 40px max(24px, 5vw) 48px;
+}
+
+.not-found-page + .site-footer {
+  margin-top: 0;
+}
+
+.not-found-layout {
+  display: grid;
+  width: min(100%, 1280px);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: clamp(36px, 7vw, 96px);
+  margin: 0 auto;
+}
+
+.not-found-copy {
+  max-width: 540px;
+}
+
+.not-found-code {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.not-found-code-rule {
+  width: 44px;
+  height: 1px;
+  background: var(--border);
+}
+
+.not-found-copy h1 {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.not-found-description {
+  max-width: 48ch;
+  margin: 20px 0 0;
+  color: var(--muted-foreground);
+  font-size: 17px;
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+
+.not-found-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-top: 28px;
+}
+
+.not-found-home {
+  gap: 12px;
+  min-height: 50px;
+  border-radius: 4px;
+  padding-inline: 22px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.not-found-shop {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 9px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 5px;
+  transition: color 180ms ease-out, text-decoration-color 180ms ease-out;
+}
+
+.not-found-shop:hover {
+  color: var(--primary);
+  text-decoration-color: currentColor;
+}
+
+.not-found-home:focus-visible,
+.not-found-shop:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+
+.not-found-art {
+  min-width: 0;
+  margin: 0;
+}
+
+.not-found-art-frame {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 8px;
+}
+
+.not-found-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.55;
+  object-fit: cover;
+  object-position: center 45%;
+}
+
+.not-found-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 20px;
+  margin-top: 14px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .not-found-page {
+    min-height: 0;
+    padding-block: 48px 56px;
+  }
+
+  .not-found-layout {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .not-found-copy h1 {
+    font-size: 2.75rem;
+  }
+
+  .not-found-art {
+    width: min(100%, 640px);
+  }
+}
+
+@media (max-width: 480px) {
+  .not-found-page {
+    padding: 36px 20px 48px;
+  }
+
+  .not-found-copy h1 {
+    font-size: 2.25rem;
+  }
+
+  .not-found-description {
+    font-size: 16px;
+  }
+
+  .not-found-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .not-found-home,
+  .not-found-shop {
+    justify-content: center;
+  }
+
+  .not-found-caption {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .not-found-shop {
+    transition: none;
   }
 }
