@@ -61,7 +61,20 @@ class Ga4AnalyticsServiceTest {
         var result = Ga4AnalyticsService.parseReports(empty, empty, empty, 7);
         assertThat(result).containsEntry("status", "EMPTY").containsEntry("period", "7daysAgo - yesterday");
         assertThatThrownBy(() -> new Ga4AnalyticsService("560090227").historical(8))
-                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+                .isInstanceOf(com.bautruc.ecommerce.common.exception.BusinessException.class)
+                .satisfies(error -> assertThat(((com.bautruc.ecommerce.common.exception.BusinessException) error).status())
+                        .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> new Ga4AnalyticsService("").historical(30))
+                .isInstanceOf(com.bautruc.ecommerce.common.exception.BusinessException.class)
+                .satisfies(error -> {
+                    var failure = (com.bautruc.ecommerce.common.exception.BusinessException) error;
+                    assertThat(failure.status()).isEqualTo(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
+                    assertThat(failure.code()).isEqualTo("GA4_NOT_CONFIGURED");
+                });
+        assertThatThrownBy(() -> new Ga4AnalyticsService("").realtime())
+                .isInstanceOf(com.bautruc.ecommerce.common.exception.BusinessException.class)
+                .satisfies(error -> assertThat(((com.bautruc.ecommerce.common.exception.BusinessException) error).code())
+                        .isEqualTo("GA4_NOT_CONFIGURED"));
     }
 
     @Test

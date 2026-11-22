@@ -67,6 +67,13 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsMissingGa4ConfigurationTo503() throws Exception {
+        mockMvc.perform(get("/test/ga4-not-configured"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code", is("GA4_NOT_CONFIGURED")));
+    }
+
+    @Test
     void mapsValidationFailureToApiErrorEnvelope() throws Exception {
         mockMvc.perform(post("/test/validate")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -135,6 +142,11 @@ class GlobalExceptionHandlerTest {
     @Validated
     @RestController
     public static class TestController {
+        @GetMapping("/test/ga4-not-configured")
+        void ga4NotConfigured() {
+            throw new BusinessException("GA4_NOT_CONFIGURED", "GA4 property is not configured", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+
         @GetMapping("/test/business-error")
         void businessError() {
             throw new BusinessException("TEST_CONFLICT", "Conflict for test", HttpStatus.CONFLICT);

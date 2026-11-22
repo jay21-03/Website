@@ -2,6 +2,7 @@ package com.bautruc.ecommerce.reporting.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.bautruc.ecommerce.common.exception.BusinessException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +18,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class Ga4AnalyticsService {
@@ -45,10 +45,10 @@ public class Ga4AnalyticsService {
 
     private Map<String, Object> historicalLocked(int days) {
         if (days != 7 && days != 30 && days != 90) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "days must be 7, 30 or 90");
+            throw new BusinessException("GA4_INVALID_RANGE", "days must be 7, 30 or 90", HttpStatus.BAD_REQUEST);
         }
         if (propertyId == null || !propertyId.matches("\\d+")) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "GA4 property is not configured");
+            throw new BusinessException("GA4_NOT_CONFIGURED", "GA4 property is not configured", HttpStatus.SERVICE_UNAVAILABLE);
         }
         if (historicalCache.containsKey(days) && Instant.now().isBefore(historicalCachedAt.get(days).plus(TTL))) return historicalCache.get(days);
         try {
@@ -91,7 +91,7 @@ public class Ga4AnalyticsService {
 
     private Map<String, Object> realtimeLocked() {
         if (propertyId == null || !propertyId.matches("\\d+")) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "GA4 property is not configured");
+            throw new BusinessException("GA4_NOT_CONFIGURED", "GA4 property is not configured", HttpStatus.SERVICE_UNAVAILABLE);
         }
         if (realtimeCached != null && Instant.now().isBefore(realtimeCachedAt.plusSeconds(25))) return realtimeCached;
         try {
@@ -234,14 +234,14 @@ public class Ga4AnalyticsService {
         return row.path("metricValues").path(index).path("value").asLong(0);
     }
 
-    private static ResponseStatusException ga4Failure(Exception error) {
+    private static BusinessException ga4Failure(Exception error) {
         if (error instanceof RestClientResponseException response) {
             int status = response.getStatusCode().value();
-            if (status == 403) return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "GA4 permission denied", error);
-            if (status == 429) return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "GA4 quota exceeded", error);
-            if (status == 400) return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "GA4 report metric or dimension unsupported", error);
+            if (status == 403) return new BusinessException("GA4_PERMISSION_DENIED", "GA4 permission denied", HttpStatus.BAD_GATEWAY);
+            if (status == 429) return new BusinessException("GA4_QUOTA_EXCEEDED", "GA4 quota exceeded", HttpStatus.SERVICE_UNAVAILABLE);
+            if (status == 400) return new BusinessException("GA4_REPORT_UNSUPPORTED", "GA4 report metric or dimension unsupported", HttpStatus.BAD_GATEWAY);
         }
-        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Google Analytics Data API unavailable", error);
+        return new BusinessException("GA4_UNAVAILABLE", "Google Analytics Data API unavailable", HttpStatus.BAD_GATEWAY);
     }
 
     static Map<String, Object> comparison(JsonNode current, JsonNode previous) {

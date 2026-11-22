@@ -51,6 +51,22 @@ Frontend: VITE_GOOGLE_CLIENT_ID
 
 No Google Client Secret is required for this flow.
 
+GA4 visitor reports are separate from Google Login and business reports. To enable them
+in the local Docker backend, obtain the **numeric GA4 Property ID** for the existing
+production property and a Google Application Default Credentials JSON file with
+Viewer access to that property. The Measurement ID (`G-BB79X513WR`) is not the
+Property ID. Keep the credential file outside the repository. In PowerShell, set:
+
+```powershell
+$env:GA4_PROPERTY_ID = '<numeric-property-id>'
+$env:GA4_CREDENTIALS_FILE = 'C:\absolute\path\to\ga4-credentials.json'
+docker compose -f docker-compose.yml -f docker-compose.ga4.yml up -d --build backend
+```
+
+Without this opt-in override, visitor reports return `GA4_NOT_CONFIGURED` (HTTP 503)
+while business reports remain available. Do not put the credential JSON in `.env`
+or commit it.
+
 ### 2. Start Local Backend Stack
 
 Normal startup:

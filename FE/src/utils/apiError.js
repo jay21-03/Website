@@ -341,6 +341,27 @@ const messages = {
     en: 'The report date range is invalid.'
   },
 
+  GA4_NOT_CONFIGURED: {
+    vi: 'Chưa cấu hình GA4 Property ID trên máy chủ. Vui lòng kiểm tra cấu hình báo cáo truy cập.',
+    en: 'GA4 Property ID is not configured on the server. Check the visitor analytics configuration.'
+  },
+  GA4_PERMISSION_DENIED: {
+    vi: 'Máy chủ chưa có quyền đọc dữ liệu GA4. Vui lòng kiểm tra quyền tài khoản dịch vụ.',
+    en: 'The server cannot read GA4 data. Check the service account permissions.'
+  },
+  GA4_QUOTA_EXCEEDED: {
+    vi: 'GA4 đã hết hạn mức truy vấn tạm thời. Vui lòng thử lại sau.',
+    en: 'The GA4 query quota is temporarily exhausted. Please try again later.'
+  },
+  GA4_REPORT_UNSUPPORTED: {
+    vi: 'Cấu hình báo cáo GA4 không tương thích. Vui lòng kiểm tra máy chủ.',
+    en: 'The GA4 report configuration is unsupported. Check the server.'
+  },
+  GA4_UNAVAILABLE: {
+    vi: 'Không kết nối được GA4. Vui lòng kiểm tra thông tin xác thực và kết nối máy chủ.',
+    en: 'GA4 is unavailable. Check the server credentials and connection.'
+  },
+
 
   // =========================
   // COMMON

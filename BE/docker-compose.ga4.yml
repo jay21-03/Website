@@ -1,0 +1,9 @@
+# Opt-in local GA4 reporting. Supply the numeric property ID and a local
+# service-account JSON file through environment variables before using this override.
+services:
+  backend:
+    environment:
+      GA4_PROPERTY_ID: ${GA4_PROPERTY_ID:?Set the numeric GA4 Property ID}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/ga4/credentials.json
+    volumes:
+      - ${GA4_CREDENTIALS_FILE:?Set the absolute path to a local GA4 credential file}:/run/ga4/credentials.json:ro

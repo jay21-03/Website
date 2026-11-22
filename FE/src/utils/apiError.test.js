@@ -3,6 +3,7 @@ import { apiErrorMessage } from './apiError'
 
 describe('business error mapping', () => {
   it('maps checkout inventory conflict', () => expect(apiErrorMessage('INVENTORY_INSUFFICIENT', 'fallback')).toContain('không còn đủ'))
+  it('explains missing GA4 server configuration', () => expect(apiErrorMessage('GA4_NOT_CONFIGURED', 'fallback')).toContain('GA4 Property ID'))
   it('maps checkout inventory conflict in English', () => expect(apiErrorMessage('INVENTORY_INSUFFICIENT', 'fallback', 'en')).toContain('stock'))
   it('localizes checkout not found in Vietnamese', () => expect(apiErrorMessage('CHECKOUT_NOT_FOUND', 'fallback', 'vi')).toBe('Không tìm thấy phiên đặt hàng. Vui lòng thử đặt hàng lại.'))
   it('localizes order cancellation not allowed in Vietnamese', () => expect(apiErrorMessage('ORDER_CANCELLATION_NOT_ALLOWED', 'fallback', 'vi')).toBe('Không thể hủy đơn hàng với trạng thái thanh toán hiện tại.'))
