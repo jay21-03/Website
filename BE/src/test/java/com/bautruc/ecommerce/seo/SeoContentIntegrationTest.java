@@ -52,6 +52,17 @@ class SeoContentIntegrationTest {
 
     @BeforeEach void clean() { jdbc.execute("TRUNCATE blog_posts, faq_items, users CASCADE"); }
 
+    @Test void homepageHtmlContainsStoreSchemaBeforeHydration() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title><meta name=\"robots\" content=\"noindex\" /></head><body><div id=\"root\"></div></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        mvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("application/ld+json")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"@type\":\"Store\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("content=\"index,follow\"")));
+    }
+
     @Test void blogDraftIsPrivateAndPublishedPostAppearsInSitemap() throws Exception {
         Cookie admin = admin();
         String draft = """
@@ -220,6 +231,8 @@ class SeoContentIntegrationTest {
                 .andExpect(header().string("Location", "https://dangxembautruc.com/san-pham/test-pottery-product"));
         mvc.perform(get("/san-pham/test-pottery-product")).andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("<title>Test pottery |")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"@type\":\"Product\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"priceCurrency\":\"VND\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("https://schema.org/OutOfStock")));
         mvc.perform(get("/san-pham/hidden-pottery-product")).andExpect(status().isNotFound());
         mvc.perform(get("/san-pham/no-such-product")).andExpect(status().isNotFound());
@@ -238,9 +251,17 @@ class SeoContentIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content(item)).andExpect(status().isOk()).andReturn();
         long id = ((Number) com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id")).longValue();
         mvc.perform(get("/api/v1/faq")).andExpect(jsonPath("$.data[0].questionVi").value("Câu hỏi?"));
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title><meta name=\"robots\" content=\"noindex\" /></head><body><div id=\"root\"></div></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        mvc.perform(get("/faq")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"@type\":\"FAQPage\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<section><h2>")));
         mvc.perform(put("/api/v1/admin/faq/{id}", id).cookie(admin).with(csrf().asHeader())
                 .contentType(MediaType.APPLICATION_JSON).content(item.replace("true", "false"))).andExpect(status().isOk());
         mvc.perform(get("/api/v1/faq")).andExpect(jsonPath("$.data").isEmpty());
+        mvc.perform(get("/faq")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("\"@type\":\"FAQPage\""))));
         mvc.perform(delete("/api/v1/admin/faq/{id}", id).cookie(admin).with(csrf().asHeader())).andExpect(status().isOk());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM faq_items", Long.class)).isZero();
     }

@@ -3,8 +3,10 @@
 ## Current www redirect release
 
 The production `bautruc-prod-spa-rewrite` function currently uses
-`www-redirect-live.js` to redirect HTTPS requests for `www.dangxembautruc.com`
-to the same path and query on the apex domain before the existing SPA rewrite.
+`seo-edge-live.js` to redirect HTTPS requests for `www.dangxembautruc.com`
+to the same path and query on the apex domain and route public SEO pages to
+the existing backend for initial HTML, JSON-LD, canonical and sitemap output.
+Private SPA routes and static assets continue to use the frontend S3 origin.
 The function is attached to the default, `/api/*`, and `/actuator/health`
 CloudFront behaviors. The full SEO function in `edge.yml` includes the same
 www rule and behavior associations; deploy that template only as part of its

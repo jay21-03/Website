@@ -81,7 +81,8 @@ public class SeoPageController {
         String heading = homepage.current().slogan().vi();
         var business = support.current();
         return page("/", heading, "Gốm Bàu Trúc thủ công từ xưởng Đàng Xem.", homepage.current().media().stream()
-                .filter(item -> item.slot().name().equals("HOME_HERO")).map(item -> item.url()).findFirst().orElse(null), heading,
+                .filter(item -> item.slot() != null && item.slot().name().equals("HOME_HERO"))
+                .map(item -> item.url()).filter(url -> url != null && !url.isBlank()).findFirst().orElse(null), heading,
                 Map.of("@context", "https://schema.org", "@type", "Store", "name", "Đàng Xem",
                         "url", SITE, "telephone", business.getZaloPhone(), "email", business.getEmail(),
                         "address", business.getAddress()));
