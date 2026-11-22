@@ -34,6 +34,10 @@ Read-only Production `/api/v1/home` returned the old Vietnamese slogan `Tinh hoa
 
 V30 seeds both approved Blog articles as `DRAFT`. After acceptance, publish article 1 through Admin. Schedule article 2 for early December 2026; its public API, HTML and sitemap must remain absent before publication. Current Production does not have the new Blog API (`GET /api/v1/blog` returned 401); its old SPA fallback returned 200 for both Blog paths, so those responses are **not** evidence that the PR publication rules are live.
 
+The Journal link is now visible in the public header and footer. While all posts are drafts, `/blog` returns a readable empty state with HTTP 200 and `noindex`; unpublished article URLs still return 404 and `/blog` stays out of the sitemap. When a post becomes public, `/blog` becomes indexable and enters the sitemap. Verify both states through the initial HTML and hydrated page during staging acceptance.
+
+Local follow-up checks for the Journal UI: FE lint, typecheck, 87 unit tests, 82 Playwright tests and production build passed; BE `mvn -q test` passed 263 tests. After the final Admin URL suggestion edit, focused desktop/mobile Blog tests (4) and FE lint/build passed again. Playwright covers the public Journal link and empty state, plus unsaved Admin preview and the suggested URL. This still does not substitute for staging or Production acceptance.
+
 The AWS `website-audit` session expired during this audit (`sts get-caller-identity` failed). Account, deployed stack, CloudFormation Change Set, backup recency, a Production-data clone and an actual restore test are still unverified. No Production migration, CloudFormation execution, merge or deploy was performed. The local Testcontainers PostgreSQL tests validate a fresh schema, **not** compatibility with a copy of Production data.
 
 ### Remaining release gates

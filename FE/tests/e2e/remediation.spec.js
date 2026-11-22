@@ -625,13 +625,27 @@ test('admin blog preview reflects the unsaved draft', async ({ page }) => {
   await mockApi(page, 'ADMIN')
   await page.route('**/api/v1/admin/blog', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) }))
   await page.goto('/admin?section=blog')
-  await page.getByRole('button', { name: /Thêm bài viết|Add post/ }).click()
-  await page.getByLabel('Tiêu đề', { exact: true }).fill('Bài viết mới')
-  await page.getByLabel('Markdown').fill('# Bài viết mới\n## Làng nghề\nNội dung xem trước.')
+  await page.getByRole('button', { name: /Viết bài mới|New story/ }).click()
+  await page.getByLabel('Tiêu đề bài viết').fill('Bài viết mới')
+  await expect(page.locator('.blog-url-hint')).toHaveText('/blog/bai-viet-moi')
+  await page.locator('.blog-seo-options summary').click()
+  await expect(page.getByLabel('Đường dẫn bài viết')).toHaveValue('bai-viet-moi')
+  await page.getByLabel('Nội dung (Markdown)').fill('# Bài viết mới\n## Làng nghề\nNội dung xem trước.')
   const preview = page.getByText('Xem trước bài viết').locator('..')
   await expect(preview.getByRole('heading', { name: 'Bài viết mới' })).toBeVisible()
   await expect(preview.getByRole('heading', { name: 'Làng nghề' })).toBeVisible()
   await expect(preview).toContainText('Nội dung xem trước.')
+})
+
+test('public blog link remains findable while posts are drafts', async ({ page, isMobile }) => {
+  await mockApi(page)
+  await page.route('**/api/v1/blog', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) }))
+  await page.goto('/')
+  if (isMobile) await page.getByRole('button', { name: 'Mở menu' }).click()
+  await page.getByRole('navigation').getByRole('link', { name: 'Chuyện Làng Gốm' }).first().click()
+  await expect(page).toHaveURL(/\/blog$/)
+  await expect(page.getByRole('heading', { name: 'Chưa có bài viết được xuất bản' })).toBeVisible()
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
 })
 
 test('public collections route filters products and product detail gallery supports zoom', async ({ page, isMobile }) => {
@@ -874,6 +888,7 @@ test('failed checkout login preserves the guest cart and stays on cart', async (
 })
 
 test('normal header Google login does not create checkout redirect', async ({ page, isMobile }) => {
+  await page.addInitScript(() => localStorage.setItem('dx.analytics.consent.v1', 'denied'))
   await mockGoogleIdentity(page)
   await mockApi(page, null)
   await page.route('**/api/v1/auth/google', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { user: { id: 2, fullName: 'Customer', email: 'customer@example.com', role: 'USER' } } }) }))

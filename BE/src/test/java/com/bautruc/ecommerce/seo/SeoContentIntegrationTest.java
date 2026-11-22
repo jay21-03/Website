@@ -64,11 +64,18 @@ class SeoContentIntegrationTest {
         long id = ((Number) com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id")).longValue();
         mvc.perform(get("/api/v1/blog/test-pottery-story")).andExpect(status().isNotFound());
         mvc.perform(get("/sitemap.xml")).andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("test-pottery-story"))));
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title><meta name=\"robots\" content=\"noindex\" /></head><body><div id=\"root\"></div></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        mvc.perform(get("/blog")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("content=\"noindex,follow\"")));
         mvc.perform(put("/api/v1/admin/blog/{id}", id).cookie(admin).with(csrf().asHeader())
                 .contentType(MediaType.APPLICATION_JSON).content(draft.replace("DRAFT", "PUBLISHED")))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/v1/blog/test-pottery-story")).andExpect(status().isOk());
         mvc.perform(get("/sitemap.xml")).andExpect(content().string(org.hamcrest.Matchers.containsString("/blog/test-pottery-story")));
+        mvc.perform(get("/blog")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("content=\"index,follow\"")));
         org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
                 "<!doctype html><html><head><title>old</title><meta name=\"robots\" content=\"noindex\" /></head><body><div id=\"root\"></div></body></html>");
         org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));

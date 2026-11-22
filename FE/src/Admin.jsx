@@ -1643,39 +1643,50 @@ function BlogAdmin({ notify, lang = 'vi' }) {
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
+  const [slug, setSlug] = useState('')
+  const [slugEdited, setSlugEdited] = useState(false)
+  const [status, setStatus] = useState('DRAFT')
+  const [saving, setSaving] = useState(false)
   const previews = useImagePreviews(selectedFiles)
   const load = useCallback(() => api.adminBlogPosts().then(setPosts).catch(error => notify(error.message)), [notify])
   useEffect(() => { load() }, [load])
   async function save(event) {
     event.preventDefault()
+    if (saving) return
     const form = new FormData(event.currentTarget)
     const file = form.get('image')
     const values = Object.fromEntries(form)
     delete values.image
     values.publishAt = values.publishAt ? businessLocalDateTimeToOffset(values.publishAt) : null
+    setSaving(true)
     try {
       const post = editing ? await api.updateBlogPost(editing.id, values) : await api.createBlogPost(values)
       if (file?.size) await api.uploadBlogImage(post.id, file)
       setOpen(false)
       load()
       notify(adminText(lang, 'Đã lưu bài viết.', 'Blog post saved.'))
-    } catch (error) { notify(error.message) }
+    } catch (error) { notify(error.message) } finally { setSaving(false) }
   }
-  return <Panel title="Blog" action={<button className="admin-primary" onClick={() => { setEditing(null); setPreview({}); setSelectedFiles([]); setOpen(true) }}>+ {adminText(lang, 'Thêm bài viết', 'Add post')}</button>}>
-    {!posts ? <p>{adminText(lang, 'Đang tải...', 'Loading...')}</p> : <div className="admin-list">{posts.map(post => <div className="admin-list-row" key={post.id}><strong>{post.title}</strong><small> /blog/{post.slug} · {post.status}</small><button onClick={() => { setEditing(post); setPreview(post); setSelectedFiles([]); setOpen(true) }}>{adminText(lang, 'Sửa', 'Edit')}</button></div>)}</div>}
-    {open && <Modal title={editing ? adminText(lang, 'Sửa bài viết', 'Edit post') : adminText(lang, 'Bài viết mới', 'New post')} close={() => setOpen(false)}><form className="admin-form" onInput={event => setPreview(current => ({ ...current, [event.target.name]: event.target.value }))} onSubmit={save}>
-      <label>Slug<input name="slug" defaultValue={editing?.slug || ''} pattern="[a-z][a-z0-9]*(?:-[a-z0-9]+)*" maxLength={160} required readOnly={Boolean(editing)} /></label>
-      <label>{adminText(lang, 'Tiêu đề', 'Title')}<input name="title" defaultValue={editing?.title || ''} maxLength={180} required /></label>
-      <label className="wide">Markdown<textarea name="bodyMarkdown" defaultValue={editing?.bodyMarkdown || ''} rows={18} maxLength={50000} required /></label>
-      <label>SEO Title<input name="seoTitle" defaultValue={editing?.seoTitle || ''} maxLength={180} /></label>
-      <label>Meta Description<textarea name="seoDescription" defaultValue={editing?.seoDescription || ''} maxLength={500} /></label>
-      <label>OG Title<input name="ogTitle" defaultValue={editing?.ogTitle || ''} maxLength={180} /></label>
-      <label>OG Description<textarea name="ogDescription" defaultValue={editing?.ogDescription || ''} maxLength={500} /></label>
-      <label>{adminText(lang, 'Ảnh bài viết', 'Post image')}{editing?.imageUrl && <img src={editing.imageUrl} alt="" style={{ maxWidth: 320, width: '100%' }} />}<input name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} /></label>
-      <label>{adminText(lang, 'Trạng thái', 'Status')}<select name="status" defaultValue={editing?.status || 'DRAFT'}><option value="DRAFT">{adminText(lang, 'Nháp', 'Draft')}</option><option value="SCHEDULED">{adminText(lang, 'Lịch đăng', 'Scheduled')}</option><option value="PUBLISHED">{adminText(lang, 'Đã xuất bản', 'Published')}</option></select></label>
-      <label>{adminText(lang, 'Thời gian đăng', 'Publish time')}<input name="publishAt" type="datetime-local" defaultValue={businessDateTimeLocal(editing?.publishAt)} /></label>
-      <div className="admin-fieldset wide"><strong>{adminText(lang, 'Xem trước bài viết', 'Post preview')}</strong>{(previews[0]?.url || editing?.imageUrl) && <img src={previews[0]?.url || editing.imageUrl} alt="" style={{ maxWidth: 320, width: '100%' }} />}<h2>{preview.title}</h2><BlogBody markdown={preview.bodyMarkdown} /></div>
-      <button className="admin-primary">{adminText(lang, 'Lưu bài viết', 'Save post')}</button>
+  const editPost = post => { setEditing(post); setPreview(post || {}); setSelectedFiles([]); setSlug(post?.slug || ''); setSlugEdited(false); setStatus(post?.status || 'DRAFT'); setOpen(true) }
+  const suggestSlug = title => {
+    const value = title.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 160).replace(/-$/g, '')
+    return /^[a-z]/.test(value) ? value : value ? `bai-${value}`.slice(0, 160).replace(/-$/g, '') : ''
+  }
+  const statusLabel = value => ({ DRAFT: adminText(lang, 'Nháp', 'Draft'), SCHEDULED: adminText(lang, 'Lên lịch', 'Scheduled'), PUBLISHED: adminText(lang, 'Đã đăng', 'Published') })[value] || value
+  return <Panel title={adminText(lang, 'Bài viết', 'Stories')} action={<button className="admin-primary" onClick={() => editPost(null)}>+ {adminText(lang, 'Viết bài mới', 'New story')}</button>}>
+    <p className="admin-help">{adminText(lang, 'Quản lý bài viết ở đây. Chỉ bài đã đăng và bài đến lịch mới xuất hiện tại Chuyện Làng Gốm trên website.', 'Manage stories here. Only published or due scheduled stories appear in the public Journal.')}</p>
+    {!posts ? <p>{adminText(lang, 'Đang tải...', 'Loading...')}</p> : !posts.length ? <p className="blog-admin-empty">{adminText(lang, 'Chưa có bài viết. Chọn “Viết bài mới” để bắt đầu.', 'No stories yet. Select “New story” to begin.')}</p> : <div className="blog-admin-list">{posts.map(post => <article className="blog-admin-row" key={post.id}>{post.imageUrl ? <img src={post.imageUrl} alt="" /> : <div className="blog-admin-placeholder" aria-hidden="true">✦</div>}<div className="blog-admin-row-copy"><strong>{post.title}</strong><small>/blog/{post.slug}</small><span className={`blog-status blog-status-${post.status.toLowerCase()}`}>{statusLabel(post.status)}{post.status === 'SCHEDULED' && post.publishAt ? ` · ${new Date(post.publishAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}` : ''}</span></div><button type="button" onClick={() => editPost(post)}>{adminText(lang, 'Chỉnh sửa', 'Edit')}</button></article>)}</div>}
+    {open && <Modal title={editing ? adminText(lang, 'Chỉnh sửa bài viết', 'Edit story') : adminText(lang, 'Viết bài mới', 'New story')} close={() => setOpen(false)}><form className="admin-form blog-admin-form" onInput={event => setPreview(current => ({ ...current, [event.target.name]: event.target.value }))} onSubmit={save}>
+      <div className="blog-admin-fields">
+        <label>{adminText(lang, 'Tiêu đề bài viết', 'Story title')}<input name="title" defaultValue={editing?.title || ''} onChange={event => { if (!editing && !slugEdited) setSlug(suggestSlug(event.target.value)) }} maxLength={180} required /></label>
+        <p className="blog-url-hint">/blog/{slug || 'ten-bai-viet'}</p>
+        <label>{adminText(lang, 'Nội dung (Markdown)', 'Content (Markdown)')}<textarea name="bodyMarkdown" defaultValue={editing?.bodyMarkdown || ''} rows={16} maxLength={50000} required /></label>
+        <label>{adminText(lang, 'Ảnh bìa', 'Cover image')}<input name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} /></label>
+        <div className="blog-publish-controls"><label>{adminText(lang, 'Hiển thị bài viết', 'Publication')}<select name="status" value={status} onChange={event => setStatus(event.target.value)}><option value="DRAFT">{adminText(lang, 'Lưu nháp', 'Keep as draft')}</option><option value="SCHEDULED">{adminText(lang, 'Lên lịch đăng', 'Schedule')}</option><option value="PUBLISHED">{adminText(lang, 'Đăng ngay', 'Publish now')}</option></select></label>{status === 'SCHEDULED' && <label>{adminText(lang, 'Ngày và giờ đăng', 'Publication date and time')}<input name="publishAt" type="datetime-local" defaultValue={businessDateTimeLocal(editing?.publishAt)} required /></label>}</div>
+        <details className="blog-seo-options"><summary>{adminText(lang, 'Tùy chọn đường dẫn, SEO & chia sẻ', 'URL, SEO & sharing options')}</summary><p>{adminText(lang, 'Đường dẫn tự tạo từ tiêu đề. Có thể sửa trước khi lưu lần đầu; để trống các mục khác để dùng nội dung bài viết.', 'The URL is suggested from the title. Adjust it before the first save; leave other fields blank to use the story content.')}</p><label>{adminText(lang, 'Đường dẫn bài viết', 'Story URL')}<span className="blog-url-field"><span>/blog/</span><input name="slug" value={slug} onChange={event => { setSlug(event.target.value); setSlugEdited(true) }} pattern="[a-z][a-z0-9]*(?:-[a-z0-9]+)*" maxLength={160} required readOnly={Boolean(editing)} placeholder="ten-bai-viet" /></span></label><label>SEO Title<input name="seoTitle" defaultValue={editing?.seoTitle || ''} maxLength={180} /></label><label>Meta Description<textarea name="seoDescription" defaultValue={editing?.seoDescription || ''} maxLength={500} /></label><label>OG Title<input name="ogTitle" defaultValue={editing?.ogTitle || ''} maxLength={180} /></label><label>OG Description<textarea name="ogDescription" defaultValue={editing?.ogDescription || ''} maxLength={500} /></label></details>
+        <button className="admin-primary" disabled={saving}>{saving ? adminText(lang, 'Đang lưu...', 'Saving...') : adminText(lang, 'Lưu bài viết', 'Save story')}</button>
+      </div>
+      <div className="blog-admin-preview"><strong>{adminText(lang, 'Xem trước bài viết', 'Post preview')}</strong>{(previews[0]?.url || editing?.imageUrl) && <img src={previews[0]?.url || editing.imageUrl} alt="" />}<h2>{preview.title || adminText(lang, 'Tiêu đề bài viết', 'Story title')}</h2><BlogBody markdown={preview.bodyMarkdown} /></div>
     </form></Modal>}
   </Panel>
 }

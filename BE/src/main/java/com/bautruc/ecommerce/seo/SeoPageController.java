@@ -156,7 +156,6 @@ public class SeoPageController {
 
     @GetMapping(value = "/blog", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> blogIndex() {
-        if (blog.publicPosts().isEmpty()) return notFound();
         return page("/blog", "Câu chuyện gốm Chăm Bàu Trúc", "Bài viết về làng gốm và sản phẩm Bàu Trúc.", null);
     }
 
@@ -229,7 +228,7 @@ public class SeoPageController {
             if (schema != null) head += "<script type=\"application/ld+json\">" + json.writeValueAsString(schema).replace("</", "<\\/") + "</script>";
             String html = shell().replaceFirst("(?s)<title>.*?</title>", "")
                     .replaceFirst("(?s)<meta name=\"description\"[^>]*>", "")
-                    .replace("<meta name=\"robots\" content=\"noindex\" />", "<meta name=\"robots\" content=\"index,follow\">")
+                    .replace("<meta name=\"robots\" content=\"noindex\" />", "<meta name=\"robots\" content=\"" + (path.equals("/blog") && blog.publicPosts().isEmpty() ? "noindex,follow" : "index,follow") + "\">")
                     .replace("</head>", head + "</head>")
                     .replace("<div id=\"root\"></div>", "<div id=\"root\"><main><h1>" + escape(heading) + "</h1><p>" + cleanDescription + "</p>" + initialBody(path) + "</main></div>");
             return ResponseEntity.ok().cacheControl(CacheControl.noCache()).contentType(HTML).body(html);
