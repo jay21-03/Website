@@ -32,6 +32,7 @@ import org.springframework.web.util.HtmlUtils;
 public class SeoPageController {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SeoPageController.class);
     private static final String SITE = "https://dangxembautruc.com";
+    private static final MediaType HTML = new MediaType(MediaType.TEXT_HTML, java.nio.charset.StandardCharsets.UTF_8);
     private static final Map<String, String> PAGE_NAMES = Map.of(
             "/san-pham", "Sản phẩm gốm Bàu Trúc",
             "/trai-nghiem", "Trải nghiệm làm gốm Bàu Trúc",
@@ -231,7 +232,7 @@ public class SeoPageController {
                     .replace("<meta name=\"robots\" content=\"noindex\" />", "<meta name=\"robots\" content=\"index,follow\">")
                     .replace("</head>", head + "</head>")
                     .replace("<div id=\"root\"></div>", "<div id=\"root\"><main><h1>" + escape(heading) + "</h1><p>" + cleanDescription + "</p>" + initialBody(path) + "</main></div>");
-            return ResponseEntity.ok().cacheControl(CacheControl.noCache()).contentType(MediaType.TEXT_HTML).body(html);
+            return ResponseEntity.ok().cacheControl(CacheControl.noCache()).contentType(HTML).body(html);
         } catch (Exception ex) {
             log.error("Could not render SEO HTML for {}", path, ex);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).contentType(MediaType.TEXT_PLAIN).body("SEO page temporarily unavailable");
@@ -341,7 +342,7 @@ public class SeoPageController {
 
     private ResponseEntity<String> notFound() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).header("X-Robots-Tag", "noindex")
-                .contentType(MediaType.TEXT_HTML).body("<!doctype html><html lang=\"vi\"><meta charset=\"utf-8\"><title>Không tìm thấy trang</title><h1>Không tìm thấy trang</h1></html>");
+                .contentType(HTML).body("<!doctype html><html lang=\"vi\"><meta charset=\"utf-8\"><title>Không tìm thấy trang</title><h1>Không tìm thấy trang</h1></html>");
     }
 
     private static String nonblank(String value, String fallback) {

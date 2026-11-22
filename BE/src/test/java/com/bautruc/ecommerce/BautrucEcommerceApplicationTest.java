@@ -106,6 +106,8 @@ class BautrucEcommerceApplicationTest {
         assertThat(supportSettingsTableCount).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select count(*) from faq_items", Long.class)).isGreaterThanOrEqualTo(9);
         assertThat(jdbcTemplate.queryForObject("select count(*) from faq_items where answer_vi like '%[%'", Long.class)).isZero();
+        assertThat(jdbcTemplate.queryForList("select slug from blog_posts where status = 'DRAFT' order by slug", String.class))
+                .containsExactly("lang-gom-bau-truc-o-dau", "mua-gom-bau-truc-lam-qua-tet");
         String idDefault = jdbcTemplate.queryForObject(
                 """
                 select column_default

@@ -89,12 +89,13 @@ public class BlogService {
                 throw new BusinessException("BLOG_IMAGE_INVALID", "Choose an uploaded site image.");
             }
         }
+        var publication = input.publishAt() == null ? null : java.sql.Timestamp.from(input.publishAt());
         if (id == null) {
             id = jdbc.queryForObject("""
                     INSERT INTO blog_posts(slug,title,body_markdown,seo_title,seo_description,og_title,og_description,image_slot,status,publish_at)
                     VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id
                     """, Long.class, input.slug(), input.title(), input.bodyMarkdown(), input.seoTitle(),
-                    input.seoDescription(), input.ogTitle(), input.ogDescription(), input.imageSlot(), input.status(), input.publishAt());
+                    input.seoDescription(), input.ogTitle(), input.ogDescription(), input.imageSlot(), input.status(), publication);
         } else {
             long existingId = id;
             var existing = adminPosts().stream().filter(post -> post.id() == existingId).findFirst()
@@ -105,7 +106,7 @@ public class BlogService {
                     UPDATE blog_posts SET title=?,body_markdown=?,seo_title=?,seo_description=?,og_title=?,og_description=?,
                         image_slot=?,status=?,publish_at=?,updated_at=now() WHERE id=?
                     """, input.title(), input.bodyMarkdown(), input.seoTitle(), input.seoDescription(), input.ogTitle(),
-                    input.ogDescription(), input.imageSlot(), input.status(), input.publishAt(), id);
+                    input.ogDescription(), input.imageSlot(), input.status(), publication, id);
         }
         Long savedId = id;
         return adminPosts().stream().filter(post -> post.id().equals(savedId)).findFirst().orElseThrow();

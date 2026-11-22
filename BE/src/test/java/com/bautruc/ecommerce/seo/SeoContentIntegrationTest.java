@@ -87,6 +87,20 @@ class SeoContentIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test void scheduledBlogIsPrivateUntilItsPublicationTime() throws Exception {
+        Cookie admin = admin();
+        String future = Instant.now().plusSeconds(3600).toString();
+        String input = "{\"slug\":\"scheduled-story\",\"title\":\"Scheduled story\",\"bodyMarkdown\":\"# Scheduled story\",\"status\":\"SCHEDULED\",\"publishAt\":\"" + future + "\"}";
+        var result = mvc.perform(post("/api/v1/admin/blog").cookie(admin).with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON).content(input)).andExpect(status().isOk()).andReturn();
+        long id = ((Number) com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.id")).longValue();
+        mvc.perform(get("/api/v1/blog/scheduled-story")).andExpect(status().isNotFound());
+        mvc.perform(get("/sitemap.xml")).andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("scheduled-story"))));
+        jdbc.update("UPDATE blog_posts SET publish_at = now() - interval '1 second' WHERE id = ?", id);
+        mvc.perform(get("/api/v1/blog/scheduled-story")).andExpect(status().isOk());
+        mvc.perform(get("/sitemap.xml")).andExpect(content().string(org.hamcrest.Matchers.containsString("/blog/scheduled-story")));
+    }
+
     @Test void adminMetadataSaveAppearsInPublicHtmlWithoutBuild() throws Exception {
         String payload = """
                 {"path":"/faq","title":"Updated FAQ title","description":"Updated FAQ description"}
@@ -104,6 +118,33 @@ class SeoContentIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("<title>Updated FAQ title</title>")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("content=\"Updated FAQ description\"")));
+    }
+
+    @Test void productHtmlRedirectAndSitemapMatchPublicationStatus() throws Exception {
+        long collection = jdbc.queryForObject("""
+                INSERT INTO collections(name_vi,name_en,slug,status,created_at,updated_at)
+                VALUES ('Test collection','Test collection','test-seo-collection','ACTIVE',now(),now()) RETURNING id
+                """, Long.class);
+        long active = jdbc.queryForObject("""
+                INSERT INTO products(name_vi,name_en,slug,base_price,status,collection_id,created_at,updated_at)
+                VALUES ('Test pottery','Test pottery','test-pottery-product',120000,'ACTIVE',?,now(),now()) RETURNING id
+                """, Long.class, collection);
+        jdbc.update("""
+                INSERT INTO products(name_vi,name_en,slug,base_price,status,collection_id,created_at,updated_at)
+                VALUES ('Hidden pottery','Hidden pottery','hidden-pottery-product',120000,'INACTIVE',?,now(),now())
+                """, collection);
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title><meta name=\"robots\" content=\"noindex\" /></head><body><div id=\"root\"></div></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        mvc.perform(get("/products/{id}", active)).andExpect(status().isMovedPermanently())
+                .andExpect(header().string("Location", "https://dangxembautruc.com/san-pham/test-pottery-product"));
+        mvc.perform(get("/san-pham/test-pottery-product")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<title>Test pottery |")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://schema.org/OutOfStock")));
+        mvc.perform(get("/san-pham/hidden-pottery-product")).andExpect(status().isNotFound());
+        mvc.perform(get("/san-pham/no-such-product")).andExpect(status().isNotFound());
+        mvc.perform(get("/sitemap.xml")).andExpect(content().string(org.hamcrest.Matchers.containsString("/san-pham/test-pottery-product")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("hidden-pottery-product"))));
     }
 
     @Test void faqSaveHideAndDeleteControlPublicContent() throws Exception {
