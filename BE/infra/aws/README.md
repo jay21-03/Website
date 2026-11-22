@@ -1,5 +1,17 @@
 # AWS production deployment
 
+## Current www redirect release
+
+The production `bautruc-prod-spa-rewrite` function currently uses
+`www-redirect-live.js` to redirect HTTPS requests for `www.dangxembautruc.com`
+to the same path and query on the apex domain before the existing SPA rewrite.
+The function is attached to the default, `/api/*`, and `/actuator/health`
+CloudFront behaviors. The full SEO function in `edge.yml` includes the same
+www rule and behavior associations; deploy that template only as part of its
+separate, reviewed SEO release. Until then, a CloudFormation drift check may
+report this targeted live update. Keep the saved pre-release function code and
+distribution configuration for rollback.
+
 This directory contains the AWS infrastructure for Bau Truc ecommerce.
 
 ## Architecture

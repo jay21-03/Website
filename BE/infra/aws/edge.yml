@@ -99,7 +99,7 @@ Resources:
           };
           var canonical = redirects[uri.replace(/\/$/, '')] || uri;
 
-          if ((host === 'www.dangxembautruc.com' && !/^\/products\/\d+$/.test(uri)) || canonical !== uri) {
+          if (host === 'www.dangxembautruc.com' || canonical !== uri) {
             var query = request.querystring || {};
             var parts = [];
             Object.keys(query).forEach(function (key) {
