@@ -98,6 +98,34 @@ class SeoContentIntegrationTest {
                 .andExpect(jsonPath("$.data.bodyMarkdownEn").value(org.hamcrest.Matchers.nullValue()));
     }
 
+    @Test void crawlerHtmlKeepsBlogTextWithoutAnInitialHeading() throws Exception {
+        Cookie admin = admin();
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title></head><body><div id=\"root\"></div></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        mvc.perform(post("/api/v1/admin/blog").cookie(admin).with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"slug":"no-heading-story","title":"Story","bodyMarkdown":"Opening <script>alert(1)</script> text.\\n\\n## Details\\nMore text.","status":"PUBLISHED"}
+                        """))
+                .andExpect(status().isOk());
+        mvc.perform(get("/blog/no-heading-story"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Opening")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<h2>Details</h2>")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<script>alert(1)</script>"))));
+
+        mvc.perform(post("/api/v1/admin/blog").cookie(admin).with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"slug":"late-heading-story","title":"Story","bodyMarkdown":"Intro before heading.\\n# Later title\\nEnding paragraph.","status":"PUBLISHED"}
+                        """))
+                .andExpect(status().isOk());
+        mvc.perform(get("/blog/late-heading-story"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Intro before heading.")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<h2>Later title</h2>")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Ending paragraph.")));
+    }
+
     @Test void blogEnglishFieldsPersistAcrossAdminAndPublicReads() throws Exception {
         Cookie admin = admin();
         String draft = """

@@ -336,13 +336,17 @@ public class SeoPageController {
 
     private static String markdownBody(String source) {
         StringBuilder html = new StringBuilder();
-        boolean started = false;
-        for (String line : source.split("\\R")) {
-            if (line.startsWith("# ")) { started = true; continue; }
-            if (!started || line.isBlank() || line.startsWith("[Ảnh:")) continue;
-            if (line.startsWith("## ")) html.append("<h2>").append(escape(line.substring(3))).append("</h2>");
-            else if (line.startsWith("### ")) html.append("<h3>").append(escape(line.substring(4))).append("</h3>");
+        boolean hasContent = false;
+        for (String raw : source.split("\\R")) {
+            String line = raw.trim();
+            if (!hasContent && line.matches("(?i)^(Title|Meta|URL|Đăng):\\s.*")) continue;
+            if (line.isBlank() || line.matches("(?i)^\\[(Ảnh|Image):.*") || line.matches("(?i)^\\(Link /[^)]+\\)$")) continue;
+            if (line.startsWith("# ")) {
+                if (hasContent) html.append("<h2>").append(escape(line.substring(2))).append("</h2>");
+            } else if (line.startsWith("### ")) html.append("<h3>").append(escape(line.substring(4))).append("</h3>");
+            else if (line.startsWith("## ")) html.append("<h2>").append(escape(line.substring(3))).append("</h2>");
             else html.append("<p>").append(escape(line)).append("</p>");
+            hasContent = true;
         }
         return html.toString();
     }

@@ -169,6 +169,29 @@ test('appearance preview follows the edited field on the selected storefront pag
   await expect.poll(() => frame.locator('body').evaluate(() => window.location.pathname)).toBe('/san-pham')
 })
 
+test('experience appearance edits preview and persist on the public page', async ({ page }) => {
+  await mockApi(page, 'ADMIN')
+  let saved = null
+  const respond = route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { content: saved, media: {} } }) })
+  await page.route('**/api/v1/admin/site/presentation', async route => {
+    if (route.request().method() === 'PUT') saved = route.request().postDataJSON()
+    await respond(route)
+  })
+  await page.route('**/api/v1/site/presentation', respond)
+  await page.goto('/admin?section=presentation&view=site')
+  await page.getByRole('navigation', { name: 'Chọn trang' }).getByRole('button', { name: 'Trải nghiệm' }).click()
+  await expect(page.getByRole('link', { name: 'Quản lý Workshop' })).toHaveAttribute('href', '/admin?section=workshop')
+  const field = page.locator('[data-preview-target="field:workshop.noticeBody"]')
+  await field.getByRole('textbox', { name: 'Tiếng Việt' }).fill('Xưởng sẽ gọi điện xác nhận lịch mới.')
+  await field.getByRole('textbox', { name: 'Tiếng Anh' }).fill('The studio will confirm the new booking by phone.')
+  const frame = page.frameLocator('iframe[title="Trang khách xem trước"]')
+  await expect(frame.locator('[data-preview-target="field:workshop.noticeBody"]')).toHaveText('Xưởng sẽ gọi điện xác nhận lịch mới.')
+  await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
+  await expect.poll(() => saved?.pages?.workshop?.noticeBody?.vi).toBe('Xưởng sẽ gọi điện xác nhận lịch mới.')
+  await page.goto('/trai-nghiem')
+  await expect(page.getByText('Xưởng sẽ gọi điện xác nhận lịch mới.')).toBeVisible()
+})
+
 test('product detail copy is edited under site-wide appearance and previews the real product', async ({ page }) => {
   await mockApi(page, 'ADMIN')
   await page.route('**/api/v1/admin/site/presentation', route => route.fulfill({

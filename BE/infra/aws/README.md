@@ -149,6 +149,21 @@ Phase 2B will follow this order:
 
 `shopbautruc-product-images-dev` is currently a development resource.
 
+The optional `ManageBucketPolicy` parameter in `dev-image-cdn.yml` grants its CloudFront
+distribution read access only to `products/*` and `site/*`. It defaults to `false`.
+Before setting it to `true`, use the intended AWS profile to run
+`aws s3api get-bucket-policy --bucket shopbautruc-product-images-dev --profile <profile>`
+and review the result. Enable it only when S3 returns `NoSuchBucketPolicy`; a
+CloudFormation `AWS::S3::BucketPolicy` replaces the whole existing policy.
+After the stack owns this policy, keep `ManageBucketPolicy=true` on updates;
+changing it to `false` would delete the managed policy.
+Review the Change Set before execution and keep the current policy as rollback evidence.
+If a policy already exists, keep `ManageBucketPolicy=false`. Check whether it
+already grants the intended distribution access; if not, add the equivalent
+CloudFront service-principal statement through a separately reviewed policy
+update while preserving every existing statement. Verify a `site/*` and a `products/*`
+object through the distribution before using its URL in the backend.
+
 Do not modify its public policy during Phase 2A2.
 
 Production uses a separate generated private bucket.

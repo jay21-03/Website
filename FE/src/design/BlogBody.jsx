@@ -17,11 +17,10 @@ function inline(text) {
 
 export function BlogBody({ markdown = '' }) {
   const lines = markdown.split(/\r?\n/)
-  const title = lines.findIndex(line => line.startsWith('# '))
-  const body = lines.slice(title < 0 ? 0 : title + 1)
   const blocks = []
   let list = []
   let paragraph = []
+  let hasContent = false
 
   const flush = () => {
     if (list.length) blocks.push(<ul key={blocks.length}>{list.map((item, index) => <li key={index}>{inline(item)}</li>)}</ul>)
@@ -30,25 +29,37 @@ export function BlogBody({ markdown = '' }) {
     paragraph = []
   }
 
-  for (const raw of body) {
+  for (const raw of lines) {
     const line = raw.trim()
+    if (!hasContent && /^(?:Title|Meta|URL|Đăng):\s/i.test(line)) continue
     if (!line || /^\[(?:Ảnh|Image):/i.test(line) || /^\(Link \/[^)]+\)$/i.test(line)) {
       flush()
+    } else if (line.startsWith('# ')) {
+      if (hasContent) {
+        flush()
+        blocks.push(<h2 key={blocks.length}>{inline(line.slice(2))}</h2>)
+      }
+      hasContent = true
     } else if (line === '---') {
       flush()
       blocks.push(<hr key={blocks.length} />)
+      hasContent = true
     } else if (line.startsWith('### ')) {
       flush()
       blocks.push(<h3 key={blocks.length}>{inline(line.slice(4))}</h3>)
+      hasContent = true
     } else if (line.startsWith('## ')) {
       flush()
       blocks.push(<h2 key={blocks.length}>{inline(line.slice(3))}</h2>)
+      hasContent = true
     } else if (line.startsWith('- ')) {
       if (paragraph.length) flush()
       list.push(line.slice(2))
+      hasContent = true
     } else {
       if (list.length) flush()
       paragraph.push(line)
+      hasContent = true
     }
   }
   flush()

@@ -5,6 +5,14 @@ Parameters:
   BucketName:
     Type: String
     Default: shopbautruc-product-images-dev
+  ManageBucketPolicy:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Set true only after confirming the existing bucket has no policy. CloudFormation replaces the entire bucket policy.
+
+Conditions:
+  CreateBucketPolicy: !Equals [!Ref ManageBucketPolicy, "true"]
 
 Resources:
   ImagesOAC:
@@ -41,6 +49,26 @@ Resources:
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+
+  ImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CreateBucketPolicy
+    Properties:
+      Bucket: !Ref BucketName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowDevImagesCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource:
+              - !Sub "arn:${AWS::Partition}:s3:::${BucketName}/products/*"
+              - !Sub "arn:${AWS::Partition}:s3:::${BucketName}/site/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${ImagesDistribution}"
 
 Outputs:
   DistributionId:

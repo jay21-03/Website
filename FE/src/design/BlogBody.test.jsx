@@ -1,9 +1,24 @@
 // @vitest-environment jsdom
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, render } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { BlogBody } from './BlogBody'
 
+afterEach(cleanup)
+
 describe('BlogBody image placeholders', () => {
+  it('keeps an article without a Markdown H1', () => {
+    const { getByText } = render(<BlogBody markdown={'Mở đầu bài viết.\n\n## Phần tiếp theo\nNội dung tiếp theo.'} />)
+    expect(getByText('Mở đầu bài viết.')).not.toBeNull()
+    expect(getByText('Nội dung tiếp theo.')).not.toBeNull()
+  })
+
+  it('keeps prose before a later H1 while skipping seed metadata', () => {
+    const { container, getByText } = render(<BlogBody markdown={'Title: Trang SEO\nMeta: Mô tả\nURL: /blog/slug\nĐăng: sau nghiệm thu\n\nLời dẫn của tác giả.\n# Tiêu đề trong bài\nĐoạn cuối.'} />)
+    expect(getByText('Lời dẫn của tác giả.')).not.toBeNull()
+    expect(getByText('Tiêu đề trong bài').tagName).toBe('H2')
+    expect(container.textContent).not.toContain('Trang SEO')
+    expect(getByText('Đoạn cuối.')).not.toBeNull()
+  })
   it('omits trimmed Vietnamese and English placeholders regardless of case', () => {
     const { container } = render(
       <BlogBody markdown={'# Story\n  [Image: cover.jpg]\n[Ảnh: ảnh bìa]\n[image: another.jpg]\nStory text'} />
