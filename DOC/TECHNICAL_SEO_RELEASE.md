@@ -18,7 +18,7 @@ The backend serves public SEO HTML and a dynamic sitemap from live catalog, Blog
 
 ## Acceptance
 
-Check HTTP status and initial response body with GET, before JavaScript: `/`, all six `/san-pham/{collection-slug}` routes, an active and a hidden product, `/products/{id}` 301, `/blog` and each draft/scheduled/published article, `/faq`, `/chinh-sach`, `/sitemap.xml`, and a nonexistent path 404. Confirm www 301 preserves path and query, one canonical and H1 per indexable page, expected title/description/OG and valid Product/FAQ JSON-LD. Verify Admin save/read for SEO, product, collection, Blog, FAQ and policy; confirm visible changes reach initial HTML and sitemap. Smoke test login, catalog, cart, checkout without real payment, workshop, Admin and GA4 consent. Blog article 2 must remain private before 1 December 2026.
+Check HTTP status and initial response body with GET, before JavaScript: `/`, all six `/san-pham/{collection-slug}` routes, an active and a hidden product, `/products/{id}` 301, `/blog` and each draft/scheduled/published article, `/faq`, `/chinh-sach`, `/sitemap.xml`, and a nonexistent path 404. Confirm www 301 preserves path and query, one canonical and H1 per indexable page, expected title/description/OG and valid Product/FAQ JSON-LD. Verify Admin save/read for SEO, product, collection, Blog, FAQ and policy; confirm visible changes reach initial HTML and sitemap. Smoke test login, catalog, cart, checkout without real payment, workshop, Admin and GA4 consent.
 
 ## Rollback
 
@@ -32,7 +32,10 @@ The approved policy copy contains a payOS payment sentence. It does not activate
 
 Read-only Production `/api/v1/home` returned the old Vietnamese slogan `Tinh hoa gốm Chăm – Gìn giữ hồn di sản Việt Nam`. It matches a V28 replacement condition, but the target H1 has **not** been observed on Production because V28 is not deployed. Do not change the current homepage setting through Admin unless a post-migration check proves V28 left a customized value in place; then use the existing Admin homepage control and verify the initial HTML.
 
-V30 seeds both approved Blog articles as `DRAFT`. After acceptance, publish article 1 through Admin. Schedule article 2 for early December 2026; its public API, HTML and sitemap must remain absent before publication. Current Production does not have the new Blog API (`GET /api/v1/blog` returned 401); its old SPA fallback returned 200 for both Blog paths, so those responses are **not** evidence that the PR publication rules are live.
+V30 seeds both Blog articles as DRAFT. Publication is
+controlled by Admin through status and publishAt.
+Verify public API, initial HTML and sitemap for
+draft, scheduled and published states.
 
 The Journal link is now visible in the public header and footer. While all posts are drafts, `/blog` returns a readable empty state with HTTP 200 and `noindex`; unpublished article URLs still return 404 and `/blog` stays out of the sitemap. When a post becomes public, `/blog` becomes indexable and enters the sitemap. Verify both states through the initial HTML and hydrated page during staging acceptance.
 
@@ -46,5 +49,6 @@ The AWS `website-audit` session expired during this audit (`sts get-caller-ident
 - [ ] Verify a recent database backup, restore it into isolated PostgreSQL, run V24–V35 there, and demonstrate recovery from the backup. Never run this trial against Production.
 - [ ] Deploy to staging or an equivalent environment and test initial HTML, 301/200/404 responses, canonical/OG/schema, sitemap publication rules, Admin edits, products/categories, FAQ, Blog, cart and checkout through the actual edge and backend integration.
 - [ ] After an approved release, verify V28's exact homepage H1 in the public API and initial HTML. If a merchant-edited value survives V28, set only that field through the existing Admin homepage editor.
-- [ ] After acceptance, publish Blog article 1 and schedule article 2 for early December 2026; verify public API, initial HTML and sitemap before and after its publication time.
+- [ ] Verify Blog publication status against public API,
+      initial HTML and sitemap.
 - [ ] Confirm a tested rollback of the CloudFront function/distribution, frontend objects and backend artifact against the migrated schema before Production rollout.

@@ -12,11 +12,26 @@ describe('BlogBody image placeholders', () => {
     expect(getByText('Nội dung tiếp theo.')).not.toBeNull()
   })
 
-  it('keeps prose before a later H1 while skipping seed metadata', () => {
-    const { container, getByText } = render(<BlogBody markdown={'Title: Trang SEO\nMeta: Mô tả\nURL: /blog/slug\nĐăng: sau nghiệm thu\n\nLời dẫn của tác giả.\n# Tiêu đề trong bài\nĐoạn cuối.'} />)
+  it('preserves author text before a later H1', () => {
+    const { container, getByText } = render(
+      <BlogBody
+        markdown={
+          'Title: Nghệ thuật gốm Chăm\n' +
+          'Meta: Nội dung do tác giả nhập\n\n' +
+          'Lời dẫn của tác giả.\n' +
+          '# Tiêu đề trong bài\n' +
+          'Đoạn cuối.'
+        }
+      />
+    )
+    expect(container.textContent).toContain(
+      'Title: Nghệ thuật gốm Chăm'
+    )
+    expect(container.textContent).toContain(
+      'Meta: Nội dung do tác giả nhập'
+    )
     expect(getByText('Lời dẫn của tác giả.')).not.toBeNull()
     expect(getByText('Tiêu đề trong bài').tagName).toBe('H2')
-    expect(container.textContent).not.toContain('Trang SEO')
     expect(getByText('Đoạn cuối.')).not.toBeNull()
   })
   it('omits trimmed Vietnamese and English placeholders regardless of case', () => {

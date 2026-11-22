@@ -31,7 +31,6 @@ export function BlogBody({ markdown = '' }) {
 
   for (const raw of lines) {
     const line = raw.trim()
-    if (!hasContent && /^(?:Title|Meta|URL|Đăng):\s/i.test(line)) continue
     if (!line || /^\[(?:Ảnh|Image):/i.test(line) || /^\(Link \/[^)]+\)$/i.test(line)) {
       flush()
     } else if (line.startsWith('# ')) {

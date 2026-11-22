@@ -1137,7 +1137,18 @@ function SeoHead() {
     const publicPath = ['/', '/san-pham', '/trai-nghiem', '/ve-chung-toi', '/lien-he', '/faq', '/chinh-sach', '/blog'].includes(pathname) || pathname.startsWith('/san-pham/') || pathname.startsWith('/blog/')
     let robots = document.head.querySelector('meta[name="robots"]')
     if (!robots) { robots = document.createElement('meta'); robots.setAttribute('name', 'robots'); document.head.appendChild(robots) }
-    robots.setAttribute('content', publicPath && !((productSlug && product.isError) || (blogSlug && blog.isError) || (pathname === '/blog' && !blogList.data?.length)) ? 'index,follow' : 'noindex')
+    robots.setAttribute(
+      'content',
+      publicPath && !(
+        (productSlug && product.isError) ||
+        (blogSlug && blog.isError) ||
+        (pathname === '/blog' &&
+          blogList.isSuccess &&
+          !blogList.data?.length)
+      )
+        ? 'index,follow'
+        : 'noindex'
+    )
     if (!publicPath) { document.head.querySelector('link[rel="canonical"]')?.remove(); return }
     if (!metadata.data) return
     const configured = metadata.data[pathname] || {}
@@ -1174,7 +1185,7 @@ function SeoHead() {
     setTag('meta[property="og:url"]', 'meta', { property: 'og:url', content: `https://dangxembautruc.com${pathname}` })
     const image = item?.thumbnailUrl || article?.imageUrl || presentation?.media?.[configured.imageSlot || defaults.imageSlot]
     if (image) setTag('meta[property="og:image"]', 'meta', { property: 'og:image', content: image })
-  }, [pathname, lang, metadata.data, product.data, product.isError, productSlug, blog.data, blog.isError, blogSlug, blogList.data, collection, presentation?.media])
+  }, [pathname, lang, metadata.data, product.data, product.isError, productSlug, blog.data, blog.isError, blogSlug, blogList.data, blogList.isSuccess, collection, presentation?.media])
   return null
 }
 

@@ -339,7 +339,6 @@ public class SeoPageController {
         boolean hasContent = false;
         for (String raw : source.split("\\R")) {
             String line = raw.trim();
-            if (!hasContent && line.matches("(?i)^(Title|Meta|URL|Đăng):\\s.*")) continue;
             if (line.isBlank() || line.matches("(?i)^\\[(Ảnh|Image):.*") || line.matches("(?i)^\\(Link /[^)]+\\)$")) continue;
             if (line.startsWith("# ")) {
                 if (hasContent) html.append("<h2>").append(escape(line.substring(2))).append("</h2>");

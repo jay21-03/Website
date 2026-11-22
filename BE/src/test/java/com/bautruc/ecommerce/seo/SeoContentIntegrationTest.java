@@ -105,11 +105,14 @@ class SeoContentIntegrationTest {
         org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
         mvc.perform(post("/api/v1/admin/blog").cookie(admin).with(csrf().asHeader())
                 .contentType(MediaType.APPLICATION_JSON).content("""
-                        {"slug":"no-heading-story","title":"Story","bodyMarkdown":"Opening <script>alert(1)</script> text.\\n\\n## Details\\nMore text.","status":"PUBLISHED"}
+                        {"slug":"no-heading-story","title":"Story","bodyMarkdown":"Title: Nghệ thuật gốm Chăm\\nOpening <script>alert(1)</script> text.\\n\\n## Details\\nMore text.","status":"PUBLISHED"}
                         """))
                 .andExpect(status().isOk());
         mvc.perform(get("/blog/no-heading-story"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString(
+                                "Title: Nghệ thuật gốm Chăm")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Opening")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("<h2>Details</h2>")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<script>alert(1)</script>"))));
