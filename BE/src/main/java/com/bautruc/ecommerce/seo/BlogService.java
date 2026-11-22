@@ -118,7 +118,13 @@ public class BlogService {
                 .orElseThrow(() -> new ResourceNotFoundException("BLOG_NOT_FOUND", "Blog post not found."));
         if (file == null || file.isEmpty() || file.getSize() > maxImageBytes)
             throw new BusinessException("BLOG_IMAGE_INVALID", "Image is empty or too large.");
-        var checked = images.validate(file.getBytes(), file.getContentType());
+        final byte[] content;
+        try {
+            content = file.getBytes();
+        } catch (java.io.IOException exception) {
+            throw new BusinessException("BLOG_IMAGE_INVALID", "Could not read the uploaded image.");
+        }
+        var checked = images.validate(content, file.getContentType());
         String key = "site/blog/" + id + "/" + UUID.randomUUID() + "." + checked.extension();
         long postId = id;
         storage.put(key, checked.content(), checked.contentType());

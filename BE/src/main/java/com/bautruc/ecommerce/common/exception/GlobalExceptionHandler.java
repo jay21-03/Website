@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import com.bautruc.ecommerce.common.storage.ObjectStorageException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -115,6 +116,15 @@ public class GlobalExceptionHandler {
     ) {
         ApiError error = ApiError.of("PRODUCT_IMAGE_TOO_LARGE", "Image exceeds the configured maximum size.");
         return ResponseEntity.badRequest().body(failure(error));
+    }
+
+    @ExceptionHandler(ObjectStorageException.class)
+    public ResponseEntity<ApiResponse<Void>> handleObjectStorageException(
+            ObjectStorageException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = ApiError.of("OBJECT_STORAGE_UPLOAD_FAILED", "Could not upload the file to storage.");
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(failure(error));
     }
 
     @ExceptionHandler(Exception.class)

@@ -47,7 +47,19 @@ async function send(path, options, retryOnCsrfInvalid) {
     headers['X-XSRF-TOKEN'] = await ensureCsrfToken()
   }
   if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json'
-  const response = await fetch(`${API_ROOT}${path}`, { ...options, headers, credentials: 'include' })
+  let response
+  try {
+    response = await fetch(`${API_ROOT}${path}`, { ...options, headers, credentials: 'include' })
+  } catch (error) {
+    throw new ApiError(
+      localizedText(
+        'Không thể kết nối máy chủ. Kiểm tra kết nối mạng hoặc khởi động lại ứng dụng.',
+        'Could not connect to the server. Check your network or restart the application.'
+      ),
+      0,
+      'NETWORK_REQUEST_FAILED'
+    )
+  }
   const payload = await response.json().catch(() => null)
   if (!response.ok || payload?.success === false) {
     if (response.status === 403 && payload?.error?.code === 'CSRF_INVALID') {

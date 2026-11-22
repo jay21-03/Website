@@ -137,6 +137,14 @@ const messages = {
     vi: 'Thứ tự hình ảnh không hợp lệ.',
     en: 'Image order is invalid.'
   },
+  BLOG_IMAGE_INVALID: {
+    vi: 'Ảnh bìa trống, không hợp lệ hoặc quá dung lượng cho phép.',
+    en: 'The cover image is empty, invalid, or too large.'
+  },
+  OBJECT_STORAGE_UPLOAD_FAILED: {
+    vi: 'Không thể tải tệp lên kho lưu trữ.',
+    en: 'Could not upload the file to storage.'
+  },
 
   S3_UPLOAD_FAILED: {
     vi: 'Không thể tải hình ảnh lên kho lưu trữ. Vui lòng thử lại.',

@@ -1655,13 +1655,39 @@ function BlogAdmin({ notify, lang = 'vi' }) {
     if (saving) return
     const form = new FormData(event.currentTarget)
     const file = form.get('image')
+    if (file?.size) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        notify(adminText(lang, 'Ảnh bìa phải là JPEG, PNG hoặc WebP.', 'The cover image must be JPEG, PNG, or WebP.'))
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        notify(adminText(lang, 'Ảnh bìa vượt quá dung lượng tối đa 5 MB.', 'The cover image exceeds the 5 MB limit.'))
+        return
+      }
+    }
     const values = Object.fromEntries(form)
     delete values.image
     values.publishAt = values.publishAt ? businessLocalDateTimeToOffset(values.publishAt) : null
     setSaving(true)
     try {
       const post = editing ? await api.updateBlogPost(editing.id, values) : await api.createBlogPost(values)
-      if (file?.size) await api.uploadBlogImage(post.id, file)
+      if (file?.size) {
+        try {
+          await api.uploadBlogImage(post.id, file)
+        } catch (imageError) {
+          setEditing(post)
+          setPreview(post)
+          setSelectedFiles([])
+          load()
+          notify(adminText(
+            lang,
+            `Bài viết đã được lưu, nhưng ảnh bìa chưa tải lên: ${imageError.message}`,
+            `The story was saved, but the cover image failed to upload: ${imageError.message}`
+          ))
+          return
+        }
+      }
       setOpen(false)
       load()
       notify(adminText(lang, 'Đã lưu bài viết.', 'Blog post saved.'))

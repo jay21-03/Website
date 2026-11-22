@@ -54,6 +54,19 @@ describe('API client security', () => {
     expect(fetch.mock.calls[1][1].headers['Content-Type']).toBeUndefined()
   })
 
+  it('turns browser network failures into a localized API error', async () => {
+    fetch.mockResolvedValueOnce(response({ data: { token: 'network-token' } }))
+    fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    await expect(request('/admin/blog/1/image', {
+      method: 'PUT',
+      body: new FormData()
+    })).rejects.toMatchObject({
+      status: 0,
+      code: 'NETWORK_REQUEST_FAILED'
+    })
+  })
+
   it('refreshes CSRF token once and retries when a mutation gets CSRF_INVALID', async () => {
     fetch
       .mockResolvedValueOnce(response({ data: { token: 'old-token' } }))
