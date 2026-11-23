@@ -108,4 +108,25 @@ describe('admin SEO settings', () => {
     ))
     await waitFor(() => expect(notify).toHaveBeenCalledWith('Đã lưu SEO và chia sẻ.'))
   })
+
+  it('shows the saved sharing image and social cache refresh links', async () => {
+    api.adminSeoMetadata.mockResolvedValue({
+      default: { path: 'default', imageSlot: 'SEO_SHARE' },
+      '/': { path: '/', imageSlot: 'WORKSHOP_HERO', title: 'Home title' }
+    })
+    api.adminSitePresentation.mockResolvedValue({ media: {
+      SEO_SHARE: 'https://cdn.example.test/share.jpg',
+      WORKSHOP_HERO: 'https://cdn.example.test/workshop.jpg'
+    } })
+
+    const { container } = mount(vi.fn())
+    await screen.findByDisplayValue('Home title')
+    expect(screen.getByText(/Ảnh đã lưu: WORKSHOP_HERO/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Zalo' })).toHaveAttribute('href', 'https://developers.zalo.me/tools/debug-sharing')
+    expect(screen.getByRole('link', { name: 'Facebook' })).toHaveAttribute('href', 'https://developers.facebook.com/tools/debug/')
+    expect(container.querySelector('.seo-social-preview img')).toHaveAttribute('src', 'https://cdn.example.test/workshop.jpg')
+
+    fireEvent.change(screen.getByLabelText('Ảnh chia sẻ'), { target: { value: '' } })
+    expect(container.querySelector('.seo-social-preview img')).toHaveAttribute('src', 'https://cdn.example.test/share.jpg')
+  })
 })

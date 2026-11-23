@@ -1916,7 +1916,10 @@ function SeoSettings({ notify, lang = 'vi' }) {
   const update = (key, value) => setDraft(current => ({ ...current, [key]: value }))
   const title = draft.title || (path === 'default' ? 'Đàng Xem' : records?.[path]?.title || 'Đàng Xem')
   const description = draft.description || records?.[path]?.description || ''
-  const previewImage = media[draft.imageSlot] || ''
+  const activeImageSlot = draft.imageSlot || (path === 'default' ? '' : records?.default?.imageSlot)
+  const previewImage = media[activeImageSlot] || ''
+  const savedImageSlot = records?.[path]?.imageSlot || (path === 'default' ? '' : records?.default?.imageSlot)
+  const publicUrl = path === 'default' ? '' : `https://dangxembautruc.com${path}`
   return (
     <Panel
       title={adminText(lang, 'SEO & Chia sẻ', 'SEO & Sharing')}
@@ -1988,6 +1991,10 @@ function SeoSettings({ notify, lang = 'vi' }) {
                   {Object.entries(media).filter(([, url]) => url).map(([slot]) => <option key={slot} value={slot}>{slot}</option>)}
                 </select>
               </label>
+              <p role="status">
+                {adminText(lang, 'Ảnh đã lưu:', 'Saved image:')} {savedImageSlot || adminText(lang, 'Chưa có', 'None')}.{' '}
+                {adminText(lang, 'Ảnh đang chọn:', 'Selected image:')} {activeImageSlot || adminText(lang, 'Chưa có', 'None')}.
+              </p>
               <label className="seo-field seo-upload-field">
                 <span>{adminText(lang, 'Tải ảnh chia sẻ lên', 'Upload a sharing image')}</span>
                 <span className="seo-upload-control">
@@ -2048,6 +2055,13 @@ function SeoSettings({ notify, lang = 'vi' }) {
                   <p>{draft.ogDescription || description || adminText(lang, 'Mô tả chia sẻ sẽ hiển thị tại đây.', 'The sharing description will appear here.')}</p>
                 </div>
               </div>
+              {publicUrl && <p className="seo-preview-cache-note">
+                {adminText(lang,
+                  'Ảnh xem trước trong Admin có thể khác ảnh Zalo/Facebook đã lưu trong bộ nhớ đệm. Sau khi lưu, kiểm tra và yêu cầu thu thập lại URL tại:',
+                  'The Admin preview may differ from a cached Zalo/Facebook card. After saving, check and request a fresh scrape at:')}{' '}
+                <a href="https://developers.zalo.me/tools/debug-sharing" target="_blank" rel="noopener noreferrer">Zalo</a>{' · '}
+                <a href="https://developers.facebook.com/tools/debug/" target="_blank" rel="noopener noreferrer">Facebook</a>.
+              </p>}
             </section>
           </aside>
         </form>
