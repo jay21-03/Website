@@ -41,6 +41,7 @@ function handler(event) {
     /^\/blog\/[a-z0-9-]+$/.test(uri) ||
     /^\/products\/\d+$/.test(uri)
   ) {
+    if (uri === '/') request.uri = '/seo-home';
     cf.selectRequestOriginById('BackendElasticBeanstalkOrigin');
     return request;
   }

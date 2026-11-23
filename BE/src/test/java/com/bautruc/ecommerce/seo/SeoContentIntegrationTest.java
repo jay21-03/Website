@@ -1,6 +1,7 @@
 package com.bautruc.ecommerce.seo;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -61,6 +62,24 @@ class SeoContentIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("application/ld+json")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"@type\":\"Store\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("content=\"index,follow\"")));
+        mvc.perform(get("/seo-home"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"https://dangxembautruc.com/\"")));
+    }
+
+    @Test void savedShareImageWinsOverHomepageHeroInCrawlerHtml() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shell",
+                "<!doctype html><html><head><title>old</title></head><body><div id=\"root\"></div></body></html>");
+        org.springframework.test.util.ReflectionTestUtils.setField(seoPages, "shellExpires", Instant.now().plusSeconds(60));
+        jdbc.update("UPDATE site_media SET object_key = ?, content_type = 'image/jpeg', file_size_bytes = 100 WHERE slot = 'SEO_SHARE'",
+                "seo/share-test.jpg");
+        jdbc.update("INSERT INTO seo_metadata(path, image_slot, updated_at) VALUES ('/', 'SEO_SHARE', now()) " +
+                "ON CONFLICT (path) DO UPDATE SET image_slot = 'SEO_SHARE' ");
+        when(storage.publicUrl("seo/share-test.jpg")).thenReturn("https://images.example.com/share-test.jpg");
+        mvc.perform(get("/seo-home"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "property=\"og:image\" content=\"https://images.example.com/share-test.jpg\"")));
     }
 
     @Test void blogDraftIsPrivateAndPublishedPostAppearsInSitemap() throws Exception {

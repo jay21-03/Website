@@ -92,7 +92,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/blog", "/api/v1/blog/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/faq").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/seo/metadata").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/", "/san-pham", "/san-pham/*", "/products/*", "/trai-nghiem", "/ve-chung-toi", "/lien-he", "/faq", "/chinh-sach", "/blog", "/blog/*", "/sitemap.xml").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/seo-home", "/san-pham", "/san-pham/*", "/products/*", "/trai-nghiem", "/ve-chung-toi", "/lien-he", "/faq", "/chinh-sach", "/blog", "/blog/*", "/sitemap.xml").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/collections/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/workshops/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/support/settings").permitAll()

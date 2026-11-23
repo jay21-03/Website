@@ -76,7 +76,7 @@ public class SeoPageController {
         this.shellUri = URI.create(properties.frontendBaseUrl().replaceAll("/$", "") + "/index.html");
     }
 
-    @GetMapping(value = "/", produces = MediaType.TEXT_HTML_VALUE)
+    @GetMapping(value = {"/", "/seo-home"}, produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> home() {
         String heading = homepage.current().slogan().vi();
         var business = support.current();
@@ -225,7 +225,8 @@ public class SeoPageController {
                     nonblank(defaults.ogTitle(), configured.title() == null ? title : configured.title())));
             String ogDescription = escape(nonblank(configured.ogDescription(), dynamic ? description :
                     nonblank(defaults.ogDescription(), configured.description() == null ? description : configured.description())));
-            String ogImage = nonblank(image, metadata.imageUrl(nonblank(configured.imageSlot(), defaults.imageSlot())));
+            String sharedImage = metadata.imageUrl(nonblank(configured.imageSlot(), defaults.imageSlot()));
+            String ogImage = dynamic ? nonblank(image, sharedImage) : nonblank(sharedImage, image);
             if (path.startsWith("/blog/")) {
                 var post = blog.publicPost(path.substring(6));
                 ogTitle = escape(nonblank(post.ogTitle(), nonblank(post.seoTitle(), post.title())));
