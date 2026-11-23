@@ -99,7 +99,7 @@ Resources:
           };
           var canonical = redirects[uri.replace(/\/$/, '')] || uri;
 
-          if (host === 'www.dangxembautruc.com' || canonical !== uri) {
+          if ((host && host.toLowerCase() === 'www.dangxembautruc.com') || canonical !== uri) {
             var query = request.querystring || {};
             var parts = [];
             Object.keys(query).forEach(function (key) {
@@ -129,42 +129,27 @@ Resources:
               /^\/blog\/[a-z0-9-]+$/.test(uri) ||
               uri === '/sitemap.xml' ||
               ['/', '/san-pham', '/trai-nghiem', '/ve-chung-toi', '/lien-he', '/faq', '/chinh-sach', '/blog'].indexOf(uri) >= 0) {
+            if (uri === '/') request.uri = '/seo-home';
             cf.selectRequestOriginById('BackendElasticBeanstalkOrigin');
             return request;
           }
 
-          var pages = {
-            '/': true, '/san-pham': true, '/trai-nghiem': true,
-            '/lien-he': true, '/ve-chung-toi': true, '/faq': true,
-            '/chinh-sach': true, '/collections': true, '/about': true,
-            '/login': true, '/account': true, '/notifications': true,
-            '/cart': true, '/checkout': true, '/orders': true, '/admin': true
-          };
-          var categories = {
-            'binh-gom-trang-tri': true, 'tuong-gom-nghe-thuat': true,
-            'phu-dieu-mat-na-gom': true, 'mo-hinh-thap-cham': true,
-            'tieu-canh-gom-san-vuon': true, 'do-gom-gia-dung': true
-          };
-          if (uri.indexOf('/san-pham/') === 0 && categories[uri.substring(10)]) {
+          if (['/login', '/account', '/notifications', '/cart', '/checkout', '/orders', '/admin'].indexOf(uri) >= 0 ||
+              /^\/orders\/\d+$/.test(uri)) {
             request.uri = '/index.html';
             return request;
           }
-          if (uri.indexOf('.') === -1 && !pages[uri] && !/^\/(products|orders)\/\d+$/.test(uri)) {
-            return {
-              statusCode: 404,
-              statusDescription: 'Not Found',
-              headers: { 'content-type': { value: 'text/html; charset=utf-8' }, 'x-robots-tag': { value: 'noindex' } },
-              body: '<!doctype html><html lang="vi"><meta charset="utf-8"><title>Không tìm thấy trang</title><h1>Không tìm thấy trang</h1><a href="/">Về trang chủ</a></html>'
-            };
-          }
 
-          var lastSegment = uri.substring(uri.lastIndexOf('/') + 1);
+          if (uri === '/index.html' || uri === '/robots.txt' || uri === '/favicon.ico' ||
+              uri === '/favicon.svg' || uri === '/apple-touch-icon.png' ||
+              uri === '/google56aa56f6204ccb9e.html' || uri.indexOf('/assets/') === 0) return request;
 
-          if (uri === '/' || lastSegment.indexOf('.') === -1) {
-            request.uri = '/index.html';
-          }
-
-          return request;
+          return {
+            statusCode: 404,
+            statusDescription: 'Not Found',
+            headers: { 'content-type': { value: 'text/html; charset=utf-8' }, 'x-robots-tag': { value: 'noindex' } },
+            body: '<!doctype html><html lang="vi"><meta charset="utf-8"><title>Kh&ocirc;ng t&igrave;m th&#7845;y trang</title><main><h1>Kh&ocirc;ng t&igrave;m th&#7845;y trang</h1><a href="/">V&#7873; trang ch&#7911;</a></main></html>'
+          };
         }
 
   MainDistribution:
